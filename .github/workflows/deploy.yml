@@ -1,0 +1,302 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      service:
+        description: 'Service to deploy (leave empty for all)'
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+jobs:
+  determine-changes:
+    name: Determine Changes
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ steps.changes.outputs.gateway }}
+      people: ${{ steps.changes.outputs.people }}
+      accounts: ${{ steps.changes.outputs.accounts }}
+      pipeline: ${{ steps.changes.outputs.pipeline }}
+      automations: ${{ steps.changes.outputs.automations }}
+      packages: ${{ steps.changes.outputs.packages }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            gateway:
+              - 'services/gateway/**'
+              - 'packages/**'
+            people:
+              - 'services/people/**'
+              - 'packages/**'
+            accounts:
+              - 'services/accounts/**'
+              - 'packages/**'
+            pipeline:
+              - 'services/pipeline/**'
+              - 'packages/**'
+            automations:
+              - 'services/automations/**'
+              - 'packages/**'
+            packages:
+              - 'packages/**'
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [determine-changes]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm turbo build --filter='./packages/*'
+
+      - name: Build services
+        run: pnpm turbo build --filter='./services/*'
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            packages/*/dist
+            services/*/dist
+          retention-days: 1
+
+  deploy-gateway:
+    name: Deploy Gateway
+    runs-on: ubuntu-latest
+    needs: [build, determine-changes]
+    if: |
+      github.event.inputs.service == 'gateway' ||
+      github.event.inputs.service == '' && needs.determine-changes.outputs.gateway == 'true'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Cloudflare
+        run: pnpm --filter @creel/gateway deploy
+        env:
+          CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+  deploy-people:
+    name: Deploy People Service
+    runs-on: ubuntu-latest
+    needs: [build, determine-changes]
+    if: |
+      github.event.inputs.service == 'people' ||
+      github.event.inputs.service == '' && needs.determine-changes.outputs.people == 'true'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Cloudflare
+        run: pnpm --filter @creel/people deploy
+        env:
+          CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+  deploy-accounts:
+    name: Deploy Accounts Service
+    runs-on: ubuntu-latest
+    needs: [build, determine-changes]
+    if: |
+      github.event.inputs.service == 'accounts' ||
+      github.event.inputs.service == '' && needs.determine-changes.outputs.accounts == 'true'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Cloudflare
+        run: pnpm --filter @creel/accounts deploy
+        env:
+          CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+  deploy-pipeline:
+    name: Deploy Pipeline Service
+    runs-on: ubuntu-latest
+    needs: [build, determine-changes]
+    if: |
+      github.event.inputs.service == 'pipeline' ||
+      github.event.inputs.service == '' && needs.determine-changes.outputs.pipeline == 'true'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Cloudflare
+        run: pnpm --filter @creel/pipeline deploy
+        env:
+          CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+  deploy-automations:
+    name: Deploy Automations Service
+    runs-on: ubuntu-latest
+    needs: [build, determine-changes]
+    if: |
+      github.event.inputs.service == 'automations' ||
+      github.event.inputs.service == '' && needs.determine-changes.outputs.automations == 'true'
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy to Cloudflare
+        run: pnpm --filter @creel/automations deploy
+        env:
+          CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
+
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [deploy-gateway, deploy-people, deploy-accounts, deploy-pipeline, deploy-automations]
+    if: always()
+    steps:
+      - name: Check deployment status
+        run: |
+          if [[ "${{ needs.deploy-gateway.result }}" == "failure" ]] || \
+             [[ "${{ needs.deploy-people.result }}" == "failure" ]] || \
+             [[ "${{ needs.deploy-accounts.result }}" == "failure" ]] || \
+             [[ "${{ needs.deploy-pipeline.result }}" == "failure" ]] || \
+             [[ "${{ needs.deploy-automations.result }}" == "failure" ]]; then
+            echo "::error::One or more deployments failed"
+            exit 1
+          fi
+          echo "All deployments successful or skipped"

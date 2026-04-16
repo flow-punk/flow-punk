@@ -1,0 +1,58 @@
+services:
+  workspace:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+      - node_modules:/workspace/node_modules
+    ports:
+      - "8787:8787"
+      - "8788:8788"
+      - "8789:8789"
+      - "8790:8790"
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      typesense:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgres://creel:creel_dev@postgres:5432/creel_dev
+      - TYPESENSE_HOST=typesense
+      - TYPESENSE_PORT=8108
+      - TYPESENSE_API_KEY=creel_dev_key
+    command: sleep infinity
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: creel
+      POSTGRES_PASSWORD: creel_dev
+      POSTGRES_DB: creel_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U creel -d creel_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  typesense:
+    image: typesense/typesense:27.1
+    restart: unless-stopped
+    environment:
+      TYPESENSE_API_KEY: creel_dev_key
+      TYPESENSE_DATA_DIR: /data
+    volumes:
+      - typesense_data:/data
+    ports:
+      - "8108:8108"
+
+volumes:
+  postgres_data:
+  typesense_data:
+  node_modules:

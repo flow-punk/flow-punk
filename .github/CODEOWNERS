@@ -1,0 +1,36 @@
+# Creel CRM Code Owners
+#
+# These owners will be requested for review when someone opens a pull request
+# that modifies files they own.
+
+# Default owners for everything
+* @creel/core-team
+
+# Shared packages
+/packages/contracts/ @creel/core-team
+/packages/db/ @creel/core-team @creel/database-team
+/packages/service-utils/ @creel/core-team
+
+# Services
+/services/gateway/ @creel/platform-team
+/services/people/ @creel/crm-team
+/services/accounts/ @creel/crm-team
+/services/pipeline/ @creel/crm-team
+/services/automations/ @creel/platform-team @creel/crm-team
+
+# Frontend apps
+/apps/dashboard/ @creel/frontend-team
+
+# Infrastructure and CI/CD
+/.github/ @creel/platform-team
+/.devcontainer/ @creel/platform-team
+/wrangler.toml @creel/platform-team
+
+# Documentation
+/docs/ @creel/core-team
+
+# Root config files
+/package.json @creel/core-team
+/pnpm-workspace.yaml @creel/core-team
+/turbo.json @creel/core-team
+/tsconfig.base.json @creel/core-team

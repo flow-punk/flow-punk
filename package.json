@@ -1,0 +1,36 @@
+{
+  "name": "flow-punk",
+  "version": "0.0.1",
+  "private": true,
+  "description": "flow-punk",
+  "author": "Mark Zuppe",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "turbo build --concurrency=12",
+    "dev": "env $(cat .env 2>/dev/null | xargs) turbo dev --concurrency=12",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test && pnpm validate:architecture",
+    "validate:architecture": "node ./scripts/validate-architecture.mjs",
+    "clean": "turbo clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "db:generate": "pnpm --filter @flow-punk/db db:generate",
+    "db:migrate": "pnpm --filter @flow-punk/db db:migrate",
+    "db:studio": "pnpm --filter @flow-punk/db db:studio",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "turbo build --filter='./packages/*' && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.10",
+    "@types/node": "^20.17.10",
+    "prettier": "^3.4.2",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}

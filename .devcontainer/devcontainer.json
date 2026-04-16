@@ -1,0 +1,62 @@
+{
+  "name": "Creel Full Stack",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "workspace",
+  "workspaceFolder": "/workspace",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "postCreateCommand": "sudo chown -R node:node /workspace/node_modules && pnpm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "mikestead.dotenv",
+        "orta.vscode-jest"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "forwardPorts": [8787, 8788, 8789, 8790, 3000, 5432, 8108],
+  "portsAttributes": {
+    "8787": {
+      "label": "Gateway",
+      "onAutoForward": "notify"
+    },
+    "8788": {
+      "label": "People Service",
+      "onAutoForward": "silent"
+    },
+    "8789": {
+      "label": "Pipeline Service",
+      "onAutoForward": "silent"
+    },
+    "8790": {
+      "label": "Automations Service",
+      "onAutoForward": "silent"
+    },
+    "3000": {
+      "label": "Dashboard",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "8108": {
+      "label": "Typesense",
+      "onAutoForward": "silent"
+    }
+  },
+  "remoteEnv": {
+    "DATABASE_URL": "postgres://creel:creel_dev@postgres:5432/creel_dev",
+    "TYPESENSE_HOST": "typesense",
+    "TYPESENSE_PORT": "8108",
+    "TYPESENSE_API_KEY": "creel_dev_key"
+  }
+}
