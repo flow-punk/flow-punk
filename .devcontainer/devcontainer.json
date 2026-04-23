@@ -1,5 +1,5 @@
 {
-  "name": "Creel Full Stack",
+  "name": "Flowpunk Full Stack",
   "dockerComposeFile": "docker-compose.yml",
   "service": "workspace",
   "workspaceFolder": "/workspace",
@@ -54,9 +54,9 @@
     }
   },
   "remoteEnv": {
-    "DATABASE_URL": "postgres://creel:creel_dev@postgres:5432/creel_dev",
+    "DATABASE_URL": "postgres://flowpunk:flowpunk_dev@postgres:5432/flowpunk_dev",
     "TYPESENSE_HOST": "typesense",
     "TYPESENSE_PORT": "8108",
-    "TYPESENSE_API_KEY": "creel_dev_key"
+    "TYPESENSE_API_KEY": "flowpunk_dev_key"
   }
 }

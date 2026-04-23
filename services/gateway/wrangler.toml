@@ -1,0 +1,45 @@
+name = "gateway"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[vars]
+MAX_REQUEST_BODY_BYTES = "10485760"  # 10 MB
+SERVICE_TIMEOUT_MS = "10000"
+ALLOWED_ORIGINS = "http://localhost:4321,http://localhost:3000"
+
+[[kv_namespaces]]
+binding = "MCP_TOOLS_KV"
+id = "placeholder-mcp-tools-kv"
+
+[[durable_objects.bindings]]
+name = "MCP_SESSION_DO"
+class_name = "McpSessionDurableObject"
+
+[[migrations]]
+tag = "mcp-session-do-v1"
+new_sqlite_classes = ["McpSessionDurableObject"]
+
+# Service bindings
+[[services]]
+binding = "CONTACTS_SERVICE"
+service = "contacts"
+
+[[services]]
+binding = "PIPELINE_SERVICE"
+service = "pipeline"
+
+[[services]]
+binding = "AUTOMATIONS_SERVICE"
+service = "automations"
+
+[[services]]
+binding = "AUTH_SERVICE"
+service = "auth"
+
+[[services]]
+binding = "FORMINPUTS_SERVICE"
+service = "forminputs"
+
+[[services]]
+binding = "CMS_SERVICE"
+service = "cms"

@@ -1,36 +1,36 @@
-# Creel CRM Code Owners
+# Flowpunk CRM Code Owners
 #
 # These owners will be requested for review when someone opens a pull request
 # that modifies files they own.
 
 # Default owners for everything
-* @creel/core-team
+* @flowpunk/core-team
 
 # Shared packages
-/packages/contracts/ @creel/core-team
-/packages/db/ @creel/core-team @creel/database-team
-/packages/service-utils/ @creel/core-team
+/packages/contracts/ @flowpunk/core-team
+/packages/db/ @flowpunk/core-team @flowpunk/database-team
+/packages/service-utils/ @flowpunk/core-team
 
 # Services
-/services/gateway/ @creel/platform-team
-/services/people/ @creel/crm-team
-/services/accounts/ @creel/crm-team
-/services/pipeline/ @creel/crm-team
-/services/automations/ @creel/platform-team @creel/crm-team
+/services/gateway/ @flowpunk/platform-team
+/services/people/ @flowpunk/crm-team
+/services/accounts/ @flowpunk/crm-team
+/services/pipeline/ @flowpunk/crm-team
+/services/automations/ @flowpunk/platform-team @flowpunk/crm-team
 
 # Frontend apps
-/apps/dashboard/ @creel/frontend-team
+/apps/dashboard/ @flowpunk/frontend-team
 
 # Infrastructure and CI/CD
-/.github/ @creel/platform-team
-/.devcontainer/ @creel/platform-team
-/wrangler.toml @creel/platform-team
+/.github/ @flowpunk/platform-team
+/.devcontainer/ @flowpunk/platform-team
+/wrangler.toml @flowpunk/platform-team
 
 # Documentation
-/docs/ @creel/core-team
+/docs/ @flowpunk/core-team
 
 # Root config files
-/package.json @creel/core-team
-/pnpm-workspace.yaml @creel/core-team
-/turbo.json @creel/core-team
-/tsconfig.base.json @creel/core-team
+/package.json @flowpunk/core-team
+/pnpm-workspace.yaml @flowpunk/core-team
+/turbo.json @flowpunk/core-team
+/tsconfig.base.json @flowpunk/core-team

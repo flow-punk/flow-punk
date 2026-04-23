@@ -135,7 +135,7 @@ jobs:
           name: build-artifacts
 
       - name: Deploy to Cloudflare
-        run: pnpm --filter @creel/gateway deploy
+        run: pnpm --filter @flowpunk/gateway deploy
         env:
           CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
 
@@ -171,7 +171,7 @@ jobs:
           name: build-artifacts
 
       - name: Deploy to Cloudflare
-        run: pnpm --filter @creel/people deploy
+        run: pnpm --filter @flowpunk/people deploy
         env:
           CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
 
@@ -207,7 +207,7 @@ jobs:
           name: build-artifacts
 
       - name: Deploy to Cloudflare
-        run: pnpm --filter @creel/accounts deploy
+        run: pnpm --filter @flowpunk/accounts deploy
         env:
           CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
 
@@ -243,7 +243,7 @@ jobs:
           name: build-artifacts
 
       - name: Deploy to Cloudflare
-        run: pnpm --filter @creel/pipeline deploy
+        run: pnpm --filter @flowpunk/pipeline deploy
         env:
           CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
 
@@ -279,7 +279,7 @@ jobs:
           name: build-artifacts
 
       - name: Deploy to Cloudflare
-        run: pnpm --filter @creel/automations deploy
+        run: pnpm --filter @flowpunk/automations deploy
         env:
           CLOUDFLARE_ENV: ${{ github.event.inputs.environment || 'staging' }}
 

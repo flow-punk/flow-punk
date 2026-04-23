@@ -18,25 +18,25 @@ services:
       typesense:
         condition: service_started
     environment:
-      - DATABASE_URL=postgres://creel:creel_dev@postgres:5432/creel_dev
+      - DATABASE_URL=postgres://flowpunk:flowpunk_dev@postgres:5432/flowpunk_dev
       - TYPESENSE_HOST=typesense
       - TYPESENSE_PORT=8108
-      - TYPESENSE_API_KEY=creel_dev_key
+      - TYPESENSE_API_KEY=flowpunk_dev_key
     command: sleep infinity
 
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: creel
-      POSTGRES_PASSWORD: creel_dev
-      POSTGRES_DB: creel_dev
+      POSTGRES_USER: flowpunk
+      POSTGRES_PASSWORD: flowpunk_dev
+      POSTGRES_DB: flowpunk_dev
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U creel -d creel_dev"]
+      test: ["CMD-SHELL", "pg_isready -U flowpunk -d flowpunk_dev"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -45,7 +45,7 @@ services:
     image: typesense/typesense:27.1
     restart: unless-stopped
     environment:
-      TYPESENSE_API_KEY: creel_dev_key
+      TYPESENSE_API_KEY: flowpunk_dev_key
       TYPESENSE_DATA_DIR: /data
     volumes:
       - typesense_data:/data

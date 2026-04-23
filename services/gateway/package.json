@@ -1,0 +1,29 @@
+{
+  "name": "@flowpunk/gateway",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./middleware": "./src/middleware/index.ts",
+    "./rest": "./src/rest/handler.ts",
+    "./mcp": "./src/mcp/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir=dist",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@flowpunk/service-utils": "workspace:*",
+    "@flowpunk/tool-registry": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "typescript": "5.9.3",
+    "wrangler": "^4.22.0"
+  }
+}
