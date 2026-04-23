@@ -23,6 +23,7 @@ import type { AppContext, Env } from '../types.js';
 import type { SessionState } from './session-do.js';
 
 export const SESSION_HEADER = 'X-MCP-Session-Id';
+export const SESSION_MODE_HEADER = 'X-MCP-Session-Mode';
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
@@ -125,6 +126,9 @@ export async function handleMcp(ctx: AppContext): Promise<Response> {
   const sessionId = ctx.request.method === 'GET'
     ? (suppliedSessionId ?? generateSessionId())
     : suppliedSessionId;
+  const sessionMode = ctx.request.method === 'GET'
+    ? (suppliedSessionId ? 'reattach' : 'create')
+    : 'existing';
 
   if (!sessionId) {
     return new Response(
@@ -142,7 +146,7 @@ export async function handleMcp(ctx: AppContext): Promise<Response> {
   const stub = ctx.env.MCP_SESSION_DO.get(
     ctx.env.MCP_SESSION_DO.idFromName(sessionId),
   );
-  const headers = buildSessionForwardHeaders(ctx, sessionId);
+  const headers = buildSessionForwardHeaders(ctx, sessionId, sessionMode);
   const request = new Request('http://internal/mcp/session', {
     method: ctx.request.method,
     headers,
@@ -418,11 +422,16 @@ function downstreamToolsInvalidationFromHeaders(
   };
 }
 
-function buildSessionForwardHeaders(ctx: AppContext, sessionId: string): Headers {
+function buildSessionForwardHeaders(
+  ctx: AppContext,
+  sessionId: string,
+  sessionMode: 'create' | 'reattach' | 'existing',
+): Headers {
   const headers = new Headers();
   copyIdentityHeaders(ctx.request.headers, headers);
   headers.set(REQUEST_ID_HEADER, ctx.requestId);
   headers.set(SESSION_HEADER, sessionId);
+  headers.set(SESSION_MODE_HEADER, sessionMode);
 
   const contentType = ctx.request.headers.get('Content-Type');
   if (contentType) headers.set('Content-Type', contentType);

@@ -9,6 +9,7 @@
     "./rest": "./src/rest/handler.ts",
     "./mcp": "./src/mcp/index.ts",
     "./auth": "./src/auth/index.ts",
+    "./body-size": "./src/body-size.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

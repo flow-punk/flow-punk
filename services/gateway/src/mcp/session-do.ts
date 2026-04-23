@@ -2,6 +2,7 @@ import type { Env } from '../types.js';
 import { extractIdentityHeaders } from '../auth/identity-headers.js';
 import {
   SESSION_HEADER,
+  SESSION_MODE_HEADER,
   SSE_HEADERS,
   SESSION_IDLE_TIMEOUT_MS,
   createJsonRpcContext,
@@ -92,8 +93,21 @@ export class McpSessionDurableObject {
     }
 
     const now = new Date();
+    const sessionMode = request.headers.get(SESSION_MODE_HEADER);
     let session = await this.loadSession();
     if (!session) {
+      if (sessionMode === 'reattach') {
+        return new Response(
+          JSON.stringify({ error: 'unknown_session' }),
+          {
+            status: 404,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Request-ID': requestId,
+            },
+          },
+        );
+      }
       session = {
         sessionId,
         ...identity,

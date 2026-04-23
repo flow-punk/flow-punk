@@ -1,4 +1,5 @@
 import type { AppContext } from '../types.js';
+import { IDENTITY_HEADER_NAMES } from '../auth/identity-headers.js';
 import {
   BodyTooLargeError,
   declaredContentLengthTooLarge,
@@ -37,11 +38,11 @@ export async function handleRest(ctx: AppContext): Promise<Response> {
   const target = bindingForPath(new URL(ctx.request.url).pathname, ctx);
   if (!target) return new Response('Not Found', { status: 404 });
 
-  let forwardedRequest = ctx.request;
+  const headers = buildForwardHeaders(ctx.request.headers, ctx.requestId);
+  let forwardedRequest: Request;
   if (ctx.request.method !== 'GET' && ctx.request.method !== 'HEAD') {
     try {
       const body = await readRequestBytesWithinLimit(ctx.request, maxBytes);
-      const headers = new Headers(ctx.request.headers);
       headers.delete('Content-Length');
 
       forwardedRequest = new Request(ctx.request, {
@@ -54,17 +55,39 @@ export async function handleRest(ctx: AppContext): Promise<Response> {
       }
       throw error;
     }
+  } else {
+    forwardedRequest = new Request(ctx.request, { headers });
   }
 
   const response = await fetchWithServiceTimeout(
     target,
-    `http://internal${new URL(ctx.request.url).pathname}${new URL(ctx.request.url).search}`,
-    forwardedRequest,
+    new Request(
+      `http://internal${new URL(ctx.request.url).pathname}${new URL(ctx.request.url).search}`,
+      forwardedRequest,
+    ),
+    undefined,
     ctx.env.SERVICE_TIMEOUT_MS,
   );
 
   await invalidateToolsCacheIfRequired(response.headers, ctx);
   return response;
+}
+
+function buildForwardHeaders(
+  sourceHeaders: Headers,
+  requestId: string,
+): Headers {
+  const headers = new Headers();
+  const contentType = sourceHeaders.get('Content-Type');
+  if (contentType) headers.set('Content-Type', contentType);
+  headers.set('X-Request-ID', requestId);
+
+  for (const name of IDENTITY_HEADER_NAMES) {
+    const value = sourceHeaders.get(name);
+    if (value) headers.set(name, value);
+  }
+
+  return headers;
 }
 
 function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
