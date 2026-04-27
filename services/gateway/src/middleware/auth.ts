@@ -7,7 +7,28 @@ import {
   withIdentityHeaders,
 } from '../auth/identity-headers.js';
 import { unauthorized } from '../auth/unauthorized.js';
+import { validateSession } from '../auth/validate-session.js';
 import { isPublicPath, INDIE_PUBLIC_PATHS } from './public-paths.js';
+
+/**
+ * Paths where a `Cookie: fp_session=...` cookie is accepted as a credential
+ * on the indie edition.
+ *
+ * Indie's admin-REST surface is currently empty — its API-key management
+ * endpoints (the natural future consumer) ship with the future indie
+ * AUTH_SERVICE work, not in this plan. The session validator is wired
+ * here so future admin endpoints can opt in by adding their prefix.
+ *
+ * Sessions MUST NOT be accepted on `/mcp` — sessions are admin-REST-only
+ * (ADR-011 §MCP auth). This function returning `false` for `/mcp` is the
+ * first of two defenses; the second is `validateMcpSessionIdentity`'s
+ * runtime reject of `'session'` credential type.
+ */
+function isSessionAllowedPath(_pathname: string): boolean {
+  // No reachable admin-REST surface in indie yet. When indie AUTH_SERVICE
+  // ships, add its prefix here (e.g. `pathname.startsWith('/api/v1/admin/')`).
+  return false;
+}
 
 /**
  * Auth middleware (indie edition).
@@ -20,6 +41,33 @@ export const authMiddleware: Middleware = async (
   if (isPublicPath(url.pathname, INDIE_PUBLIC_PATHS)) {
     ctx.request = stripIdentityHeadersFromRequest(ctx.request);
     return next();
+  }
+
+  // Session-cookie path — admin-REST surface only (currently empty in indie).
+  // Runs before the API-key path so admin endpoints, when they ship, are
+  // session-only. On validation failure we fall through so a stale cookie
+  // alongside a valid API key still authenticates.
+  if (isSessionAllowedPath(url.pathname)) {
+    const session = await validateSession(ctx.env, ctx.request);
+    if (session) {
+      ctx.tenantId = session.tenantId;
+      ctx.userId = session.userId;
+      ctx.credentialId = session.credentialId;
+      ctx.credentialType = 'session';
+      ctx.scope = session.scope;
+
+      ctx.request = new Request(ctx.request, {
+        headers: withIdentityHeaders(ctx.request.headers, {
+          tenantId: session.tenantId,
+          userId: session.userId,
+          scope: session.scope,
+          credentialType: 'session',
+          credentialId: session.credentialId,
+        }),
+      });
+
+      return next();
+    }
   }
 
   const material = extractAuthMaterial(ctx.request);

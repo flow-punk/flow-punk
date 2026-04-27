@@ -7,10 +7,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
-  "dependencies": {},
+  "dependencies": {
+    "nanoid": "^5.0.7"
+  },
   "devDependencies": {
     "typescript": "5.9.3"
   }

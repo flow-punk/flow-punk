@@ -18,8 +18,21 @@ import {
   requestTooLargeResponse,
 } from '../body-size.js';
 import { fetchWithServiceTimeout } from '../fetch-with-timeout.js';
-import { hasToolExecutionScope } from '../auth/scope.js';
+import { hasToolExecutionScope, type CredentialScopeType } from '../auth/scope.js';
 import type { AppContext, Env } from '../types.js';
+import type { CredentialType } from '../auth/identity-headers.js';
+
+/**
+ * Narrow the wider trusted `CredentialType` to the MCP-accepted subset.
+ * Sessions are admin-REST-only and must never reach MCP — `validateMcpSessionIdentity`
+ * already rejects them at the entry point; this helper makes the narrowing
+ * type-safe for downstream MCP-only consumers.
+ */
+function narrowMcpCredentialType(
+  type: CredentialType | undefined,
+): CredentialScopeType | undefined {
+  return type === 'session' ? undefined : type;
+}
 import type { SessionState } from './session-do.js';
 
 export const SESSION_HEADER = 'X-MCP-Session-Id';
@@ -259,7 +272,7 @@ async function handleToolCall(
   }
 
   const requiredScope = adapter.requiredScopeForTool(toolName);
-  if (!hasToolExecutionScope(ctx.credentialType, ctx.scope, requiredScope)) {
+  if (!hasToolExecutionScope(narrowMcpCredentialType(ctx.credentialType), ctx.scope, requiredScope)) {
     return errorPayload(request.id ?? null, -32003, 'Insufficient scope', {
       requiredScope,
     });
@@ -475,6 +488,13 @@ export function validateMcpSessionIdentity(
     !identity.scope ||
     !identity.credentialId
   ) {
+    return null;
+  }
+
+  // Sessions are admin-REST-only, never valid for MCP. Path scoping in the
+  // gateway auth middleware should prevent stamping `'session'` on `/mcp`,
+  // but reject here as defense in depth (ADR-011 §MCP auth).
+  if (identity.credentialType === 'session') {
     return null;
   }
 
@@ -703,7 +723,7 @@ function createStaticGatewayToolAdapter(ctx: AppContext): McpToolAdapter {
     tenantId: ctx.tenantId,
     userId: ctx.userId,
     scope: ctx.scope,
-    credentialType: ctx.credentialType,
+    credentialType: narrowMcpCredentialType(ctx.credentialType),
   });
 }
 
@@ -715,7 +735,7 @@ function createDynamicGatewayToolAdapter(
     tenantId: ctx.tenantId,
     userId: ctx.userId,
     scope: ctx.scope,
-    credentialType: ctx.credentialType,
+    credentialType: narrowMcpCredentialType(ctx.credentialType),
     includeStaticCatalog: false,
     ...toolState,
   });

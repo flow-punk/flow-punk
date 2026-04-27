@@ -1,8 +1,25 @@
+/**
+ * Trusted credential type union.
+ *
+ * - `'apikey'` — `fpk_*` REST credentials, indie + managed.
+ * - `'oauth'` — `mcp_*` bearer tokens, managed only, MCP transport only.
+ * - `'session'` — cookie-backed session, admin-REST surface only. Never valid
+ *   on `/mcp` (enforced by both path scoping in gateway middleware and the
+ *   narrower `MCP_CREDENTIAL_TYPES` alias used by MCP-side scope helpers).
+ */
+export type CredentialType = 'apikey' | 'oauth' | 'session';
+
+/**
+ * Subset of `CredentialType` accepted on the MCP transport. Sessions are
+ * deliberately excluded — see ADR-011 §MCP auth and `auth.ts` path scoping.
+ */
+export type McpCredentialType = Exclude<CredentialType, 'session'>;
+
 export interface IdentityHeaderValues {
   tenantId: string;
   userId: string;
   scope: string;
-  credentialType: 'apikey' | 'oauth';
+  credentialType: CredentialType;
   credentialId?: string;
   clientId?: string;
 }
@@ -62,7 +79,9 @@ export function extractIdentityHeaders(
     !tenantId ||
     !userId ||
     !scope ||
-    (credentialType !== 'apikey' && credentialType !== 'oauth')
+    (credentialType !== 'apikey' &&
+      credentialType !== 'oauth' &&
+      credentialType !== 'session')
   ) {
     return null;
   }
@@ -76,6 +95,17 @@ export function extractIdentityHeaders(
     clientId: src.get('X-Client-Id') ?? undefined,
   };
 }
+
+/**
+ * Headers that the gateway forwards to downstream services on REST routes,
+ * in addition to identity headers and `Content-Type` / `X-Request-ID`.
+ *
+ * Add to this list when a downstream service needs a new gateway-preserved
+ * header. Keep alphabetical for diff sanity.
+ */
+export const REST_FORWARDED_REQUEST_HEADERS = [
+  'X-Idempotency-Key',
+] as const;
 
 export function copyIdentityHeaders(
   src: Headers,

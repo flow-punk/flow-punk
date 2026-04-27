@@ -6,7 +6,7 @@ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface CredentialDescriptor {
   credentialId: string;
-  credentialType: 'apikey' | 'oauth';
+  credentialType: 'apikey' | 'oauth' | 'session';
   keyLabel?: string | null;
 }
 

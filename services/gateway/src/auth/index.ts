@@ -17,11 +17,21 @@ export { sha256Hex } from './sha256.js';
 export { validateApiKey } from './validate-apikey.js';
 export type { ValidatedIdentity } from './validate-apikey.js';
 export {
+  copyIdentityHeaders,
+  extractIdentityHeaders,
+  IDENTITY_HEADER_NAMES,
+  REST_FORWARDED_REQUEST_HEADERS,
   stripIdentityHeaders,
   stripIdentityHeadersFromRequest,
   withIdentityHeaders,
 } from './identity-headers.js';
-export type { IdentityHeaderValues } from './identity-headers.js';
+export type {
+  CredentialType,
+  IdentityHeaderValues,
+  McpCredentialType,
+} from './identity-headers.js';
+export { buildCookie, clearCookie, parseCookies } from './cookies.js';
+export type { BuildCookieOptions } from './cookies.js';
 export { unauthorized } from './unauthorized.js';
 export type { UnauthorizedOptions } from './unauthorized.js';
 export { authMiddleware } from '../middleware/auth.js';

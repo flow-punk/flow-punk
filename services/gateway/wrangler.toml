@@ -11,6 +11,20 @@ ALLOWED_ORIGINS = "http://localhost:4321,http://localhost:3000"
 binding = "MCP_TOOLS_KV"
 id = "placeholder-mcp-tools-kv"
 
+[[kv_namespaces]]
+binding = "MCP_SESSIONS_KV"
+id = "placeholder-mcp-sessions-kv"
+
+# Indie platform DB — single bound D1 per ADR-011 §Tenancy. Carries
+# `users` (multi-user, single-admin) and `mcp_sessions` for cookie-backed
+# session auth on the admin-REST surface. Future indie AUTH_SERVICE will
+# bind this same DB via service binding rather than getting its own D1.
+[[d1_databases]]
+binding = "DB"
+database_name = "flowpunk-indie"
+database_id = "placeholder-flowpunk-indie-db"
+migrations_dir = "../../packages/db/migrations"
+
 [[durable_objects.bindings]]
 name = "MCP_SESSION_DO"
 class_name = "McpSessionDurableObject"

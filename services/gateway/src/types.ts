@@ -9,13 +9,19 @@ export interface Env {
 
   // KV namespaces
   MCP_TOOLS_KV: KVNamespace;
+  MCP_SESSIONS_KV: KVNamespace;
   MCP_SESSION_DO: DurableObjectNamespace;
+
+  // D1 — indie platform DB (users, mcp_sessions)
+  DB: D1Database;
 
   // Configuration
   MAX_REQUEST_BODY_BYTES: string;
   SERVICE_TIMEOUT_MS: string;
   ALLOWED_ORIGINS: string;
 }
+
+import type { CredentialType } from './auth/identity-headers.js';
 
 export interface AppContext {
   request: Request;
@@ -24,7 +30,7 @@ export interface AppContext {
   tenantId?: string;
   userId?: string;
   credentialId?: string;
-  credentialType?: 'apikey' | 'oauth';
+  credentialType?: CredentialType;
   keyLabel?: string | null;
   scope?: string;
 }

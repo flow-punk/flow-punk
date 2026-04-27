@@ -1,5 +1,8 @@
 import type { AppContext } from '../types.js';
-import { IDENTITY_HEADER_NAMES } from '../auth/identity-headers.js';
+import {
+  IDENTITY_HEADER_NAMES,
+  REST_FORWARDED_REQUEST_HEADERS,
+} from '../auth/identity-headers.js';
 import {
   BodyTooLargeError,
   declaredContentLengthTooLarge,
@@ -24,6 +27,11 @@ import { invalidateToolsCacheIfRequired } from '../mcp/index.js';
  *   /api/v1/forms/*       → FORMINPUTS_SERVICE
  *   /api/v1/collections/* → CMS_SERVICE
  *   /api/v1/entries/*     → CMS_SERVICE
+ *   /api/v1/shopify/*     → SHOPIFY_SERVICE  (managed-only)
+ *   /api/v1/tenants/*     → TENANTS_SERVICE  (managed-only)
+ *
+ * Managed-only routes are resolved via a typed cast over `ctx.env`; the
+ * binding is null when running indie standalone.
  *
  * Enforces request-size check (MAX_REQUEST_BODY_BYTES) before body read/forward.
  * Forwards as http://internal{path}{query} — no external DNS, no TLS overhead.
@@ -86,6 +94,10 @@ function buildForwardHeaders(
     const value = sourceHeaders.get(name);
     if (value) headers.set(name, value);
   }
+  for (const name of REST_FORWARDED_REQUEST_HEADERS) {
+    const value = sourceHeaders.get(name);
+    if (value) headers.set(name, value);
+  }
 
   return headers;
 }
@@ -125,9 +137,16 @@ function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
 
   const managedEnv = ctx.env as AppContext['env'] & {
     SHOPIFY_SERVICE?: Fetcher;
+    TENANTS_SERVICE?: Fetcher;
   };
   if (pathname.startsWith('/api/v1/shopify/')) {
     return managedEnv.SHOPIFY_SERVICE ?? null;
+  }
+  if (
+    pathname === '/api/v1/tenants' ||
+    pathname.startsWith('/api/v1/tenants/')
+  ) {
+    return managedEnv.TENANTS_SERVICE ?? null;
   }
 
   return null;

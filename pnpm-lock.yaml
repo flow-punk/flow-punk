@@ -25,6 +25,16 @@ importers:
         version: 5.9.3
 
   packages/service-utils:
+    dependencies:
+      nanoid:
+        specifier: ^5.0.7
+        version: 5.1.9
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/tool-registry:
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -35,6 +45,9 @@ importers:
       '@flowpunk/service-utils':
         specifier: workspace:*
         version: link:../../packages/service-utils
+      '@flowpunk/tool-registry':
+        specifier: workspace:*
+        version: link:../../packages/tool-registry
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20250620.0
@@ -726,6 +739,11 @@ packages:
   mri@1.2.0:
     resolution: {integrity: sha512-tzzskb3bG8LvYGFF/mDTpq3jpI6Q9wc3LEmBaghu+DdCssd1FakN7Bc0hVNmEyGq1bq3RgfkCb3cmQLpNPOroA==}
     engines: {node: '>=4'}
+
+  nanoid@5.1.9:
+    resolution: {integrity: sha512-ZUvP7KeBLe3OZ1ypw6dI/TzYJuvHP77IM4Ry73waSQTLn8/g8rpdjfyVAh7t1/+FjBtG4lCP42MEbDxOsRpBMw==}
+    engines: {node: ^18 || >=20}
+    hasBin: true
 
   outdent@0.5.0:
     resolution: {integrity: sha512-/jHxFIzoMXdqPzTaCpFzAAWhpkSjZPF4Vsn6jAfNpmbH/ymsmd7Qc6VE9BGn0L6YMj6uwpQLxCECpus4ukKS9Q==}
@@ -1566,6 +1584,8 @@ snapshots:
       - utf-8-validate
 
   mri@1.2.0: {}
+
+  nanoid@5.1.9: {}
 
   outdent@0.5.0: {}
 

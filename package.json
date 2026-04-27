@@ -15,6 +15,7 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
+    "db:migrate": "pnpm -F @flowpunk-indie/db drizzle-kit migrate",
     "clean": "turbo clean && rm -rf node_modules",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
@@ -26,6 +27,7 @@
     "@changesets/cli": "2.31.0",
     "@types/node": "20.19.39",
     "prettier": "3.8.3",
+    "tsx": "^4.21.0",
     "turbo": "2.9.6",
     "typescript": "5.9.3"
   }
