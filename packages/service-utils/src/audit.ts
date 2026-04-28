@@ -22,7 +22,7 @@ import type { Logger } from './logger.js';
 interface AuditEventCommon {
   actorId: string;
   actorTenantId: string;
-  actorCredentialType: 'apikey' | 'oauth' | 'session';
+  actorCredentialType: 'apikey' | 'oauth' | 'session' | 'system';
   resourceType: string;
   resourceId: string;
   /** Optional tenant the action targets (may differ from actorTenantId for
