@@ -15,6 +15,7 @@ AI-powered CRM platform built on Cloudflare Workers. In this checkout, the indie
 | Service | Service Path | API Docs |
 |---------|-------------|----------|
 | Gateway | `services/gateway/` | `../managed/docs/services/gateway.md` |
+| Contacts | `services/contacts/` | `../managed/docs/services/contacts.md` |
 
 ### Packages
 

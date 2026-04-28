@@ -107,9 +107,11 @@ function buildForwardHeaders(
   return headers;
 }
 
-function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
+export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
   if (
+    pathname === '/api/v1/people' ||
     pathname.startsWith('/api/v1/people/') ||
+    pathname === '/api/v1/accounts' ||
     pathname.startsWith('/api/v1/accounts/')
   ) {
     return ctx.env.CONTACTS_SERVICE;

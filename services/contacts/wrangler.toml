@@ -1,0 +1,24 @@
+name = "contacts"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[dev]
+ip = "127.0.0.1"
+port = 8788
+inspector_port = 9788
+
+# Indie platform DB — same `flowpunk-indie` D1 the gateway binds (ADR-011
+# §Tenancy: indie is single-D1). Phase 2 does not query it; declared so the
+# Phase 3 accounts entity work doesn't require a wrangler change.
+[[d1_databases]]
+binding = "DB"
+database_name = "flowpunk-indie"
+database_id = "placeholder-flowpunk-indie-db"
+migrations_dir = "../../packages/db/migrations"
+
+# Idempotency cache for mutation handlers — keyed per
+# (tenant, user, method, path, idempotency-key) with body-hash binding.
+# Default TTL 24h. See @flowpunk/service-utils withIdempotency.
+[[kv_namespaces]]
+binding = "IDEMPOTENCY_KV"
+id = "placeholder-contacts-idempotency-kv"
