@@ -22,22 +22,46 @@
       }
     }
   },
-  "forwardPorts": [8787, 8788, 8789, 8790, 3000, 5432, 8108],
+  "forwardPorts": [8787, 8788, 8789, 8790, 8800, 8801, 8802, 8803, 8850, 8900, 3000, 5432, 8108],
   "portsAttributes": {
     "8787": {
       "label": "Gateway",
       "onAutoForward": "notify"
     },
     "8788": {
-      "label": "People Service",
+      "label": "People Service (indie)",
       "onAutoForward": "silent"
     },
     "8789": {
-      "label": "Pipeline Service",
+      "label": "Pipeline Service (indie)",
       "onAutoForward": "silent"
     },
     "8790": {
-      "label": "Automations Service",
+      "label": "Automations Service (indie)",
+      "onAutoForward": "silent"
+    },
+    "8800": {
+      "label": "Tenant Router shard 1 (managed)",
+      "onAutoForward": "silent"
+    },
+    "8801": {
+      "label": "Tenant Router shard 2 (managed)",
+      "onAutoForward": "silent"
+    },
+    "8802": {
+      "label": "Tenant Router shard 3 (managed)",
+      "onAutoForward": "silent"
+    },
+    "8803": {
+      "label": "Tenant Router shard 4 (managed)",
+      "onAutoForward": "silent"
+    },
+    "8850": {
+      "label": "Provisioner (managed)",
+      "onAutoForward": "silent"
+    },
+    "8900": {
+      "label": "Tenants (managed)",
       "onAutoForward": "silent"
     },
     "3000": {
