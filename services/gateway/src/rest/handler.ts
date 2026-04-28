@@ -53,9 +53,14 @@ export async function handleRest(ctx: AppContext): Promise<Response> {
       const body = await readRequestBytesWithinLimit(ctx.request, maxBytes);
       headers.delete('Content-Length');
 
-      forwardedRequest = new Request(ctx.request, {
+      // Construct from URL+init (not from ctx.request) so we don't fall back
+      // to ctx.request.body — which readRequestBytesWithinLimit just consumed.
+      // For empty bodies use `null`, not `new Uint8Array(0)`, so we forward
+      // "no body" rather than a present zero-length body stream.
+      forwardedRequest = new Request(ctx.request.url, {
+        method: ctx.request.method,
         headers,
-        body: body.byteLength === 0 ? undefined : body,
+        body: body.byteLength === 0 ? null : body,
       });
     } catch (error) {
       if (error instanceof BodyTooLargeError) {
