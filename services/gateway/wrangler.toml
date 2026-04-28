@@ -2,6 +2,11 @@ name = "gateway"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
 
+[dev]
+ip = "127.0.0.1"
+port = 8787
+inspector_port = 9787
+
 [vars]
 MAX_REQUEST_BODY_BYTES = "10485760"  # 10 MB
 SERVICE_TIMEOUT_MS = "10000"
