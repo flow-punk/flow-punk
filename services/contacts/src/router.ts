@@ -1,6 +1,11 @@
 import type { Logger } from '@flowpunk/service-utils';
 import { withIdempotency } from '@flowpunk/service-utils';
 
+import { handleCreateAccount } from './handlers/accounts/create.js';
+import { handleGetAccount } from './handlers/accounts/get.js';
+import { handleListAccounts } from './handlers/accounts/list.js';
+import { handleSoftDeleteAccount } from './handlers/accounts/softDelete.js';
+import { handleUpdateAccount } from './handlers/accounts/update.js';
 import { parseIdentity } from './middleware/identity.js';
 import type { Actor, ContactsEnv } from './types.js';
 
@@ -11,7 +16,7 @@ const PEOPLE_ITEM_PREFIX = '/api/v1/people/';
 
 export async function route(
   request: Request,
-  _env: ContactsEnv,
+  env: ContactsEnv,
   _logger?: Logger,
 ): Promise<Response> {
   const url = new URL(request.url);
@@ -30,9 +35,43 @@ export async function route(
   const actor = parseIdentity(request);
   if (!actor) return unauthenticated();
 
+  // /api/v1/accounts collection
+  if (pathname === ACCOUNTS_COLLECTION_PATH) {
+    if (method === 'GET' || method === 'HEAD') {
+      return handleListAccounts(request, env, actor);
+    }
+    if (method === 'POST') {
+      return idempotent(request, env, actor, () =>
+        handleCreateAccount(request, env, actor),
+      );
+    }
+    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+  }
+
+  // /api/v1/accounts/:id item
+  if (pathname.startsWith(ACCOUNTS_ITEM_PREFIX)) {
+    const id = pathname.slice(ACCOUNTS_ITEM_PREFIX.length);
+    // Reject sub-resource paths until they are explicitly added (e.g.
+    // `/accounts/:id/people` would land here unrouted otherwise).
+    if (id.length === 0 || id.includes('/')) return notFound();
+
+    if (method === 'GET' || method === 'HEAD') {
+      return handleGetAccount(request, env, actor, id);
+    }
+    if (method === 'PATCH') {
+      return idempotent(request, env, actor, () =>
+        handleUpdateAccount(request, env, actor, id),
+      );
+    }
+    if (method === 'DELETE') {
+      return idempotent(request, env, actor, () =>
+        handleSoftDeleteAccount(request, env, actor, id),
+      );
+    }
+    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+  }
+
   if (
-    pathname === ACCOUNTS_COLLECTION_PATH ||
-    pathname.startsWith(ACCOUNTS_ITEM_PREFIX) ||
     pathname === PEOPLE_COLLECTION_PATH ||
     pathname.startsWith(PEOPLE_ITEM_PREFIX)
   ) {
@@ -45,9 +84,7 @@ export async function route(
 /**
  * Wrap a mutation handler in `withIdempotency` keyed per
  * `${tenantId}:${userId}` so two requests with the same `Idempotency-Key`
- * from the same actor de-dupe to a single side-effect. Phase 2 has no
- * mutation handlers; this helper is exported so Phase 3 can use it
- * verbatim.
+ * from the same actor de-dupe to a single side-effect.
  */
 export function idempotent(
   request: Request,

@@ -8,15 +8,18 @@
     "build": "wrangler deploy --dry-run --outdir=dist",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@flowpunk-indie/db": "workspace:*",
     "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",
     "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250620.0",
+    "tsx": "^4.19.2",
     "typescript": "5.9.3",
     "wrangler": "^4.22.0"
   }

@@ -62,6 +62,25 @@ export type AuditEvent =
         bindingName: string;
         d1DatabaseId: string;
       };
+    })
+  | (AuditEventCommon & {
+      action: 'accounts.created';
+      // Non-PII fixed-format fields only. `country` is ISO alpha-2 (regex
+      // bounded). Free-form caller-controlled strings (e.g. `industry`)
+      // are deliberately excluded — an operator could otherwise stuff PII
+      // into them and bypass the action-typed allowlist guarantee.
+      detail: { country?: string };
+    })
+  | (AuditEventCommon & {
+      action: 'accounts.updated';
+      // Column NAMES only — never the new values, since values may be PII.
+      // Names are derived from a fixed allowlist (`ALLOWED_PATCH_FIELDS` in
+      // `@flowpunk-indie/db`) so unknown/forged keys cannot leak in.
+      detail: { fieldsChanged: string[] };
+    })
+  | (AuditEventCommon & {
+      action: 'accounts.softDeleted';
+      detail: Record<string, never>;
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {

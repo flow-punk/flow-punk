@@ -1,8 +1,13 @@
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
+import type { AuditEvent, Logger } from '@flowpunk/service-utils';
+import { AccountsRepoError } from '@flowpunk-indie/db';
 
-import type { ContactsEnv } from '../types.js';
+import type { Actor, ContactsEnv } from '../types.js';
 
-export function getDb(env: ContactsEnv) {
+export type Db = DrizzleD1Database<Record<string, never>>;
+
+export function getDb(env: ContactsEnv): Db {
   return drizzle(env.DB);
 }
 
@@ -84,4 +89,53 @@ export async function requireJsonBody<T>(
 
 export function isString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+/**
+ * Map AccountsRepoError to HTTP. Non-repo errors are rethrown so the
+ * top-level fetch handler logs them as INTERNAL_ERROR. 500s never include
+ * the underlying message in the response body.
+ */
+export function mapRepoError(err: unknown): Response {
+  if (!(err instanceof AccountsRepoError)) throw err;
+  switch (err.code) {
+    case 'not_found':
+      return errorResponse(404, 'NOT_FOUND', err.message);
+    case 'invalid_input':
+      return errorResponse(400, 'INVALID_INPUT', err.message);
+    case 'wrong_state':
+      return errorResponse(409, 'WRONG_STATE', err.message);
+    case 'invariant_violation': {
+      const logger = createLogger({ service: 'contacts' });
+      logger.error('accounts repo invariant violation', {
+        error: err,
+        repoCode: err.code,
+      });
+      return errorResponse(500, 'INTERNAL_ERROR');
+    }
+  }
+}
+
+export type ContactsAuditEventInput = Omit<
+  AuditEvent,
+  'actorId' | 'actorTenantId' | 'actorCredentialType'
+>;
+
+/**
+ * Project the cleared actor onto a contacts-domain audit event and emit
+ * via the shared `emitAuditEvent` helper. Today this is a structured
+ * `audit.event` log line; queue fan-out is deferred (see ADR-007 addendum).
+ */
+export function emitContactsAudit(
+  actor: Actor,
+  event: ContactsAuditEventInput,
+  logger?: Logger,
+): void {
+  const log = logger ?? createLogger({ service: 'contacts' });
+  emitAuditEvent(log, {
+    ...event,
+    actorId: actor.userId,
+    actorTenantId: actor.tenantId,
+    actorCredentialType: actor.credentialType,
+  } as AuditEvent);
 }
