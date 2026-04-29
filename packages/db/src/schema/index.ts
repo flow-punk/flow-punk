@@ -23,3 +23,25 @@ export {
   type EmailConsent,
   type NewPerson,
 } from './persons.js';
+export {
+  pipelines,
+  type Pipeline,
+  type PipelineStatus,
+  type PipelinePatchableField,
+  type NewPipeline,
+} from './pipelines.js';
+export {
+  stages,
+  type Stage,
+  type StageStatus,
+  type StageTerminalKind,
+  type StagePatchableField,
+  type NewStage,
+} from './stages.js';
+export {
+  deals,
+  type Deal,
+  type DealStatus,
+  type DealPatchableField,
+  type NewDeal,
+} from './deals.js';

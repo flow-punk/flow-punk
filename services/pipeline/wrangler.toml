@@ -1,0 +1,23 @@
+name = "pipeline"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[dev]
+ip = "127.0.0.1"
+port = 8790
+inspector_port = 9790
+
+# Indie platform DB — same `flowpunk-indie` D1 the gateway and contacts bind
+# (ADR-011 §Tenancy: indie is single-D1).
+[[d1_databases]]
+binding = "DB"
+database_name = "flowpunk-indie"
+database_id = "placeholder-flowpunk-indie-db"
+migrations_dir = "../../packages/db/migrations"
+
+# Idempotency cache for mutation handlers — keyed per
+# (tenant, user, method, path, idempotency-key) with body-hash binding.
+# Default TTL 24h. See @flowpunk/service-utils withIdempotency.
+[[kv_namespaces]]
+binding = "IDEMPOTENCY_KV"
+id = "placeholder-pipeline-idempotency-kv"

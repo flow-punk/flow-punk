@@ -118,8 +118,11 @@ export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | nul
     return ctx.env.CONTACTS_SERVICE;
   }
   if (
+    pathname === '/api/v1/deals' ||
     pathname.startsWith('/api/v1/deals/') ||
+    pathname === '/api/v1/pipelines' ||
     pathname.startsWith('/api/v1/pipelines/') ||
+    pathname === '/api/v1/stages' ||
     pathname.startsWith('/api/v1/stages/')
   ) {
     return ctx.env.PIPELINE_SERVICE;
