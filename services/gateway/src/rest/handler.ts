@@ -27,6 +27,7 @@ import { invalidateToolsCacheIfRequired } from '../mcp/index.js';
  *   /api/v1/forms/*       → FORMINPUTS_SERVICE
  *   /api/v1/collections/* → CMS_SERVICE
  *   /api/v1/entries/*     → CMS_SERVICE
+ *   /api/v1/users/*       → USERS_SERVICE
  *   /api/v1/shopify/*     → SHOPIFY_SERVICE  (managed-only)
  *   /api/v1/tenants/*     → TENANTS_SERVICE  (managed-only)
  *
@@ -140,6 +141,12 @@ export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | nul
   }
   if (pathname.startsWith('/api/v1/auth/')) {
     return ctx.env.AUTH_SERVICE;
+  }
+  if (
+    pathname === '/api/v1/users' ||
+    pathname.startsWith('/api/v1/users/')
+  ) {
+    return ctx.env.USERS_SERVICE;
   }
 
   const managedEnv = ctx.env as AppContext['env'] & {

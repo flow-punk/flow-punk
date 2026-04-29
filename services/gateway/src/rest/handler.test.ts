@@ -16,6 +16,7 @@ function makeCtx(): AppContext {
     AUTH_SERVICE: { tag: 'AUTH_SERVICE' } as unknown as Fetcher,
     FORMINPUTS_SERVICE: { tag: 'FORMINPUTS_SERVICE' } as unknown as Fetcher,
     CMS_SERVICE: { tag: 'CMS_SERVICE' } as unknown as Fetcher,
+    USERS_SERVICE: { tag: 'USERS_SERVICE' } as unknown as Fetcher,
   };
   const env = {
     ...sentinels,
@@ -66,5 +67,20 @@ test('bindingForPath returns null for /api/v1/accountsX (no false-positive prefi
 
 test('bindingForPath returns null for /unknown', () => {
   const binding = bindingForPath('/unknown', makeCtx());
+  assert.equal(binding, null);
+});
+
+test('bindingForPath dispatches /api/v1/users (collection) to USERS_SERVICE', () => {
+  const binding = bindingForPath('/api/v1/users', makeCtx());
+  assert.equal((binding as unknown as { tag: string }).tag, 'USERS_SERVICE');
+});
+
+test('bindingForPath dispatches /api/v1/users/usr_abc (item) to USERS_SERVICE', () => {
+  const binding = bindingForPath('/api/v1/users/usr_abc', makeCtx());
+  assert.equal((binding as unknown as { tag: string }).tag, 'USERS_SERVICE');
+});
+
+test('bindingForPath returns null for /api/v1/usersX (no false-positive prefix match)', () => {
+  const binding = bindingForPath('/api/v1/usersX', makeCtx());
   assert.equal(binding, null);
 });

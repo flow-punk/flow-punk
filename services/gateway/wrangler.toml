@@ -62,3 +62,7 @@ service = "forminputs"
 [[services]]
 binding = "CMS_SERVICE"
 service = "cms"
+
+[[services]]
+binding = "USERS_SERVICE"
+service = "users"

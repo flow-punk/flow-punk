@@ -75,14 +75,19 @@ export async function validateSession(
   if (row.revokedAt) return null;
   if (!isStillValid(row.expiresAt)) return null;
 
+  // Admin gate AND active-status gate. `includeDeleted: true` so the
+  // soft-delete check is explicit (defense in depth alongside the cascade
+  // in `usersRepo.softDelete` that revokes mcp_sessions on delete). A
+  // soft-deleted admin must not authenticate even if their session row
+  // wasn't successfully revoked during cascade.
   let user: Awaited<ReturnType<typeof usersRepo.findById>>;
   try {
     const db = drizzle(env.DB);
-    user = await usersRepo.findById(db, row.userId);
+    user = await usersRepo.findById(db, row.userId, { includeDeleted: true });
   } catch {
     return null;
   }
-  if (!user || !user.isAdmin) return null;
+  if (!user || !user.isAdmin || user.status !== 'active') return null;
 
   const identity: SessionIdentity = {
     tenantId: row.tenantId,

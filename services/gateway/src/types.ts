@@ -6,6 +6,7 @@ export interface Env {
   AUTH_SERVICE: Fetcher;
   FORMINPUTS_SERVICE: Fetcher;
   CMS_SERVICE: Fetcher;
+  USERS_SERVICE: Fetcher;
 
   // KV namespaces
   MCP_TOOLS_KV: KVNamespace;

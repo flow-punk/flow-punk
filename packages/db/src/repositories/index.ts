@@ -4,6 +4,16 @@ export * as personsRepo from './persons.js';
 export * as usersRepo from './users.js';
 export { AccountsRepoError } from './accounts.js';
 export { PersonsRepoError } from './persons.js';
+export { UsersRepoError } from './users.js';
+export type {
+  CreateUserInput,
+  CreateUserOptions,
+  ListOptions as UsersListOptions,
+  ListResult as UsersListResult,
+  UpdateUserOptions,
+  UpdateUserPatch,
+  UpdateResult as UsersUpdateResult,
+} from './users.js';
 export type {
   CreateAccountInput,
   CursorPayload,

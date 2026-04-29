@@ -167,7 +167,7 @@ function runWrangler(args: string[], captureStdout = false): WranglerResult {
 }
 
 function adminUserExists(mode: ParsedArgs['mode'], userId: string): boolean {
-  const sql = `SELECT id FROM users WHERE id = '${escapeSqlLiteral(userId)}' AND is_admin = 1`;
+  const sql = `SELECT id FROM users WHERE id = '${escapeSqlLiteral(userId)}' AND is_admin = 1 AND status = 'active'`;
   const result = runWrangler(
     [mode, ...persistFlags(mode), '--json', '--command', sql],
     true,
@@ -208,7 +208,13 @@ async function main(): Promise<void> {
   const sessionId = generateId('sess');
 
   if (!skipUserInsert) {
-    const userSql = `INSERT OR IGNORE INTO users (id, is_admin, created_at, updated_at) VALUES ('${escapeSqlLiteral(userId)}', 1, '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
+    // Bootstrap defaults for the operator row. `email` and `display_name`
+    // are NOT NULL (added alongside the users CRUD work); the bootstrap
+    // values can be PATCHed by the operator through `/api/v1/users/<id>`
+    // once the gateway is up and a session cookie is set.
+    const email = `admin+${userId}@example.invalid`;
+    const displayName = 'Operator';
+    const userSql = `INSERT OR IGNORE INTO users (id, email, display_name, is_admin, status, created_at, updated_at) VALUES ('${escapeSqlLiteral(userId)}', '${escapeSqlLiteral(email)}', '${escapeSqlLiteral(displayName)}', 1, 'active', '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
     const userResult = runWrangler([
       args.mode,
       ...persistFlags(args.mode),

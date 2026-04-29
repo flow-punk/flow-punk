@@ -103,6 +103,25 @@ export type AuditEvent =
   | (AuditEventCommon & {
       action: 'persons.softDeleted';
       detail: Record<string, never>;
+    })
+  | (AuditEventCommon & {
+      action: 'users.created';
+      // `isAdmin` is a non-PII boolean; `email` and `displayName` are
+      // pii()-marked at the schema layer and stay off the structured log
+      // surface. Names of patchable fields are sufficient for replay.
+      detail: { isAdmin: boolean };
+    })
+  | (AuditEventCommon & {
+      action: 'users.updated';
+      // Column NAMES only — never the new values, since values include
+      // pii()-marked columns (email, displayName, firstName, lastName).
+      // Names are derived from a fixed allowlist (`ALLOWED_PATCH_FIELDS`
+      // in `@flowpunk-indie/db`) so unknown/forged keys cannot leak in.
+      detail: { fieldsChanged: string[] };
+    })
+  | (AuditEventCommon & {
+      action: 'users.softDeleted';
+      detail: Record<string, never>;
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {

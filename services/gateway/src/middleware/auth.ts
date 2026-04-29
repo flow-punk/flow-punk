@@ -24,10 +24,14 @@ import { isPublicPath, INDIE_PUBLIC_PATHS } from './public-paths.js';
  * first of two defenses; the second is `validateMcpSessionIdentity`'s
  * runtime reject of `'session'` credential type.
  */
-function isSessionAllowedPath(_pathname: string): boolean {
-  // No reachable admin-REST surface in indie yet. When indie AUTH_SERVICE
-  // ships, add its prefix here (e.g. `pathname.startsWith('/api/v1/admin/')`).
-  return false;
+function isSessionAllowedPath(pathname: string): boolean {
+  // Users CRUD is the first reachable admin-REST surface on indie. Other
+  // session-allowed prefixes (e.g. future indie AUTH_SERVICE endpoints)
+  // can be added here.
+  return (
+    pathname === '/api/v1/users' ||
+    pathname.startsWith('/api/v1/users/')
+  );
 }
 
 /**
