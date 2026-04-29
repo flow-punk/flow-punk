@@ -1,7 +1,7 @@
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
 import type { AuditEvent, Logger } from '@flowpunk/service-utils';
-import { AccountsRepoError } from '@flowpunk-indie/db';
+import { AccountsRepoError, PersonsRepoError } from '@flowpunk-indie/db';
 
 import type { Actor, ContactsEnv } from '../types.js';
 
@@ -92,12 +92,19 @@ export function isString(value: unknown): value is string {
 }
 
 /**
- * Map AccountsRepoError to HTTP. Non-repo errors are rethrown so the
- * top-level fetch handler logs them as INTERNAL_ERROR. 500s never include
- * the underlying message in the response body.
+ * Map a contacts-domain repo error (accounts or persons) to HTTP. Non-repo
+ * errors are rethrown so the top-level fetch handler logs them as
+ * INTERNAL_ERROR. 500s never include the underlying message in the
+ * response body.
  */
 export function mapRepoError(err: unknown): Response {
-  if (!(err instanceof AccountsRepoError)) throw err;
+  if (
+    !(err instanceof AccountsRepoError) &&
+    !(err instanceof PersonsRepoError)
+  ) {
+    throw err;
+  }
+  const repoLabel = err instanceof AccountsRepoError ? 'accounts' : 'persons';
   switch (err.code) {
     case 'not_found':
       return errorResponse(404, 'NOT_FOUND', err.message);
@@ -107,7 +114,7 @@ export function mapRepoError(err: unknown): Response {
       return errorResponse(409, 'WRONG_STATE', err.message);
     case 'invariant_violation': {
       const logger = createLogger({ service: 'contacts' });
-      logger.error('accounts repo invariant violation', {
+      logger.error(`${repoLabel} repo invariant violation`, {
         error: err,
         repoCode: err.code,
       });

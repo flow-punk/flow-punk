@@ -53,12 +53,70 @@ test('non-health request without identity headers returns 401', async () => {
   assert.equal(body.error.code, 'UNAUTHENTICATED');
 });
 
-test('GET /api/v1/people returns 501 (not yet implemented)', async () => {
+test('GET /api/v1/people (legacy path) returns 404', async () => {
+  // The persons entity moved from /api/v1/people to /api/v1/persons. The
+  // old path is unreserved and falls through to the catch-all 404.
   const response = await route(
     withApikey('http://internal/api/v1/people'),
     stubEnv,
   );
-  assert.equal(response.status, 501);
+  assert.equal(response.status, 404);
+});
+
+test('GET /api/v1/persons/:id with sub-path returns 404', async () => {
+  const response = await route(
+    withApikey('http://internal/api/v1/persons/per_x/notes'),
+    stubEnv,
+  );
+  assert.equal(response.status, 404);
+});
+
+test('PUT /api/v1/persons returns 405', async () => {
+  const response = await route(
+    withApikey('http://internal/api/v1/persons', { method: 'PUT' }),
+    stubEnv,
+  );
+  assert.equal(response.status, 405);
+  assert.ok(response.headers.get('Allow')?.includes('GET'));
+});
+
+test('POST /api/v1/persons without body returns 400 INVALID_BODY', async () => {
+  const response = await route(
+    withApikey('http://internal/api/v1/persons', { method: 'POST' }),
+    stubEnv,
+  );
+  assert.equal(response.status, 400);
+  const body = (await response.json()) as {
+    success: boolean;
+    error: { code: string };
+  };
+  assert.equal(body.error.code, 'INVALID_BODY');
+});
+
+test('GET /api/v1/persons?limit=999 returns 400 INVALID_INPUT', async () => {
+  const response = await route(
+    withApikey('http://internal/api/v1/persons?limit=999'),
+    stubEnv,
+  );
+  assert.equal(response.status, 400);
+  const body = (await response.json()) as {
+    success: boolean;
+    error: { code: string };
+  };
+  assert.equal(body.error.code, 'INVALID_INPUT');
+});
+
+test('GET /api/v1/persons?accountId=bogus returns 400 INVALID_INPUT', async () => {
+  const response = await route(
+    withApikey('http://internal/api/v1/persons?accountId=bogus'),
+    stubEnv,
+  );
+  assert.equal(response.status, 400);
+  const body = (await response.json()) as {
+    success: boolean;
+    error: { code: string };
+  };
+  assert.equal(body.error.code, 'INVALID_INPUT');
 });
 
 test('GET /api/v1/accounts/:id with sub-path returns 404', async () => {

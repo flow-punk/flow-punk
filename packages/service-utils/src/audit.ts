@@ -81,6 +81,28 @@ export type AuditEvent =
   | (AuditEventCommon & {
       action: 'accounts.softDeleted';
       detail: Record<string, never>;
+    })
+  | (AuditEventCommon & {
+      action: 'persons.created';
+      // Boolean only — never the linked account id (would leak which account
+      // a person belongs to into the structured log surface). No consent
+      // value: consent records are personal data per GDPR Art. 7. A
+      // dedicated consent ledger is the right place for value history; this
+      // arm follows the accounts pattern of fixed-format-non-PII-only.
+      detail: { hasAccountId: boolean };
+    })
+  | (AuditEventCommon & {
+      action: 'persons.updated';
+      // Column NAMES only — never the new values, since values may be PII
+      // (including `consentEmail`, which is `pii()`-marked at the schema
+      // layer per GDPR Art. 7). Names are derived from a fixed allowlist
+      // (`ALLOWED_PATCH_FIELDS` in `@flowpunk-indie/db`) so unknown/forged
+      // keys cannot leak in.
+      detail: { fieldsChanged: string[] };
+    })
+  | (AuditEventCommon & {
+      action: 'persons.softDeleted';
+      detail: Record<string, never>;
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {

@@ -17,7 +17,7 @@ import { invalidateToolsCacheIfRequired } from '../mcp/index.js';
 /**
  * REST route handler.
  * Path-prefix dispatch to domain services via service bindings:
- *   /api/v1/people/*      → CONTACTS_SERVICE
+ *   /api/v1/persons/*     → CONTACTS_SERVICE
  *   /api/v1/accounts/*    → CONTACTS_SERVICE
  *   /api/v1/deals/*       → PIPELINE_SERVICE
  *   /api/v1/pipelines/*   → PIPELINE_SERVICE
@@ -109,8 +109,8 @@ function buildForwardHeaders(
 
 export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
   if (
-    pathname === '/api/v1/people' ||
-    pathname.startsWith('/api/v1/people/') ||
+    pathname === '/api/v1/persons' ||
+    pathname.startsWith('/api/v1/persons/') ||
     pathname === '/api/v1/accounts' ||
     pathname.startsWith('/api/v1/accounts/')
   ) {

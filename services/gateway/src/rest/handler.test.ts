@@ -44,14 +44,19 @@ test('bindingForPath dispatches /api/v1/accounts/abc (item) to CONTACTS_SERVICE'
   assert.equal((binding as unknown as { tag: string }).tag, 'CONTACTS_SERVICE');
 });
 
-test('bindingForPath dispatches /api/v1/people (collection) to CONTACTS_SERVICE', () => {
-  const binding = bindingForPath('/api/v1/people', makeCtx());
+test('bindingForPath dispatches /api/v1/persons (collection) to CONTACTS_SERVICE', () => {
+  const binding = bindingForPath('/api/v1/persons', makeCtx());
   assert.equal((binding as unknown as { tag: string }).tag, 'CONTACTS_SERVICE');
 });
 
-test('bindingForPath dispatches /api/v1/people/abc (item) to CONTACTS_SERVICE', () => {
-  const binding = bindingForPath('/api/v1/people/abc', makeCtx());
+test('bindingForPath dispatches /api/v1/persons/abc (item) to CONTACTS_SERVICE', () => {
+  const binding = bindingForPath('/api/v1/persons/abc', makeCtx());
   assert.equal((binding as unknown as { tag: string }).tag, 'CONTACTS_SERVICE');
+});
+
+test('bindingForPath returns null for legacy /api/v1/people path', () => {
+  const binding = bindingForPath('/api/v1/people', makeCtx());
+  assert.equal(binding, null);
 });
 
 test('bindingForPath returns null for /api/v1/accountsX (no false-positive prefix match)', () => {

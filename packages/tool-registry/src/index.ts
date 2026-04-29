@@ -90,14 +90,14 @@ const staticDomainSeeds: DomainSeed[] = [
   {
     name: 'contacts',
     description:
-      'Contacts and CRM records. Common actions: people_search, people_get, people_create.',
-    promotedTools: ['people_search', 'people_get', 'people_create'],
+      'Contacts and CRM records. Common actions: persons_search, persons_get, persons_create.',
+    promotedTools: ['persons_search', 'persons_get', 'persons_create'],
     service: 'contacts',
     tools: [
-      makeToolSeed('people_search', 'Search people records', searchSchema(), 'read'),
-      makeToolSeed('people_get', 'Get a person by id', idSchema(), 'read'),
-      makeToolSeed('people_create', 'Create a person record', objectSchema(), 'write'),
-      makeToolSeed('people_update', 'Update a person record', idWithFieldsSchema(), 'write'),
+      makeToolSeed('persons_search', 'Search person records', searchSchema(), 'read'),
+      makeToolSeed('persons_get', 'Get a person by id', idSchema(), 'read'),
+      makeToolSeed('persons_create', 'Create a person record', objectSchema(), 'write'),
+      makeToolSeed('persons_update', 'Update a person record', idWithFieldsSchema(), 'write'),
       makeToolSeed('accounts_search', 'Search account records', searchSchema(), 'read'),
       makeToolSeed('accounts_get', 'Get an account by id', idSchema(), 'read'),
       makeToolSeed('accounts_create', 'Create an account record', objectSchema(), 'write'),

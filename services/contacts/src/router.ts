@@ -6,13 +6,18 @@ import { handleGetAccount } from './handlers/accounts/get.js';
 import { handleListAccounts } from './handlers/accounts/list.js';
 import { handleSoftDeleteAccount } from './handlers/accounts/softDelete.js';
 import { handleUpdateAccount } from './handlers/accounts/update.js';
+import { handleCreatePerson } from './handlers/persons/create.js';
+import { handleGetPerson } from './handlers/persons/get.js';
+import { handleListPersons } from './handlers/persons/list.js';
+import { handleSoftDeletePerson } from './handlers/persons/softDelete.js';
+import { handleUpdatePerson } from './handlers/persons/update.js';
 import { parseIdentity } from './middleware/identity.js';
 import type { Actor, ContactsEnv } from './types.js';
 
 const ACCOUNTS_COLLECTION_PATH = '/api/v1/accounts';
 const ACCOUNTS_ITEM_PREFIX = '/api/v1/accounts/';
-const PEOPLE_COLLECTION_PATH = '/api/v1/people';
-const PEOPLE_ITEM_PREFIX = '/api/v1/people/';
+const PERSONS_COLLECTION_PATH = '/api/v1/persons';
+const PERSONS_ITEM_PREFIX = '/api/v1/persons/';
 
 export async function route(
   request: Request,
@@ -71,11 +76,38 @@ export async function route(
     return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
   }
 
-  if (
-    pathname === PEOPLE_COLLECTION_PATH ||
-    pathname.startsWith(PEOPLE_ITEM_PREFIX)
-  ) {
-    return notImplemented();
+  // /api/v1/persons collection
+  if (pathname === PERSONS_COLLECTION_PATH) {
+    if (method === 'GET' || method === 'HEAD') {
+      return handleListPersons(request, env, actor);
+    }
+    if (method === 'POST') {
+      return idempotent(request, env, actor, () =>
+        handleCreatePerson(request, env, actor),
+      );
+    }
+    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+  }
+
+  // /api/v1/persons/:id item
+  if (pathname.startsWith(PERSONS_ITEM_PREFIX)) {
+    const id = pathname.slice(PERSONS_ITEM_PREFIX.length);
+    if (id.length === 0 || id.includes('/')) return notFound();
+
+    if (method === 'GET' || method === 'HEAD') {
+      return handleGetPerson(request, env, actor, id);
+    }
+    if (method === 'PATCH') {
+      return idempotent(request, env, actor, () =>
+        handleUpdatePerson(request, env, actor, id),
+      );
+    }
+    if (method === 'DELETE') {
+      return idempotent(request, env, actor, () =>
+        handleSoftDeletePerson(request, env, actor, id),
+      );
+    }
+    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
   }
 
   return notFound();
@@ -109,16 +141,6 @@ function unauthenticated(): Response {
     JSON.stringify({ success: false, error: { code: 'UNAUTHENTICATED' } }),
     {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
-}
-
-function notImplemented(): Response {
-  return new Response(
-    JSON.stringify({ success: false, error: { code: 'NOT_IMPLEMENTED' } }),
-    {
-      status: 501,
       headers: { 'Content-Type': 'application/json' },
     },
   );
