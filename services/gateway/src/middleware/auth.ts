@@ -30,7 +30,9 @@ function isSessionAllowedPath(pathname: string): boolean {
   // can be added here.
   return (
     pathname === '/api/v1/users' ||
-    pathname.startsWith('/api/v1/users/')
+    pathname.startsWith('/api/v1/users/') ||
+    pathname === '/api/v1/auth/keys' ||
+    pathname.startsWith('/api/v1/auth/keys/')
   );
 }
 

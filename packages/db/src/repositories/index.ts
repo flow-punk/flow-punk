@@ -1,4 +1,5 @@
 export * as accountsRepo from './accounts.js';
+export * as apiKeysRepo from './api-keys.js';
 export * as mcpSessionsRepo from './mcp-sessions.js';
 export * as personsRepo from './persons.js';
 export * as usersRepo from './users.js';
@@ -6,11 +7,18 @@ export * as pipelinesRepo from './pipelines.js';
 export * as stagesRepo from './stages.js';
 export * as dealsRepo from './deals.js';
 export { AccountsRepoError } from './accounts.js';
+export { ApiKeysRepoError } from './api-keys.js';
 export { PersonsRepoError } from './persons.js';
 export { UsersRepoError } from './users.js';
 export { PipelinesRepoError } from './pipelines.js';
 export { StagesRepoError } from './stages.js';
 export { DealsRepoError } from './deals.js';
+export type {
+  CreateApiKeyInput,
+  CreateApiKeyOptions,
+  ListApiKeysOptions,
+  ValidatedApiKey,
+} from './api-keys.js';
 export type {
   CreateUserInput,
   CreateUserOptions,

@@ -15,6 +15,7 @@ AI-powered CRM platform built on Cloudflare Workers. In this checkout, the indie
 | Service | Service Path | API Docs |
 |---------|-------------|----------|
 | Gateway | `services/gateway/` | `../managed/docs/services/gateway.md` |
+| Auth | `services/auth/` | `../managed/docs/services/auth.md` |
 | Contacts | `services/contacts/` | `../managed/docs/services/contacts.md` |
 | Pipeline | `services/pipeline/` | `../managed/docs/services/pipeline.md` |
 
@@ -23,4 +24,4 @@ AI-powered CRM platform built on Cloudflare Workers. In this checkout, the indie
 | Package | Path | Purpose |
 |---------|------|---------|
 | service-utils | `packages/service-utils/` | Logger, auth, errors, tracing, idempotency, audit emission |
-| db | `packages/db/` | Indie platform DB schema (`users`, `mcp_sessions`) and repositories |
+| db | `packages/db/` | Indie platform DB schema (`users`, `mcp_sessions`, `api_keys`) and repositories |

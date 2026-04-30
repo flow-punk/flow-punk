@@ -1,0 +1,19 @@
+name = "auth"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+workers_dev = false
+
+[dev]
+ip = "127.0.0.1"
+port = 8791
+inspector_port = 9791
+
+[[d1_databases]]
+binding = "DB"
+database_name = "flowpunk-indie"
+database_id = "placeholder-flowpunk-indie-db"
+migrations_dir = "../../packages/db/migrations"
+
+[[kv_namespaces]]
+binding = "LAST_USED_KV"
+id = "placeholder-auth-last-used-kv"
