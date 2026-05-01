@@ -3,14 +3,20 @@
  * Bootstrap an admin user + session for manual smoke-testing of the indie
  * accounts surface.
  *
- * Mirrors managed/services/tenants/scripts/bootstrap-admin.ts; deltas:
+ * Structural sibling: managed/services/gateway/scripts/bootstrap-platform-admin.ts.
+ * Deltas vs that script:
  *  - Wrangler runs with cwd = indie/services/gateway so `DB` resolves to the
  *    indie `flowpunk-indie` D1 (ADR-011 §Tenancy: indie is single-D1).
  *  - Binding name is `DB`, not `PARENT_DB`.
- *  - Writes to indie's `users` and `mcp_sessions` tables.
- *  - `tenant_id` is hardcoded to `_system` — indie is single-tenant per
- *    ADR-011, and the gateway propagates `X-Tenant-Id` for audit context
- *    only; entity rows do not carry it.
+ *  - Writes to indie's `users` and `mcp_sessions` tables (NOT
+ *    `platform_admins` + `platform_admin_sessions`).
+ *  - Cookie scope is the literal `_system` (NOT `platform`) — indie is
+ *    single-tenant per ADR-011, and the gateway propagates `X-Tenant-Id`
+ *    for audit context only; entity rows do not carry it.
+ *
+ * Managed has no equivalent for tenant `users` rows: tenant owners are
+ * seeded automatically by the provisioner's Step 3.5 (ensureOwnerSeeded)
+ * from the POST /api/v1/tenants payload (per ADR-013).
  *
  * The session cookie is printed ONCE on success. It is hashed (sha256 hex)
  * before persistence, so a fresh run is the only recovery path.
