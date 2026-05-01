@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import type { Logger } from '@flowpunk/service-utils';
-import { usersRepo } from '@flowpunk-indie/db';
+import { hasAdminRights, usersRepo, type Role } from '@flowpunk-indie/db';
 
 import type { Actor, UsersEnv } from '../types.js';
 import { errorResponse } from '../handlers/_shared.js';
@@ -13,17 +13,17 @@ export type AdminCheckResult =
 /**
  * Pure decision function.
  *
- * Per ADR-012's admin-auth posture (extended for soft-delete in this
- * iteration): platform-admin operations require
+ * Per ADR-012's admin-auth posture + ADR-013 §"Roles":
  * - session OR oauth credential type (never apikey)
- * - the looked-up user has `isAdmin === true` AND `status === 'active'`
+ * - the looked-up user has `hasAdminRights(role) === true` AND
+ *   `status === 'active'` (owner or admin role; member/readonly rejected)
  *
- * A soft-deleted admin row must NOT authorize anything; this is the
- * defense-in-depth predicate for Group A of codex review.
+ * A soft-deleted row must NOT authorize anything; this is the
+ * defense-in-depth predicate at every entry point.
  */
 export function evaluateAdmin(
   actor: Actor | null,
-  user: { isAdmin: boolean; status: 'active' | 'deleted' } | null,
+  user: { role: Role; status: 'active' | 'deleted' } | null,
 ): AdminCheckResult {
   if (!actor) {
     return { ok: false, response: errorResponse(401, 'UNAUTHENTICATED') };
@@ -38,7 +38,7 @@ export function evaluateAdmin(
       ),
     };
   }
-  if (!user || !user.isAdmin || user.status !== 'active') {
+  if (!user || user.status !== 'active' || !hasAdminRights(user.role)) {
     return { ok: false, response: errorResponse(403, 'FORBIDDEN') };
   }
   return { ok: true, actor };
@@ -69,7 +69,7 @@ export async function requireAdmin(
     let reason = 'user_not_found';
     if (user) {
       if (user.status !== 'active') reason = 'user_deleted';
-      else if (!user.isAdmin) reason = 'user_not_admin';
+      else if (!hasAdminRights(user.role)) reason = 'role_insufficient';
     }
     logAuthFailure(logger, reason, actor);
   }

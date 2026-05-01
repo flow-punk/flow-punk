@@ -80,8 +80,10 @@ export async function route(
 }
 
 /**
- * Wrap a mutation handler in `withIdempotency` keyed per actor. Indie
- * has no separate tenant axis, so the scope key is just the userId.
+ * Wrap a mutation handler in `withIdempotency` keyed per
+ * `${tenantId}:${userId}`. Indie stamps `tenantId = '_system'` so the
+ * scope key is `_system:<userId>`; managed stamps the real tenantId so
+ * concurrent requests across tenants never collide.
  */
 function idempotent(
   request: Request,
@@ -90,7 +92,7 @@ function idempotent(
   handler: () => Promise<Response>,
 ): Promise<Response> {
   return withIdempotency(request, env.IDEMPOTENCY_KV, handler, {
-    scopeKey: actor.userId,
+    scopeKey: `${actor.tenantId}:${actor.userId}`,
   });
 }
 

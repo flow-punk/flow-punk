@@ -166,8 +166,8 @@ function runWrangler(args: string[], captureStdout = false): WranglerResult {
   };
 }
 
-function adminUserExists(mode: ParsedArgs['mode'], userId: string): boolean {
-  const sql = `SELECT id FROM users WHERE id = '${escapeSqlLiteral(userId)}' AND is_admin = 1 AND status = 'active'`;
+function ownerUserExists(mode: ParsedArgs['mode'], userId: string): boolean {
+  const sql = `SELECT id FROM users WHERE id = '${escapeSqlLiteral(userId)}' AND role = 'owner' AND status = 'active'`;
   const result = runWrangler(
     [mode, ...persistFlags(mode), '--json', '--command', sql],
     true,
@@ -182,8 +182,12 @@ function adminUserExists(mode: ParsedArgs['mode'], userId: string): boolean {
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
-  const cookie = generateCookieValue();
-  const cookieHash = await sha256Hex(cookie);
+  // Cookie value follows ADR-013 scoped format `<scope>.<sessionId>`.
+  // Indie always uses `_system` as the scope (single tenant by definition).
+  // The full string (prefix included) is what gets hashed into mcp_sessions.cookie_hash.
+  const sessionPayload = generateCookieValue();
+  const cookieValue = `${TENANT_SENTINEL}.${sessionPayload}`;
+  const cookieHash = await sha256Hex(cookieValue);
 
   const nowIso = new Date().toISOString();
   const expiresIso = new Date(
@@ -194,9 +198,9 @@ async function main(): Promise<void> {
   let skipUserInsert = false;
 
   if (args.userId) {
-    if (!adminUserExists(args.mode, args.userId)) {
+    if (!ownerUserExists(args.mode, args.userId)) {
       fail(
-        `--user-id "${args.userId}" does not match an existing admin user (is_admin = 1).`,
+        `--user-id "${args.userId}" does not match an active owner user.`,
       );
     }
     userId = args.userId;
@@ -209,12 +213,11 @@ async function main(): Promise<void> {
 
   if (!skipUserInsert) {
     // Bootstrap defaults for the operator row. `email` and `display_name`
-    // are NOT NULL (added alongside the users CRUD work); the bootstrap
-    // values can be PATCHed by the operator through `/api/v1/users/<id>`
-    // once the gateway is up and a session cookie is set.
+    // are NOT NULL; bootstrap values can be PATCHed by the operator
+    // through `/api/v1/users/<id>` once the gateway is up.
     const email = `admin+${userId}@example.invalid`;
     const displayName = 'Operator';
-    const userSql = `INSERT OR IGNORE INTO users (id, email, display_name, is_admin, status, created_at, updated_at) VALUES ('${escapeSqlLiteral(userId)}', '${escapeSqlLiteral(email)}', '${escapeSqlLiteral(displayName)}', 1, 'active', '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
+    const userSql = `INSERT OR IGNORE INTO users (id, email, display_name, role, status, created_at, updated_at) VALUES ('${escapeSqlLiteral(userId)}', '${escapeSqlLiteral(email)}', '${escapeSqlLiteral(displayName)}', 'owner', 'active', '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
     const userResult = runWrangler([
       args.mode,
       ...persistFlags(args.mode),
@@ -226,7 +229,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const sessionSql = `INSERT INTO mcp_sessions (id, cookie_hash, user_id, tenant_id, expires_at, created_at, updated_at) VALUES ('${escapeSqlLiteral(sessionId)}', '${escapeSqlLiteral(cookieHash)}', '${escapeSqlLiteral(userId)}', '${TENANT_SENTINEL}', '${escapeSqlLiteral(expiresIso)}', '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
+  const sessionSql = `INSERT INTO mcp_sessions (id, cookie_hash, user_id, expires_at, created_at, updated_at) VALUES ('${escapeSqlLiteral(sessionId)}', '${escapeSqlLiteral(cookieHash)}', '${escapeSqlLiteral(userId)}', '${escapeSqlLiteral(expiresIso)}', '${escapeSqlLiteral(nowIso)}', '${escapeSqlLiteral(nowIso)}');`;
   const sessionResult = runWrangler([
     args.mode,
     ...persistFlags(args.mode),
@@ -252,7 +255,7 @@ async function main(): Promise<void> {
       banner,
       'BOOTSTRAP COMPLETE — cookie value below is shown ONCE',
       banner,
-      `cookie:     ${cookie}`,
+      `cookie:     ${cookieValue}`,
       `user id:    ${userId}${skipUserInsert ? ' (existing)' : ''}`,
       `session id: ${sessionId}`,
       `expires:    ${expiresIso}`,
@@ -264,7 +267,7 @@ async function main(): Promise<void> {
       'auth for the accounts surface until that flip lands.',
       '',
       'Smoke test (after the session flip ships):',
-      `  curl -i -H "Cookie: fp_session=${cookie}" -H "X-CSRF-Token: <minted-token>" http://localhost:8787/api/v1/accounts`,
+      `  curl -i -H "Cookie: fp_session=${cookieValue}" -H "X-CSRF-Token: <minted-token>" http://localhost:8787/api/v1/accounts`,
       banner,
       '',
     ].join('\n'),

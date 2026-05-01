@@ -21,9 +21,14 @@ import {
  * PATCH /api/v1/users/:id — self OR admin.
  *
  * Self can only patch fields in `SELF_ALLOWED_PATCH_FIELDS` (display
- * name + first/last name). `email`, `isAdmin` are admin-only because
+ * name + first/last name). `email` and `role` are admin-only because
  * email is an identifier (changing it without verification is an
- * account-takeover vector) and isAdmin is a privilege transition.
+ * account-takeover vector) and role is a privilege transition.
+ *
+ * Role transitions are race-safe (`enforceSingleOwner` + atomic
+ * single-statement UPDATEs in the repo). The `users.updated` audit
+ * fields-changed list includes `role` when it transitions; a separate
+ * `users.roleChanged` event is emitted by `usersRepo.setRole` (future).
  */
 export async function handleUpdate(
   request: Request,
@@ -59,7 +64,7 @@ export async function handleUpdate(
       patch as UpdateUserPatch,
       actor.userId,
       now,
-      { enforceSingleAdmin: env.EDITION === 'indie' },
+      { enforceSingleOwner: env.USERS_OPTIONS.enforceSingleOwner },
     );
     if (result.fieldsChanged.length > 0) {
       emitUsersAudit(actor, {
@@ -78,4 +83,3 @@ export async function handleUpdate(
     return mapRepoError(err);
   }
 }
-

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@flowpunk-indie/db": "workspace:*",
+    "@flowpunk-indie/pipeline-core": "workspace:*",
     "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",
     "drizzle-orm": "^0.36.4"

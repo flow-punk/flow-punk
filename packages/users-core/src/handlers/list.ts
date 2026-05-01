@@ -1,4 +1,4 @@
-import { usersRepo } from '@flowpunk-indie/db';
+import { isRole, usersRepo, type Role } from '@flowpunk-indie/db';
 
 import type { UsersEnv } from '../types.js';
 import { badRequest, getDb, jsonResponse, mapRepoError } from './_shared.js';
@@ -22,12 +22,16 @@ export async function handleList(
   const cursor = url.searchParams.get('cursor') ?? undefined;
   const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
 
-  let isAdmin: boolean | undefined;
-  const isAdminParam = url.searchParams.get('isAdmin');
-  if (isAdminParam !== null) {
-    if (isAdminParam === 'true') isAdmin = true;
-    else if (isAdminParam === 'false') isAdmin = false;
-    else return badRequest('INVALID_IS_ADMIN', 'isAdmin must be "true" or "false"');
+  let role: Role | undefined;
+  const roleParam = url.searchParams.get('role');
+  if (roleParam !== null) {
+    if (!isRole(roleParam)) {
+      return badRequest(
+        'INVALID_ROLE',
+        'role must be one of owner, admin, member, readonly',
+      );
+    }
+    role = roleParam;
   }
 
   try {
@@ -35,7 +39,7 @@ export async function handleList(
       limit,
       cursor,
       includeDeleted,
-      isAdmin,
+      role,
     });
     return jsonResponse(200, result);
   } catch (err) {

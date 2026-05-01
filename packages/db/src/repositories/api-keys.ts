@@ -27,17 +27,20 @@ export class ApiKeysRepoError extends Error {
   }
 }
 
-export const API_KEY_MAX_ACTIVE_INDIE = 1;
-export const API_KEY_MAX_ACTIVE_MANAGED = 5;
 export const API_KEY_MAX_EXPIRES_MS = 365 * 24 * 60 * 60 * 1000;
 export const API_KEY_LABEL_MIN = 1;
 export const API_KEY_LABEL_MAX = 64;
 
 const API_KEY_SCOPE_SET = new Set<string>(API_KEY_SCOPE_VALUES);
 
+/**
+ * `maxActiveKeys` per ADR-012 §"Per-edition caps":
+ * - indie: 1 (single-deploy admin)
+ * - managed: 5 (per tenant user)
+ * Wrappers pass the appropriate value; no edition flag in the repo.
+ */
 export interface CreateApiKeyInput {
   userId: string;
-  tenantId: string;
   label: string;
   hash: string;
   prefix: string;
@@ -56,7 +59,6 @@ export interface ListApiKeysOptions {
 export interface ValidatedApiKey {
   id: string;
   userId: string;
-  tenantId: string;
   label: string;
   scope: string;
   expiresAt: string | null;
@@ -83,7 +85,6 @@ export async function create(
   const row: NewApiKey = {
     id,
     userId: normalized.userId,
-    tenantId: normalized.tenantId,
     label: normalized.label,
     hash: normalized.hash,
     prefix: normalized.prefix,
@@ -186,7 +187,6 @@ export async function validateByHash(
   return {
     id: row.id,
     userId: row.userId,
-    tenantId: row.tenantId,
     label: row.label,
     scope: scopes.join(' '),
     expiresAt: row.expiresAt,
@@ -224,13 +224,11 @@ export function parseStoredScopes(raw: string): ApiKeyScope[] | null {
 
 function validateCreate(input: CreateApiKeyInput, now: string): Required<CreateApiKeyInput> {
   const userId = input.userId.trim();
-  const tenantId = input.tenantId.trim();
   const label = input.label.trim();
   const hash = input.hash.trim();
   const prefix = input.prefix.trim();
 
   if (!userId) throw invalid('userId is required', 'INVALID_USER_ID');
-  if (!tenantId) throw invalid('tenantId is required', 'INVALID_TENANT_ID');
   if (label.length < API_KEY_LABEL_MIN || label.length > API_KEY_LABEL_MAX) {
     throw invalid('label must be 1-64 characters', 'INVALID_LABEL');
   }
@@ -241,7 +239,7 @@ function validateCreate(input: CreateApiKeyInput, now: string): Required<CreateA
   const expiresAt = input.expiresAt ?? null;
   if (expiresAt !== null) validateExpiresAt(expiresAt, now);
 
-  return { userId, tenantId, label, hash, prefix, scopes, expiresAt };
+  return { userId, label, hash, prefix, scopes, expiresAt };
 }
 
 function normalizeScopes(scopes: readonly string[]): ApiKeyScope[] {

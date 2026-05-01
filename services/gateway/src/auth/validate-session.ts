@@ -1,11 +1,21 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { mcpSessionsRepo, usersRepo } from '@flowpunk-indie/db';
+import {
+  hasAdminRights,
+  mcpSessionsRepo,
+  usersRepo,
+} from '@flowpunk-indie/db';
 import { parseCookies } from './cookies.js';
 import { sha256Hex } from './sha256.js';
 import type { Env } from '../types.js';
 
 export const SESSION_COOKIE_NAME = 'fp_session';
 export const SESSION_SCOPE = 'admin';
+/**
+ * Indie always stamps the `_system` scope per ADR-013. Cookie value
+ * format: `_system.<sessionId>`. The full raw value (including the
+ * scope prefix) is what gets hashed for cookie_hash.
+ */
+const INDIE_TENANT_ID = '_system';
 
 const MAX_CACHE_TTL_SECONDS = 60;
 const SESSION_CACHE_PREFIX = 'session:';
@@ -23,16 +33,13 @@ export interface SessionIdentity {
 /**
  * Validates an indie-edition session cookie.
  *
- * Mirrors the managed validator (same KV+D1 lookup shape, same TOCTOU
- * tombstone re-check, same admin gating). The only divergence today is the
- * D1 binding: indie reads from `env.DB`; managed reads from `env.PARENT_DB`.
- * Duplicated because this is edition-owned gateway service code (not part of
- * the gateway's exported surface) with edition-specific DB/env coupling
- * (`@flowpunk-indie/db` here, `@flowpunk-managed/db` there). ADR-011
- * §Behavioral variation would justify further divergence later.
+ * Cookie format: `<scope>.<sessionId>` per ADR-013 §"Credential format".
+ * Indie always uses scope `_system` (single tenant by definition); the
+ * managed gateway is what dispatches `<tenantId>` vs `platform` cookies
+ * to per-tenant or PARENT_DB lookups respectively.
  *
- * Path scoping in the indie gateway middleware confines this validator to
- * the admin-REST surface. Sessions never reach `/mcp`.
+ * Path scoping in the indie gateway middleware confines this validator
+ * to the admin-REST surface. Sessions never reach `/mcp`.
  */
 export async function validateSession(
   env: Env,
@@ -41,6 +48,13 @@ export async function validateSession(
   const cookies = parseCookies(request);
   const cookieValue = cookies.get(SESSION_COOKIE_NAME);
   if (!cookieValue) return null;
+
+  // Per ADR-013, valid indie cookies have the form `_system.<random>`.
+  // Hash the FULL raw value (the same string that was stored as cookie_hash).
+  const dot = cookieValue.indexOf('.');
+  if (dot < 1) return null;
+  const scope = cookieValue.slice(0, dot);
+  if (scope !== INDIE_TENANT_ID) return null;
 
   const cookieHash = await sha256Hex(cookieValue);
   const cacheKey = `${SESSION_CACHE_PREFIX}${cookieHash}`;
@@ -76,10 +90,10 @@ export async function validateSession(
   if (!isStillValid(row.expiresAt)) return null;
 
   // Admin gate AND active-status gate. `includeDeleted: true` so the
-  // soft-delete check is explicit (defense in depth alongside the cascade
-  // in `usersRepo.softDelete` that revokes mcp_sessions on delete). A
-  // soft-deleted admin must not authenticate even if their session row
-  // wasn't successfully revoked during cascade.
+  // soft-delete check is explicit (defense in depth alongside the
+  // cascade in `usersRepo.softDelete` that revokes mcp_sessions on
+  // delete). A soft-deleted admin must not authenticate even if their
+  // session row wasn't successfully revoked during cascade.
   let user: Awaited<ReturnType<typeof usersRepo.findById>>;
   try {
     const db = drizzle(env.DB);
@@ -87,10 +101,12 @@ export async function validateSession(
   } catch {
     return null;
   }
-  if (!user || !user.isAdmin || user.status !== 'active') return null;
+  if (!user || user.status !== 'active' || !hasAdminRights(user.role)) {
+    return null;
+  }
 
   const identity: SessionIdentity = {
-    tenantId: row.tenantId,
+    tenantId: INDIE_TENANT_ID,
     userId: row.userId,
     scope: SESSION_SCOPE,
     credentialType: 'session',

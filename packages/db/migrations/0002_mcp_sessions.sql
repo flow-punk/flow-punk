@@ -2,7 +2,6 @@ CREATE TABLE mcp_sessions (
   id TEXT PRIMARY KEY,
   cookie_hash TEXT NOT NULL UNIQUE,
   user_id TEXT NOT NULL,
-  tenant_id TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   revoked_at TEXT,
   created_at TEXT NOT NULL,

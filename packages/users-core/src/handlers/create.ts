@@ -1,4 +1,4 @@
-import { usersRepo } from '@flowpunk-indie/db';
+import { isRole, usersRepo, type Role } from '@flowpunk-indie/db';
 
 import type { Actor, UsersEnv } from '../types.js';
 import {
@@ -15,7 +15,7 @@ interface CreateBody {
   displayName?: unknown;
   firstName?: unknown;
   lastName?: unknown;
-  isAdmin?: unknown;
+  role?: unknown;
 }
 
 export async function handleCreate(
@@ -35,8 +35,12 @@ export async function handleCreate(
   if (input.lastName !== undefined && input.lastName !== null && typeof input.lastName !== 'string') {
     return badRequest('INVALID_LAST_NAME');
   }
-  if (input.isAdmin !== undefined && typeof input.isAdmin !== 'boolean') {
-    return badRequest('INVALID_IS_ADMIN');
+  let role: Role | undefined;
+  if (input.role !== undefined) {
+    if (!isRole(input.role)) {
+      return badRequest('INVALID_ROLE', 'role must be one of owner, admin, member, readonly');
+    }
+    role = input.role;
   }
 
   const now = new Date().toISOString();
@@ -48,17 +52,17 @@ export async function handleCreate(
         displayName: input.displayName,
         firstName: input.firstName as string | null | undefined,
         lastName: input.lastName as string | null | undefined,
-        isAdmin: input.isAdmin as boolean | undefined,
+        role,
       },
       actor.userId,
       now,
-      { enforceSingleAdmin: env.EDITION === 'indie' },
+      { enforceSingleOwner: env.USERS_OPTIONS.enforceSingleOwner },
     );
     emitUsersAudit(actor, {
       action: 'users.created',
       resourceType: 'user',
       resourceId: user.id,
-      detail: { isAdmin: user.isAdmin },
+      detail: { role: user.role },
     });
     return jsonResponse(201, { user });
   } catch (err) {

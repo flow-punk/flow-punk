@@ -18,7 +18,7 @@ const stubEnv = {
     get: async () => null,
     put: async () => undefined,
   } as unknown as UsersEnv['IDEMPOTENCY_KV'],
-  EDITION: 'indie' as const,
+  USERS_OPTIONS: { enforceSingleOwner: true },
 } satisfies UsersEnv;
 
 function withHeaders(

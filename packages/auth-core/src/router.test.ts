@@ -7,6 +7,7 @@ import type { AuthEnv } from './types.js';
 const env = {
   DB: {} as D1Database,
   LAST_USED_KV: {} as KVNamespace,
+  AUTH_OPTIONS: { maxActiveKeys: 1 },
 } satisfies AuthEnv;
 
 test('/auth/validate rejects non-apikey credentialType before touching DB', async () => {

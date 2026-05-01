@@ -1,15 +1,27 @@
 import type { IdentityHeaderValues } from '@flowpunk/gateway/auth';
 import type { IdempotencyKvNamespace } from '@flowpunk/service-utils';
 
+/**
+ * Edition-agnostic options handed in by the wrapper. Indie wrappers pass
+ * `enforceSingleOwner: true` (per ADR-011 §"Indie multi-user foundation");
+ * managed wrappers pass `false`.
+ *
+ * Per ADR-011:201 there is no `EDITION` env-var runtime branch; behavior
+ * is selected at the wrapper boundary by passing different option
+ * constants.
+ */
+export interface UsersCoreOptions {
+  enforceSingleOwner: boolean;
+}
+
 export interface UsersEnv {
   DB: D1Database;
   IDEMPOTENCY_KV: KVNamespace & IdempotencyKvNamespace;
   /**
-   * Edition flag. Indie passes `"indie"` and the create/promote paths
-   * enforce the one-active-admin invariant per ADR-011. Managed passes
-   * `"managed"` (multiple platform admins permitted).
+   * Wrapper-supplied options. Each edition's worker `index.ts` constructs
+   * this object before forwarding to `route()`. See ADR-011:201 + ADR-013.
    */
-  EDITION: 'indie' | 'managed';
+  USERS_OPTIONS: UsersCoreOptions;
 }
 
 /**

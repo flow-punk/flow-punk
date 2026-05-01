@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { usersRepo } from '@flowpunk-indie/db';
+import { hasAdminRights, usersRepo, type Role } from '@flowpunk-indie/db';
 
 import type { Actor, UsersEnv } from '../types.js';
 import { errorResponse } from '../handlers/_shared.js';
@@ -9,6 +9,7 @@ export type AuthCheckResult =
   | {
       ok: true;
       actor: Actor;
+      role: Role;
       isAdmin: boolean;
     }
   | { ok: false; response: Response };
@@ -16,9 +17,10 @@ export type AuthCheckResult =
 /**
  * Softer guard for self-or-admin endpoints (GET /:id, PATCH /:id).
  *
- * Returns the actor and an `isAdmin` flag so handlers can dispatch on
- * self vs admin. Like `requireAdmin`, rejects API-key auth — users CRUD
- * is session/oauth-only at every entrypoint per ADR-012. A soft-deleted
+ * Returns the actor, the actor's role, and an `isAdmin` boolean
+ * (`hasAdminRights(role)`) so handlers can dispatch on self vs admin.
+ * Like `requireAdmin`, rejects API-key auth — users CRUD is
+ * session/oauth-only at every entrypoint per ADR-012. A soft-deleted
  * actor cannot use any endpoint.
  */
 export async function requireAuthenticated(
@@ -46,5 +48,10 @@ export async function requireAuthenticated(
   if (!user || user.status !== 'active') {
     return { ok: false, response: errorResponse(403, 'FORBIDDEN') };
   }
-  return { ok: true, actor, isAdmin: user.isAdmin };
+  return {
+    ok: true,
+    actor,
+    role: user.role,
+    isAdmin: hasAdminRights(user.role),
+  };
 }

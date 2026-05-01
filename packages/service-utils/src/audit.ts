@@ -106,10 +106,18 @@ export type AuditEvent =
     })
   | (AuditEventCommon & {
       action: 'users.created';
-      // `isAdmin` is a non-PII boolean; `email` and `displayName` are
-      // pii()-marked at the schema layer and stay off the structured log
-      // surface. Names of patchable fields are sufficient for replay.
-      detail: { isAdmin: boolean };
+      // `role` is the non-PII enum (`owner`/`admin`/`member`/`readonly`);
+      // `email` and `displayName` are pii()-marked at the schema layer
+      // and stay off the structured log surface.
+      detail: { role: 'owner' | 'admin' | 'member' | 'readonly' };
+    })
+  | (AuditEventCommon & {
+      action: 'users.roleChanged';
+      // Privilege transition; logs both old and new roles. Non-PII.
+      detail: {
+        from: 'owner' | 'admin' | 'member' | 'readonly';
+        to: 'owner' | 'admin' | 'member' | 'readonly';
+      };
     })
   | (AuditEventCommon & {
       action: 'users.updated';

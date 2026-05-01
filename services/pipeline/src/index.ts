@@ -1,7 +1,5 @@
 import { createLogger } from '@flowpunk/service-utils';
-
-import { route } from './router.js';
-import type { PipelineEnv } from './types.js';
+import { route, type PipelineEnv } from '@flowpunk-indie/pipeline-core';
 
 export default {
   async fetch(request: Request, env: PipelineEnv): Promise<Response> {
@@ -35,4 +33,4 @@ export default {
   },
 };
 
-export type { PipelineEnv } from './types.js';
+export type { PipelineEnv } from '@flowpunk-indie/pipeline-core';

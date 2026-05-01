@@ -1,27 +1,26 @@
 /**
- * Users repository — indie platform users (single-tenant deploy).
+ * Users repository — tenant users (per-tenant D1 on managed; single bound
+ * D1 on indie). Per SYSTEM.md §"Domain Model" + ADR-001:19, this table is
+ * tenant-scoped without a `tenant_id` column.
  *
  * Functional style matching `accounts.ts` / `persons.ts`. Throws
  * `UsersRepoError` for caller-actionable failures; handlers map via
- * `mapRepoError` in the indie users service.
+ * `mapRepoError`.
  *
  * Validation lives here, not in handlers, so any caller (REST handler,
  * future internal job, future MCP tool) gets the same input contract.
  *
  * Email uniqueness is enforced by the partial unique index
- * `idx_users_email_active_unique` (`UNIQUE(email) WHERE status='active'`).
- * The DB constraint is authoritative; `findByEmail` is a UX-only pre-check
- * for clean error messages. Concurrent inserts that race the pre-check
- * still surface as `EMAIL_TAKEN` because the unique-violation catch is
- * the second line of defense.
+ * `idx_users_email_active_unique`. The DB constraint is authoritative;
+ * `findByEmail` is a UX-only pre-check for clean error messages.
  *
- * Last-admin and indie one-admin invariants are enforced via single
- * conditional `UPDATE … WHERE … EXISTS(…)` statements so the read-then-
- * write race window does not exist.
+ * Roles (`owner` | `admin` | `member` | `readonly`) gate all admin-tier
+ * operations. Indie's "exactly one active owner" invariant is enforced
+ * via single conditional `INSERT … WHERE NOT EXISTS` / `UPDATE … WHERE
+ * EXISTS` statements so the read-then-write race window does not exist.
  *
- * Per ADR-011, indie has at most one active admin. The handler passes
- * `enforceSingleAdmin: true` on create / promote so the repo rejects with
- * `invariant_violation` ('ADMIN_EXISTS') if another active admin exists.
+ * Per ADR-011, indie wrappers pass `enforceSingleOwner: true`; managed
+ * wrappers pass `false`. The repo itself is edition-agnostic.
  */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, desc, eq, lt, ne, or, sql } from 'drizzle-orm';
@@ -38,6 +37,7 @@ import {
   type User,
   type UserPatchableField,
 } from '../schema/users.js';
+import { ROLE_VALUES, isRole, type Role } from '../utils/roles.js';
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -71,16 +71,16 @@ export interface CreateUserInput {
   displayName: string;
   firstName?: string | null;
   lastName?: string | null;
-  isAdmin?: boolean;
+  role?: Role;
 }
 
 export interface CreateUserOptions {
   /**
-   * When true, reject `isAdmin: true` if any other active admin already
-   * exists. Set by the indie users service (one-admin-per-deploy
-   * invariant per ADR-011); managed leaves this false.
+   * When true, reject `role: 'owner'` if any other active owner already
+   * exists. Set by indie wrappers (one-active-owner invariant per
+   * ADR-011); managed wrappers leave this false.
    */
-  enforceSingleAdmin?: boolean;
+  enforceSingleOwner?: boolean;
 }
 
 export type UpdateUserPatch = Partial<{
@@ -88,7 +88,7 @@ export type UpdateUserPatch = Partial<{
 }>;
 
 export interface UpdateUserOptions {
-  enforceSingleAdmin?: boolean;
+  enforceSingleOwner?: boolean;
 }
 
 export interface UpdateResult {
@@ -100,7 +100,7 @@ export interface ListOptions {
   limit?: number;
   cursor?: string | null;
   includeDeleted?: boolean;
-  isAdmin?: boolean;
+  role?: Role;
 }
 
 export interface ListResult {
@@ -131,14 +131,14 @@ export async function create(
   }
 
   const id = generateId('usr');
-  const isAdminInt = normalized.isAdmin ? 1 : 0;
+  const role: Role = normalized.role ?? 'member';
   const firstName = normalized.firstName ?? null;
   const lastName = normalized.lastName ?? null;
-  const enforceSingleAdminCreate =
-    options.enforceSingleAdmin === true && normalized.isAdmin === true;
+  const enforceSingleOwnerCreate =
+    options.enforceSingleOwner === true && role === 'owner';
 
-  if (enforceSingleAdminCreate) {
-    // Race-safe single-admin enforcement (indie one-active-admin per
+  if (enforceSingleOwnerCreate) {
+    // Race-safe single-owner enforcement (indie one-active-owner per
     // ADR-011). Single-statement conditional INSERT — the WHERE NOT
     // EXISTS clause closes the read-then-write window that a separate
     // pre-check would leave open.
@@ -146,26 +146,26 @@ export async function create(
       const result = await db.run(sql`
         INSERT INTO users (
           id, email, display_name, first_name, last_name,
-          is_admin, status, last_login_at,
+          role, status, last_login_at,
           deleted_at, deleted_by,
           created_at, created_by, updated_at, updated_by
         )
         SELECT
           ${id}, ${normalized.email}, ${normalized.displayName},
           ${firstName}, ${lastName},
-          ${isAdminInt}, 'active', NULL,
+          ${role}, 'active', NULL,
           NULL, NULL,
           ${now}, ${actorId}, ${now}, ${actorId}
         WHERE NOT EXISTS (
           SELECT 1 FROM users u
-          WHERE u.is_admin = 1 AND u.status = 'active'
+          WHERE u.role = 'owner' AND u.status = 'active'
         )
       `);
       if (getChanges(result) === 0) {
         throw new UsersRepoError(
           'invariant_violation',
-          `another active admin already exists`,
-          'ADMIN_EXISTS',
+          `another active owner already exists`,
+          'OWNER_EXISTS',
         );
       }
     } catch (err) {
@@ -189,15 +189,14 @@ export async function create(
     return inserted;
   }
 
-  // Default path (managed, or non-admin create on indie). Plain INSERT
-  // with unique-violation catch for email collisions.
+  // Default path. Plain INSERT with unique-violation catch for email collisions.
   const row: NewUser = {
     id,
     email: normalized.email,
     displayName: normalized.displayName,
     firstName,
     lastName,
-    isAdmin: normalized.isAdmin ?? false,
+    role,
     status: 'active',
     lastLoginAt: null,
     deletedAt: null,
@@ -280,7 +279,7 @@ export async function list(
 
   const filters = [];
   if (!options.includeDeleted) filters.push(eq(users.status, 'active'));
-  if (options.isAdmin !== undefined) filters.push(eq(users.isAdmin, options.isAdmin));
+  if (options.role !== undefined) filters.push(eq(users.role, options.role));
   if (cursor) {
     filters.push(
       or(
@@ -373,17 +372,15 @@ export async function update(
     return { user: current, fieldsChanged: [] };
   }
 
-  // Toggle isAdmin via dedicated atomic UPDATEs so the last-admin and
-  // single-admin invariants are race-safe. Other field changes go through
+  // Role transitions go through `setRole` so the last-owner and
+  // single-owner invariants are race-safe. Other field changes go through
   // the standard UPDATE below.
-  if ('isAdmin' in changes) {
-    const target = changes.isAdmin as boolean;
-    if (target === false) {
-      await demoteAdmin(db, id, actorId, now);
-    } else {
-      await promoteAdmin(db, id, actorId, now, options.enforceSingleAdmin === true);
-    }
-    delete changes.isAdmin;
+  if ('role' in changes) {
+    const target = changes.role as Role;
+    await setRole(db, id, target, actorId, now, {
+      enforceSingleOwner: options.enforceSingleOwner === true,
+    });
+    delete changes.role;
   }
 
   // Email uniqueness pre-check (UX); unique-violation is authoritative.
@@ -443,8 +440,8 @@ export async function update(
     }
   }
 
-  // Reload the row so the returned snapshot reflects both the admin
-  // toggle and the field updates.
+  // Reload the row so the returned snapshot reflects both the role
+  // transition and the field updates.
   const after = await findById(db, id, { includeDeleted: true });
   if (!after) {
     throw new UsersRepoError('not_found', `user "${id}" not found`);
@@ -452,102 +449,91 @@ export async function update(
   return { user: after, fieldsChanged };
 }
 
-async function demoteAdmin(
+/**
+ * Atomic role transition. Single-statement conditional UPDATE preserves
+ * the last-owner / single-owner invariants without a read-then-write
+ * race window. Demoting the last active owner throws `LAST_OWNER`; in
+ * single-owner mode, promoting to `owner` while another active owner
+ * exists throws `OWNER_EXISTS`.
+ */
+export async function setRole(
   db: Db,
   id: string,
+  target: Role,
   actorId: string,
   now: string,
+  options: { enforceSingleOwner?: boolean } = {},
 ): Promise<void> {
-  // Conditional UPDATE: only succeed if the target is an active admin
-  // AND another active admin exists. Single statement → race-safe.
-  const result = await db.run(sql`
-    UPDATE users
-    SET is_admin = 0, updated_at = ${now}, updated_by = ${actorId}
-    WHERE id = ${id}
-      AND status = 'active'
-      AND is_admin = 1
-      AND EXISTS (
-        SELECT 1 FROM users u2
-        WHERE u2.id != ${id}
-          AND u2.is_admin = 1
-          AND u2.status = 'active'
-      )
-  `);
-
-  if (getChanges(result) > 0) return;
-
-  // 0 rows changed: figure out why so we throw the right error.
-  const current = await findById(db, id, { includeDeleted: true });
-  if (!current) {
+  const before = await findById(db, id, { includeDeleted: true });
+  if (!before) {
     throw new UsersRepoError('not_found', `user "${id}" not found`);
   }
-  if (current.status !== 'active') {
+  if (before.status !== 'active') {
     throw new UsersRepoError('wrong_state', `user "${id}" is not active`);
   }
-  if (!current.isAdmin) {
-    // Already not an admin; treat as a no-op for the caller. Avoid an
-    // error so the surrounding update() call can finish other field
-    // changes coherently.
+  if (before.role === target) {
+    return; // no-op
+  }
+
+  // Promotion to owner.
+  if (target === 'owner') {
+    if (options.enforceSingleOwner) {
+      const result = await db.run(sql`
+        UPDATE users
+        SET role = 'owner', updated_at = ${now}, updated_by = ${actorId}
+        WHERE id = ${id}
+          AND status = 'active'
+          AND role != 'owner'
+          AND NOT EXISTS (
+            SELECT 1 FROM users u2
+            WHERE u2.id != ${id}
+              AND u2.role = 'owner'
+              AND u2.status = 'active'
+          )
+      `);
+      if (getChanges(result) > 0) return;
+      throw new UsersRepoError(
+        'invariant_violation',
+        `another active owner already exists`,
+        'OWNER_EXISTS',
+      );
+    }
+    // Multi-owner allowed (managed): plain promotion.
+    await db
+      .update(users)
+      .set({ role: 'owner', updatedAt: now, updatedBy: actorId })
+      .where(and(eq(users.id, id), eq(users.status, 'active')));
     return;
   }
-  throw new UsersRepoError(
-    'invariant_violation',
-    `cannot demote the last active admin`,
-    'LAST_ADMIN',
-  );
-}
 
-async function promoteAdmin(
-  db: Db,
-  id: string,
-  actorId: string,
-  now: string,
-  enforceSingleAdmin: boolean,
-): Promise<void> {
-  if (enforceSingleAdmin) {
+  // Demotion away from owner: must keep at least one active owner.
+  if (before.role === 'owner') {
     const result = await db.run(sql`
       UPDATE users
-      SET is_admin = 1, updated_at = ${now}, updated_by = ${actorId}
+      SET role = ${target}, updated_at = ${now}, updated_by = ${actorId}
       WHERE id = ${id}
         AND status = 'active'
-        AND is_admin = 0
-        AND NOT EXISTS (
+        AND role = 'owner'
+        AND EXISTS (
           SELECT 1 FROM users u2
           WHERE u2.id != ${id}
-            AND u2.is_admin = 1
+            AND u2.role = 'owner'
             AND u2.status = 'active'
         )
     `);
     if (getChanges(result) > 0) return;
-
-    const current = await findById(db, id, { includeDeleted: true });
-    if (!current) {
-      throw new UsersRepoError('not_found', `user "${id}" not found`);
-    }
-    if (current.status !== 'active') {
-      throw new UsersRepoError('wrong_state', `user "${id}" is not active`);
-    }
-    if (current.isAdmin) return; // already admin, no-op
     throw new UsersRepoError(
       'invariant_violation',
-      `another active admin already exists`,
-      'ADMIN_EXISTS',
+      `cannot demote the last active owner`,
+      'LAST_OWNER',
     );
   }
 
-  // Managed: simple promote.
-  const updated = await db
+  // Non-owner role transition (e.g. admin → member): plain update.
+  await db
     .update(users)
-    .set({ isAdmin: true, updatedAt: now, updatedBy: actorId })
-    .where(and(eq(users.id, id), eq(users.status, 'active')))
-    .returning();
-  if (!updated[0]) {
-    const current = await findById(db, id, { includeDeleted: true });
-    if (!current) {
-      throw new UsersRepoError('not_found', `user "${id}" not found`);
-    }
-    throw new UsersRepoError('wrong_state', `user "${id}" is not active`);
-  }
+    .set({ role: target, updatedAt: now, updatedBy: actorId })
+    .where(and(eq(users.id, id), eq(users.status, 'active')));
 }
 
 // ---------- soft delete ----------
@@ -558,8 +544,8 @@ export async function softDelete(
   actorId: string,
   now: string,
 ): Promise<User> {
-  // Last-admin guard baked into the WHERE clause: allowed if the target
-  // is non-admin, or if the target is admin AND (another admin exists OR
+  // Last-owner guard baked into the WHERE clause: allowed if the target
+  // is non-owner, or if the target is owner AND (another owner exists OR
   // this is the last active user — decommission case).
   const result = await db.run(sql`
     UPDATE users
@@ -571,11 +557,11 @@ export async function softDelete(
     WHERE id = ${id}
       AND status = 'active'
       AND (
-        is_admin = 0
+        role != 'owner'
         OR EXISTS (
           SELECT 1 FROM users u2
           WHERE u2.id != ${id}
-            AND u2.is_admin = 1
+            AND u2.role = 'owner'
             AND u2.status = 'active'
         )
         OR (
@@ -607,12 +593,12 @@ export async function softDelete(
       `user "${id}" is already deleted`,
     );
   }
-  // Active admin, blocked by invariant: at least one other active user
-  // exists but no other admin.
+  // Active owner, blocked by invariant: at least one other active user
+  // exists but no other owner.
   throw new UsersRepoError(
     'invariant_violation',
-    `cannot soft-delete the last active admin while other active users exist`,
-    'LAST_ADMIN_BLOCKS_DELETE',
+    `cannot soft-delete the last active owner while other active users exist`,
+    'LAST_OWNER_BLOCKS_DELETE',
   );
 }
 
@@ -640,8 +626,10 @@ export async function touchLastLogin(
  * Revoke all active mcp_sessions for a user. Called by the soft-delete
  * handler so a deleted user's cookie immediately stops authenticating.
  *
- * Indie has no `mcp_oauth_tokens` (managed-only). Managed's repo defines
- * a separate `revokeOauthTokensForUser`.
+ * Indie has no `mcp_oauth_tokens` (managed-only). Managed services that
+ * import this repo via the proxy revoke OAuth tokens at the wrapper
+ * layer (`@flowpunk-managed/tenant-db`'s oauthTokensRepo.revokeForUser)
+ * after this call returns.
  */
 export async function revokeMcpSessionsForUser(
   db: Db,
@@ -655,9 +643,9 @@ export async function revokeMcpSessionsForUser(
 }
 
 /**
- * Edition-aware auth-state revocation. Called from the soft-delete
- * handler. Indie revokes only mcp_sessions; managed extends this with
- * oauth-token revocation in its own repo override.
+ * Edition-agnostic auth-state revocation called from the soft-delete
+ * handler. Indie revokes only mcp_sessions; managed wrappers chain the
+ * OAuth-token revocation in the wrapper after this returns.
  */
 export async function revokeAuthStateForUser(
   db: Db,
@@ -674,7 +662,7 @@ interface NormalizedCreate {
   displayName: string;
   firstName?: string | null;
   lastName?: string | null;
-  isAdmin?: boolean;
+  role?: Role;
 }
 
 function validateCreate(input: CreateUserInput): NormalizedCreate {
@@ -690,11 +678,17 @@ function validateCreate(input: CreateUserInput): NormalizedCreate {
   const displayName = input.displayName.trim();
   validateDisplayName(displayName);
 
-  const out: NormalizedCreate = {
-    email,
-    displayName,
-    isAdmin: input.isAdmin === true,
-  };
+  const out: NormalizedCreate = { email, displayName };
+
+  if (input.role !== undefined) {
+    if (!isRole(input.role)) {
+      throw new UsersRepoError(
+        'invalid_input',
+        `role must be one of ${ROLE_VALUES.join(', ')}`,
+      );
+    }
+    out.role = input.role;
+  }
 
   if (input.firstName !== undefined) {
     if (input.firstName === null) {
@@ -736,11 +730,11 @@ function validateField(field: UserPatchableField, value: unknown): void {
     case 'lastName':
       validateString(field, value, NAME_MIN, NAME_MAX);
       return;
-    case 'isAdmin':
-      if (typeof value !== 'boolean') {
+    case 'role':
+      if (!isRole(value)) {
         throw new UsersRepoError(
           'invalid_input',
-          'isAdmin must be a boolean',
+          `role must be one of ${ROLE_VALUES.join(', ')}`,
         );
       }
       return;
@@ -762,8 +756,8 @@ function normalizeField(field: UserPatchableField, value: unknown): unknown {
     case 'firstName':
     case 'lastName':
       return (value as string).trim();
-    case 'isAdmin':
-      return value as boolean;
+    case 'role':
+      return value as Role;
   }
 }
 

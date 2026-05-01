@@ -1,7 +1,5 @@
 import { createLogger } from '@flowpunk/service-utils';
-
-import { route } from './router.js';
-import type { ContactsEnv } from './types.js';
+import { route, type ContactsEnv } from '@flowpunk-indie/contacts-core';
 
 export default {
   async fetch(request: Request, env: ContactsEnv): Promise<Response> {
@@ -35,4 +33,4 @@ export default {
   },
 };
 
-export type { ContactsEnv } from './types.js';
+export type { ContactsEnv } from '@flowpunk-indie/contacts-core';

@@ -2,18 +2,19 @@ import { sql } from 'drizzle-orm';
 import { index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /**
- * API keys for the indie auth service.
+ * API keys for the auth service (both editions).
  *
- * Indie is single-tenant, but API keys still carry a `tenantId` so the
- * gateway can stamp the same trusted identity header shape in both editions.
- * Auth service creation always stores the `_system` sentinel for indie.
+ * Lives in the per-tenant D1 (managed) or single bound D1 (indie) — never
+ * in PARENT_DB. Per ADR-001:19 there is no `tenant_id` column; the
+ * tenant is the D1 the row lives in. The encoded `fpk_` token carries
+ * the tenant scope as a prefix (`fpk_<scope>.<random>`) so the gateway
+ * knows which D1 to route validation to before calling AUTH_SERVICE.
  */
 export const apiKeys = sqliteTable(
   'api_keys',
   {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull(),
-    tenantId: text('tenant_id').notNull(),
     label: text('label').notNull(),
     hash: text('hash').notNull(),
     prefix: text('prefix').notNull(),
@@ -28,7 +29,6 @@ export const apiKeys = sqliteTable(
   },
   (t) => ({
     userIdx: index('idx_api_keys_user_id').on(t.userId),
-    tenantIdx: index('idx_api_keys_tenant_id').on(t.tenantId),
     hashIdx: uniqueIndex('idx_api_keys_hash_unique').on(t.hash),
     userLabelActiveUnique: uniqueIndex('idx_api_keys_user_label_active_unique')
       .on(t.userId, t.label)
