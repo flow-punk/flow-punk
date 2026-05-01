@@ -11,6 +11,15 @@ inspector_port = 9787
 MAX_REQUEST_BODY_BYTES = "10485760"  # 10 MB
 SERVICE_TIMEOUT_MS = "10000"
 ALLOWED_ORIGINS = "http://localhost:4321,http://localhost:3000"
+# Per-service MCP introspection adoption flag. Empty → all services use
+# static-registry fallback (safe default for fresh deploys). Set to
+# "contacts,pipeline" once those services are deployed and their
+# `GET /mcp/tools` endpoints have been smoke-tested.
+MCP_TOOLS_DYNAMIC_SERVICES = ""
+# Build-time edition marker. `'all'` for indie; `'managed'` for the
+# managed wrapper. Edition filters tool-registry at registry-build time
+# inside each gateway wrapper (ADR-006:41 / ADR-008:33).
+EDITION = "all"
 
 [[kv_namespaces]]
 binding = "MCP_TOOLS_KV"

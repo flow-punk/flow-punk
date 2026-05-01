@@ -27,6 +27,8 @@ function makeCtx(): AppContext {
     MAX_REQUEST_BODY_BYTES: '0',
     SERVICE_TIMEOUT_MS: '0',
     ALLOWED_ORIGINS: '',
+    MCP_TOOLS_DYNAMIC_SERVICES: '',
+    EDITION: 'all' as const,
   } satisfies Env;
   return {
     request: new Request('http://internal/'),

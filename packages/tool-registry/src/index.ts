@@ -2,13 +2,9 @@ export type ToolScope = 'read' | 'write';
 
 export type ToolKind = 'domain' | 'static' | 'dynamic';
 
-export type McpServiceName =
-  | 'gateway'
-  | 'contacts'
-  | 'pipeline'
-  | 'automations'
-  | 'forms'
-  | 'cms';
+export type Edition = 'all' | 'managed';
+
+export type McpServiceName = 'gateway' | 'contacts' | 'pipeline';
 
 export interface ToolAvailability {
   status: 'available' | 'unavailable';
@@ -25,6 +21,7 @@ export interface ToolMetadata {
   service: McpServiceName;
   requiredScope: ToolScope;
   availability: ToolAvailability;
+  edition: Edition;
   promotedTools?: string[];
   tools?: ToolMetadata[];
   keywords?: string[];
@@ -68,11 +65,20 @@ export interface McpToolAdapter {
   requiredScopeForTool(name: string): ToolScope;
 }
 
+export interface ToolRegistry {
+  edition: Edition;
+  domainSeeds: DomainSeed[];
+  staticExecutableTools: ToolMetadata[];
+  staticDomainTools: ToolMetadata[];
+  toolsSearch: ToolMetadata;
+}
+
 interface DomainSeed {
   name: string;
   description: string;
   promotedTools: string[];
   service: Exclude<McpServiceName, 'gateway'>;
+  edition: Edition;
   tools: ToolSeed[];
 }
 
@@ -81,18 +87,20 @@ interface ToolSeed {
   description: string;
   inputSchema: Record<string, unknown>;
   requiredScope: ToolScope;
+  edition: Edition;
   keywords?: string[];
 }
 
 const available = (): ToolAvailability => ({ status: 'available' });
 
-const staticDomainSeeds: DomainSeed[] = [
+const ALL_DOMAIN_SEEDS: DomainSeed[] = [
   {
     name: 'contacts',
     description:
       'Contacts and CRM records. Common actions: persons_search, persons_get, persons_create.',
     promotedTools: ['persons_search', 'persons_get', 'persons_create'],
     service: 'contacts',
+    edition: 'all',
     tools: [
       makeToolSeed('persons_search', 'Search person records', searchSchema(), 'read'),
       makeToolSeed('persons_get', 'Get a person by id', idSchema(), 'read'),
@@ -111,6 +119,7 @@ const staticDomainSeeds: DomainSeed[] = [
       'Deals and pipeline state. Common actions: deals_search, deals_get, deals_create.',
     promotedTools: ['deals_search', 'deals_get', 'deals_create'],
     service: 'pipeline',
+    edition: 'all',
     tools: [
       makeToolSeed('deals_search', 'Search deals', searchSchema(), 'read'),
       makeToolSeed('deals_get', 'Get a deal by id', idSchema(), 'read'),
@@ -134,49 +143,9 @@ const staticDomainSeeds: DomainSeed[] = [
       makeToolSeed('stages_search', 'Search stages', searchSchema(), 'read'),
     ],
   },
-  {
-    name: 'automations',
-    description:
-      'Workflow and automation control. Common actions: automations_search, automations_get, automations_trigger.',
-    promotedTools: ['automations_search', 'automations_get', 'automations_trigger'],
-    service: 'automations',
-    tools: [
-      makeToolSeed('automations_search', 'Search automations', searchSchema(), 'read'),
-      makeToolSeed('automations_get', 'Get an automation by id', idSchema(), 'read'),
-      makeToolSeed('automations_trigger', 'Trigger an automation', idSchema(), 'write'),
-      makeToolSeed('workflows_search', 'Search workflows', searchSchema(), 'read'),
-      makeToolSeed('workflows_get', 'Get a workflow by id', idSchema(), 'read'),
-    ],
-  },
-  {
-    name: 'forms',
-    description: 'Form inputs and submissions. Common actions: forms_search, forms_get.',
-    promotedTools: ['forms_search', 'forms_get'],
-    service: 'forms',
-    tools: [
-      makeToolSeed('forms_search', 'Search forms', searchSchema(), 'read'),
-      makeToolSeed('forms_get', 'Get a form by id', idSchema(), 'read'),
-      makeToolSeed('forms_submit', 'Submit a form response', objectSchema(), 'write'),
-    ],
-  },
-  {
-    name: 'cms',
-    description:
-      'Collections and CMS entries. Common actions: collections_search, collections_get, collections_create.',
-    promotedTools: ['collections_search', 'collections_get', 'collections_create'],
-    service: 'cms',
-    tools: [
-      makeToolSeed('collections_search', 'Search collections', searchSchema(), 'read'),
-      makeToolSeed('collections_get', 'Get a collection by id', idSchema(), 'read'),
-      makeToolSeed('collections_create', 'Create a collection', objectSchema(), 'write'),
-      makeToolSeed('collections_update', 'Update a collection', idWithFieldsSchema(), 'write'),
-      makeToolSeed('collections_delete', 'Delete a collection', idSchema(), 'write'),
-      makeToolSeed('cms_entries_search', 'Search CMS entries', searchSchema(), 'read'),
-    ],
-  },
 ];
 
-const toolsSearchMetadata: ToolMetadata = {
+const TOOLS_SEARCH_METADATA: ToolMetadata = {
   name: 'tools_search',
   description:
     'Search tenant-aware MCP tools, including unavailable and dynamic tools, with setup guidance when relevant.',
@@ -192,30 +161,43 @@ const toolsSearchMetadata: ToolMetadata = {
   service: 'gateway',
   requiredScope: 'read',
   availability: available(),
+  edition: 'all',
   keywords: ['search', 'discover', 'tools', 'catalog'],
 };
 
-const staticExecutableTools = staticDomainSeeds.flatMap((domain) =>
-  domain.tools.map<ToolMetadata>((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    inputSchema: tool.inputSchema,
-    kind: 'static',
-    domain: domain.name,
-    service: domain.service,
-    requiredScope: tool.requiredScope,
-    availability: available(),
-    keywords: tool.keywords,
-  })),
-);
+/**
+ * Build a per-edition tool registry. Edition filtering happens at registry build
+ * time inside each gateway wrapper; the adapter contract itself stays
+ * edition-agnostic per ADR-006 §"Tool Availability Model".
+ *
+ * - `'all'` includes only tools/domains marked `edition: 'all'`.
+ * - `'managed'` includes both `'all'` and `'managed'` (managed is a superset).
+ */
+export function buildToolRegistry(edition: Edition): ToolRegistry {
+  const includeManaged = edition === 'managed';
+  const domainSeeds = ALL_DOMAIN_SEEDS
+    .filter((seed) => seed.edition === 'all' || (includeManaged && seed.edition === 'managed'))
+    .map<DomainSeed>((seed) => ({
+      ...seed,
+      tools: seed.tools.filter((tool) => tool.edition === 'all' || (includeManaged && tool.edition === 'managed')),
+    }));
 
-const staticExecutableToolMap = new Map<string, ToolMetadata>(
-  staticExecutableTools.map((tool) => [tool.name, tool]),
-);
+  const staticExecutableTools = domainSeeds.flatMap((domain) =>
+    domain.tools.map<ToolMetadata>((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+      kind: 'static',
+      domain: domain.name,
+      service: domain.service,
+      requiredScope: tool.requiredScope,
+      availability: available(),
+      edition: tool.edition,
+      keywords: tool.keywords,
+    })),
+  );
 
-const staticDomainTools = staticDomainSeeds.map<ToolMetadata>((domain) => {
-  const tools = staticExecutableTools.filter((tool) => tool.domain === domain.name);
-  return {
+  const staticDomainTools = domainSeeds.map<ToolMetadata>((domain) => ({
     name: domain.name,
     description: domain.description,
     inputSchema: {
@@ -234,24 +216,34 @@ const staticDomainTools = staticDomainSeeds.map<ToolMetadata>((domain) => {
     service: domain.service,
     requiredScope: 'read',
     availability: available(),
-    promotedTools: domain.promotedTools,
-    tools,
+    edition: domain.edition,
+    promotedTools: domain.promotedTools.filter((toolName) =>
+      domain.tools.some((tool) => tool.name === toolName),
+    ),
+    tools: staticExecutableTools.filter((tool) => tool.domain === domain.name),
     keywords: [domain.name, ...domain.promotedTools],
-  };
-});
+  }));
 
-const staticDomainToolMap = new Map<string, ToolMetadata>(
-  staticDomainTools.map((tool) => [tool.name, tool]),
-);
+  return {
+    edition,
+    domainSeeds,
+    staticExecutableTools,
+    staticDomainTools,
+    toolsSearch: TOOLS_SEARCH_METADATA,
+  };
+}
+
+const DEFAULT_REGISTRY = buildToolRegistry('all');
 
 export function createMcpToolAdapter(
   context: McpToolAdapterContext = {},
+  registry: ToolRegistry = DEFAULT_REGISTRY,
 ): McpToolAdapter {
   const includeStaticCatalog = context.includeStaticCatalog ?? true;
   const unavailableTools = context.unavailableTools ?? [];
   const dynamicTools = context.dynamicTools ?? [];
   const availableExecutables = dedupeTools([
-    ...(includeStaticCatalog ? staticExecutableTools : []),
+    ...(includeStaticCatalog ? registry.staticExecutableTools : []),
     ...dynamicTools.filter((tool) => tool.availability.status === 'available'),
     ...(context.availableTools ?? []),
   ]);
@@ -265,14 +257,21 @@ export function createMcpToolAdapter(
     discoverableExecutables.map((tool) => [tool.name, tool]),
   );
 
-  const domainTools = buildDomainTools(availableExecutables);
+  const staticDomainToolMap = new Map<string, ToolMetadata>(
+    registry.staticDomainTools.map((tool) => [tool.name, tool]),
+  );
+  const staticExecutableToolMap = new Map<string, ToolMetadata>(
+    registry.staticExecutableTools.map((tool) => [tool.name, tool]),
+  );
+
+  const domainTools = buildDomainTools(availableExecutables, registry.domainSeeds);
   const domainToolMap = new Map<string, ToolMetadata>(
     domainTools.map((tool) => [tool.name, tool]),
   );
 
   return {
     listAvailableTools(): ToolMetadata[] {
-      return [...domainTools, toolsSearchMetadata];
+      return [...domainTools, registry.toolsSearch];
     },
 
     getToolMetadata(name: string): ToolMetadata | null {
@@ -316,17 +315,20 @@ export function createMcpToolAdapter(
 
   function resolveStaticToolMetadata(name: string): ToolMetadata | null {
     if (!includeStaticCatalog) {
-      return toolsSearchMetadata.name === name ? toolsSearchMetadata : null;
+      return registry.toolsSearch.name === name ? registry.toolsSearch : null;
     }
     return (
       staticDomainToolMap.get(name) ??
       staticExecutableToolMap.get(name) ??
-      (toolsSearchMetadata.name === name ? toolsSearchMetadata : null)
+      (registry.toolsSearch.name === name ? registry.toolsSearch : null)
     );
   }
 
-  function buildDomainTools(executableTools: ToolMetadata[]): ToolMetadata[] {
-    return staticDomainSeeds
+  function buildDomainTools(
+    executableTools: ToolMetadata[],
+    domainSeeds: DomainSeed[],
+  ): ToolMetadata[] {
+    return domainSeeds
       .map<ToolMetadata | null>((domain) => {
         const tools = executableTools.filter((tool) => tool.domain === domain.name);
         if (tools.length === 0) return null;
@@ -350,6 +352,7 @@ export function createMcpToolAdapter(
           service: domain.service,
           requiredScope: 'read',
           availability: available(),
+          edition: domain.edition,
           promotedTools: domain.promotedTools.filter((toolName) =>
             tools.some((tool) => tool.name === toolName),
           ),
@@ -399,6 +402,7 @@ function makeToolSeed(
     description,
     inputSchema,
     requiredScope,
+    edition: 'all',
     keywords,
   };
 }

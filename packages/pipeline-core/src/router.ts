@@ -16,6 +16,8 @@ import { handleGetStage } from './handlers/stages/get.js';
 import { handleListStages } from './handlers/stages/list.js';
 import { handleSoftDeleteStage } from './handlers/stages/softDelete.js';
 import { handleUpdateStage } from './handlers/stages/update.js';
+import { handleMcpExecute } from './mcp/execute.js';
+import { handleMcpTools } from './mcp/tools.js';
 import { parseIdentity } from './middleware/identity.js';
 import type { Actor, PipelineEnv } from './types.js';
 
@@ -25,6 +27,8 @@ const STAGES_COLLECTION_PATH = '/api/v1/stages';
 const STAGES_ITEM_PREFIX = '/api/v1/stages/';
 const DEALS_COLLECTION_PATH = '/api/v1/deals';
 const DEALS_ITEM_PREFIX = '/api/v1/deals/';
+const MCP_TOOLS_PATH = '/mcp/tools';
+const MCP_EXECUTE_PATH = '/mcp/execute';
 
 export async function route(
   request: Request,
@@ -46,6 +50,24 @@ export async function route(
 
   const actor = parseIdentity(request);
   if (!actor) return unauthenticated();
+
+  // MCP endpoints — internal-only (gateway service-binding ingress).
+  // Trust model: identity headers + X-MCP-Session-Id + X-Idempotency-Key
+  // (synthesized by the gateway for mutating tools).
+  if (pathname === MCP_TOOLS_PATH) {
+    if (method === 'GET' || method === 'HEAD') {
+      return handleMcpTools(env);
+    }
+    return methodNotAllowed(['GET', 'HEAD']);
+  }
+  if (pathname === MCP_EXECUTE_PATH) {
+    if (method === 'POST') {
+      return idempotent(request, env, actor, () =>
+        handleMcpExecute(request, env, actor),
+      );
+    }
+    return methodNotAllowed(['POST']);
+  }
 
   // /api/v1/pipelines collection
   if (pathname === PIPELINES_COLLECTION_PATH) {

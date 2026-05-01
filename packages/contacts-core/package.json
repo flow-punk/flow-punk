@@ -19,6 +19,7 @@
     "@flowpunk-indie/db": "workspace:*",
     "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",
+    "@flowpunk/tool-registry": "workspace:*",
     "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {

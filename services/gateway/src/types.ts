@@ -20,6 +20,21 @@ export interface Env {
   MAX_REQUEST_BODY_BYTES: string;
   SERVICE_TIMEOUT_MS: string;
   ALLOWED_ORIGINS: string;
+  /**
+   * Comma-separated list of MCP service domains (`contacts`, `pipeline`, …)
+   * whose `GET /mcp/tools` endpoint is adopted. Listed services are queried
+   * dynamically; unlisted services use the static-registry fallback. Empty
+   * string → all services use static fallback (default for new
+   * deployments). Setting this is the gating mechanism for staged rollout.
+   */
+  MCP_TOOLS_DYNAMIC_SERVICES: string;
+  /**
+   * Build-time edition marker injected by each gateway wrapper's wrangler
+   * config. `'all'` = indie subset only; `'managed'` = indie subset plus
+   * managed-only tools. Edition is a wrapper concern, not a per-tenant
+   * concern; it is set once per worker deployment.
+   */
+  EDITION: 'all' | 'managed';
 }
 
 import type { CredentialType } from './auth/identity-headers.js';

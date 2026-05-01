@@ -1,6 +1,11 @@
 name = "pipeline"
 main = "src/index.ts"
 compatibility_date = "2025-06-01"
+# Internal-only: reachable only via the gateway's PIPELINE_SERVICE binding.
+# `workers_dev = false` disables the public `<name>.<account>.workers.dev`
+# URL so identity headers (`X-Tenant-Id`, `X-User-Id`, `X-Scope`,
+# `X-MCP-Session-Id`) cannot be spoofed by external callers.
+workers_dev = false
 
 [dev]
 ip = "127.0.0.1"

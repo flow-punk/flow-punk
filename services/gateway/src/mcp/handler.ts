@@ -1,11 +1,13 @@
 import { createLogger } from '@flowpunk/service-utils';
 import type { CredentialDescriptor, Logger } from '@flowpunk/service-utils';
-import { createMcpToolAdapter } from '@flowpunk/tool-registry';
+import { buildToolRegistry, createMcpToolAdapter } from '@flowpunk/tool-registry';
 import type {
+  Edition,
   McpServiceName,
   McpToolAdapter,
   McpToolState,
   ToolMetadata,
+  ToolRegistry,
 } from '@flowpunk/tool-registry';
 import { copyIdentityHeaders, extractIdentityHeaders } from '../auth/identity-headers.js';
 import {
@@ -37,6 +39,7 @@ import type { SessionState } from './session-do.js';
 
 export const SESSION_HEADER = 'X-MCP-Session-Id';
 export const SESSION_MODE_HEADER = 'X-MCP-Session-Mode';
+export const IDEMPOTENCY_KEY_HEADER = 'X-Idempotency-Key';
 export const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
   'Cache-Control': 'no-cache',
@@ -96,6 +99,21 @@ type CachedToolState =
   | {
     mode: 'dynamic';
     toolState: McpToolState;
+    /**
+     * Services whose `GET /mcp/tools` actually succeeded when the cache
+     * was written. The hybrid adapter uses this (∩ current adoption set)
+     * to decide which services contribute dynamic state vs static fallback —
+     * a partial fan-out where pipeline failed must NOT cause pipeline tools
+     * to disappear; static fallback fills in for adopted-but-failed.
+     */
+    succeededServices: string[];
+    /**
+     * The adoption set in effect at cache write time. If the gateway is
+     * redeployed with a different `MCP_TOOLS_DYNAMIC_SERVICES`, cached
+     * entries are ignored (treated as stale) so newly-adopted services
+     * are queried immediately rather than waiting for TTL.
+     */
+    adoptionSet: string[];
   }
   | {
     mode: 'fallback';
@@ -323,7 +341,29 @@ async function handleToolCall(
     );
   }
 
+  // Mutating tools require a JSON-RPC `id` so we can synthesize a stable
+  // X-Idempotency-Key for downstream `withIdempotency`. Without an id, MCP
+  // notifications would replay against `withIdempotency` with no dedup key
+  // and writes could double-execute on retry.
+  if (
+    requiredScope === 'write' &&
+    (request.id === undefined || request.id === null)
+  ) {
+    return errorPayload(
+      null,
+      -32602,
+      `Mutating tool ${toolName} requires a JSON-RPC id for idempotent dispatch`,
+    );
+  }
+
   const headers = buildDownstreamServiceHeaders(ctx.request.headers, ctx.requestId, session.sessionId);
+
+  if (requiredScope === 'write') {
+    headers.set(
+      IDEMPOTENCY_KEY_HEADER,
+      await synthesizeIdempotencyKey(session.sessionId, request.id ?? null, toolName),
+    );
+  }
 
   let response: Response;
   try {
@@ -333,11 +373,16 @@ async function handleToolCall(
       {
         method: 'POST',
         headers,
+        // Body is the stable retry-identity payload — must not contain any
+        // per-HTTP-request entropy. `withIdempotency` hashes the body to
+        // detect "same key, different request" replays; a volatile field
+        // here would 422 every legitimate retry. The HTTP request id lives
+        // in the `X-Request-ID` header (set by buildDownstreamServiceHeaders).
         body: JSON.stringify({
           sessionId: session.sessionId,
           name: toolName,
           arguments: params.arguments ?? {},
-          requestId: ctx.requestId,
+          jsonrpcId: request.id ?? null,
         }),
       },
       ctx.env.SERVICE_TIMEOUT_MS,
@@ -513,12 +558,6 @@ function bindingForTool(service: McpServiceName, ctx: AppContext): Fetcher | nul
       return ctx.env.CONTACTS_SERVICE;
     case 'pipeline':
       return ctx.env.PIPELINE_SERVICE;
-    case 'automations':
-      return ctx.env.AUTOMATIONS_SERVICE;
-    case 'forms':
-      return ctx.env.FORMINPUTS_SERVICE;
-    case 'cms':
-      return ctx.env.CMS_SERVICE;
     case 'gateway':
       return null;
   }
@@ -712,33 +751,110 @@ function generateSessionId(): string {
   return `mcp_sess_${base64UrlEncode(bytes)}`;
 }
 
+/**
+ * Stable per-call idempotency key derived from the MCP session, JSON-RPC
+ * request id, and tool name. Identical retries (same session, same id,
+ * same tool) collapse to a single side-effect via `withIdempotency` at
+ * the service layer.
+ *
+ * The composite preserves the JSON-RPC id's type (string vs number) so
+ * `id: 0` and `id: "0"` produce different keys — JSON.stringify of a typed
+ * tuple is the canonical form. Full SHA-256 hex (no truncation) — `withIdempotency`
+ * accepts up to 255 chars by default.
+ */
+async function synthesizeIdempotencyKey(
+  sessionId: string,
+  jsonrpcId: JsonRpcId,
+  toolName: string,
+): Promise<string> {
+  const composite = JSON.stringify(['mcp', sessionId, typeof jsonrpcId, jsonrpcId, toolName]);
+  const bytes = new TextEncoder().encode(composite);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const hex = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  return `mcp_${hex}`;
+}
+
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function createStaticGatewayToolAdapter(ctx: AppContext): McpToolAdapter {
-  return createMcpToolAdapter({
-    tenantId: ctx.tenantId,
-    userId: ctx.userId,
-    scope: ctx.scope,
-    credentialType: narrowMcpCredentialType(ctx.credentialType),
-  });
+/**
+ * Per-worker registry. Each gateway wrapper sets `env.EDITION` in its
+ * wrangler config — `'all'` for indie, `'managed'` for managed. Cached
+ * here so we build it once per worker boot rather than per request.
+ */
+const REGISTRY_CACHE = new Map<Edition, ToolRegistry>();
+
+function registryForEdition(edition: Edition): ToolRegistry {
+  let cached = REGISTRY_CACHE.get(edition);
+  if (!cached) {
+    cached = buildToolRegistry(edition);
+    REGISTRY_CACHE.set(edition, cached);
+  }
+  return cached;
 }
 
-function createDynamicGatewayToolAdapter(
+function envEdition(env: Env): Edition {
+  return env.EDITION === 'managed' ? 'managed' : 'all';
+}
+
+function parseDynamicServices(raw: string | undefined): Set<Exclude<McpServiceName, 'gateway'>> {
+  const allowed = new Set<Exclude<McpServiceName, 'gateway'>>(['contacts', 'pipeline']);
+  const out = new Set<Exclude<McpServiceName, 'gateway'>>();
+  for (const part of (raw ?? '').split(',')) {
+    const trimmed = part.trim();
+    if (allowed.has(trimmed as Exclude<McpServiceName, 'gateway'>)) {
+      out.add(trimmed as Exclude<McpServiceName, 'gateway'>);
+    }
+  }
+  return out;
+}
+
+function createStaticGatewayToolAdapter(ctx: AppContext): McpToolAdapter {
+  return createMcpToolAdapter(
+    {
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      scope: ctx.scope,
+      credentialType: narrowMcpCredentialType(ctx.credentialType),
+    },
+    registryForEdition(envEdition(ctx.env)),
+  );
+}
+
+/**
+ * Hybrid adapter: dynamic state for adopted services + static fallback for
+ * non-adopted services. The static catalog is excluded at adapter level
+ * (`includeStaticCatalog: false`); we hand-pass non-adopted services'
+ * static tools as `availableTools` so the merged set matches what the
+ * tenant should see.
+ */
+function createHybridGatewayToolAdapter(
   ctx: AppContext,
   toolState: McpToolState,
+  dynamicServices: Set<Exclude<McpServiceName, 'gateway'>>,
 ): McpToolAdapter {
-  return createMcpToolAdapter({
-    tenantId: ctx.tenantId,
-    userId: ctx.userId,
-    scope: ctx.scope,
-    credentialType: narrowMcpCredentialType(ctx.credentialType),
-    includeStaticCatalog: false,
-    ...toolState,
-  });
+  const registry = registryForEdition(envEdition(ctx.env));
+  const staticForNonAdopted = registry.staticExecutableTools.filter(
+    (tool) => !dynamicServices.has(tool.service as Exclude<McpServiceName, 'gateway'>),
+  );
+  return createMcpToolAdapter(
+    {
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      scope: ctx.scope,
+      credentialType: narrowMcpCredentialType(ctx.credentialType),
+      includeStaticCatalog: false,
+      availableTools: [...toolState.availableTools, ...staticForNonAdopted],
+      unavailableTools: toolState.unavailableTools,
+      dynamicTools: toolState.dynamicTools,
+    },
+    registry,
+  );
 }
 
 function toToolDefinition(tool: ToolMetadata): {
@@ -763,47 +879,79 @@ async function resolveGatewayToolAdapter(
     };
   }
 
-  const cachedState = await readCachedToolState(ctx);
+  const dynamicServices = parseDynamicServices(ctx.env.MCP_TOOLS_DYNAMIC_SERVICES);
+
+  // No services adopted dynamic introspection → straight to static.
+  if (dynamicServices.size === 0) {
+    return { adapter: createStaticGatewayToolAdapter(ctx) };
+  }
+
+  const cachedState = await readCachedToolState(ctx, dynamicServices);
   if (cachedState) {
     if (cachedState.mode === 'fallback') {
-      return {
-        adapter: createStaticGatewayToolAdapter(ctx),
-      };
+      return { adapter: createStaticGatewayToolAdapter(ctx) };
     }
+    // The set of services that contribute dynamic state is the
+    // intersection of (succeeded-when-cached) ∩ (currently-adopted). All
+    // other adopted services get static fallback so a single failed
+    // service in a fan-out doesn't make its tools disappear.
+    const effectivelyDynamic = intersect(
+      new Set(cachedState.succeededServices as Array<Exclude<McpServiceName, 'gateway'>>),
+      dynamicServices,
+    );
     return {
-      adapter: createDynamicGatewayToolAdapter(ctx, cachedState.toolState),
+      adapter: createHybridGatewayToolAdapter(ctx, cachedState.toolState, effectivelyDynamic),
     };
   }
 
-  const fetchedState = await fetchTenantToolState(ctx, maxBytes);
-  if (!fetchedState) {
-    bindLogger(ctx).info('mcp_tools_dynamic_fallback', {
+  const fanOut = await fetchTenantToolState(ctx, maxBytes, dynamicServices);
+  if (!fanOut) {
+    // All adopted services failed introspection. Degrade to static for THIS
+    // request (do not poison the cache with a fallback marker) so the next
+    // request retries fan-out — service deploys recover quickly.
+    bindLogger(ctx).warn('mcp_tools_introspection_failed', {
       tenantId: ctx.tenantId,
-      reason: 'no_downstream_mcp_tools_available',
+      adoptedServices: [...dynamicServices].sort(),
     });
-    await writeCachedToolState(ctx, { mode: 'fallback' });
-    return {
-      adapter: createStaticGatewayToolAdapter(ctx),
-    };
+    return { adapter: createStaticGatewayToolAdapter(ctx) };
   }
 
   await writeCachedToolState(ctx, {
     mode: 'dynamic',
-    toolState: fetchedState,
+    toolState: fanOut.toolState,
+    succeededServices: [...fanOut.succeededServices].sort(),
+    adoptionSet: [...dynamicServices].sort(),
   });
   return {
-    adapter: createDynamicGatewayToolAdapter(ctx, fetchedState),
+    adapter: createHybridGatewayToolAdapter(ctx, fanOut.toolState, fanOut.succeededServices),
   };
 }
 
-async function readCachedToolState(ctx: AppContext): Promise<CachedToolState | null> {
+function intersect<T>(a: Set<T>, b: Set<T>): Set<T> {
+  const out = new Set<T>();
+  for (const value of a) if (b.has(value)) out.add(value);
+  return out;
+}
+
+async function readCachedToolState(
+  ctx: AppContext,
+  currentAdoption: Set<Exclude<McpServiceName, 'gateway'>>,
+): Promise<CachedToolState | null> {
   if (!ctx.tenantId) return null;
 
   try {
     const cached = await ctx.env.MCP_TOOLS_KV.get(toolsCacheKey(ctx.tenantId), 'json') as
       | CachedToolState
       | null;
-    if (isCachedToolState(cached)) return cached;
+    if (!isCachedToolState(cached)) return null;
+    // Ignore cache when the adoption set has changed — otherwise newly
+    // adopted services would be invisible until TTL expires.
+    if (cached.mode === 'dynamic') {
+      const cachedSig = cached.adoptionSet.join(',');
+      const currentSig = [...currentAdoption].sort().join(',');
+      if (cachedSig !== currentSig) return null;
+    }
+    return cached;
   } catch (error) {
     bindLogger(ctx).warn('mcp_tools_cache_read_failed', {
       tenantId: ctx.tenantId,
@@ -831,20 +979,25 @@ async function writeCachedToolState(ctx: AppContext, cachedState: CachedToolStat
   }
 }
 
+interface FanOutResult {
+  toolState: McpToolState;
+  succeededServices: Set<Exclude<McpServiceName, 'gateway'>>;
+}
+
 async function fetchTenantToolState(
   ctx: AppContext,
   maxBytes: number,
-): Promise<McpToolState | null> {
-  const services: Array<{
+  dynamicServices: Set<Exclude<McpServiceName, 'gateway'>>,
+): Promise<FanOutResult | null> {
+  const allServices: Array<{
     name: Exclude<McpServiceName, 'gateway'>;
     binding: Fetcher;
   }> = [
     { name: 'contacts' as const, binding: ctx.env.CONTACTS_SERVICE },
     { name: 'pipeline' as const, binding: ctx.env.PIPELINE_SERVICE },
-    { name: 'automations' as const, binding: ctx.env.AUTOMATIONS_SERVICE },
-    { name: 'forms' as const, binding: ctx.env.FORMINPUTS_SERVICE },
-    { name: 'cms' as const, binding: ctx.env.CMS_SERVICE },
   ];
+  const services = allServices.filter((entry) => dynamicServices.has(entry.name));
+  if (services.length === 0) return null;
 
   const results = await Promise.allSettled(
     services.map(async ({ name, binding }) => ({
@@ -854,12 +1007,12 @@ async function fetchTenantToolState(
   );
 
   const mergedState = emptyToolState();
-  let successCount = 0;
+  const succeededServices = new Set<Exclude<McpServiceName, 'gateway'>>();
 
   for (const [index, result] of results.entries()) {
     if (result.status === 'fulfilled') {
       mergeToolState(mergedState, result.value.response.toolState);
-      successCount += 1;
+      succeededServices.add(result.value.name);
       continue;
     }
 
@@ -872,8 +1025,8 @@ async function fetchTenantToolState(
     });
   }
 
-  if (successCount === 0) return null;
-  return mergedState;
+  if (succeededServices.size === 0) return null;
+  return { toolState: mergedState, succeededServices };
 }
 
 async function fetchDownstreamToolState(
@@ -965,7 +1118,21 @@ function isMcpToolState(value: unknown): value is McpToolState {
 
 function isCachedToolState(value: unknown): value is CachedToolState {
   if (!value || typeof value !== 'object') return false;
-  const candidate = value as { mode?: unknown; toolState?: unknown };
+  const candidate = value as {
+    mode?: unknown;
+    toolState?: unknown;
+    succeededServices?: unknown;
+    adoptionSet?: unknown;
+  };
   if (candidate.mode === 'fallback') return true;
-  return candidate.mode === 'dynamic' && isMcpToolState(candidate.toolState);
+  return (
+    candidate.mode === 'dynamic' &&
+    isMcpToolState(candidate.toolState) &&
+    isStringArray(candidate.succeededServices) &&
+    isStringArray(candidate.adoptionSet)
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
 }

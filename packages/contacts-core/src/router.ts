@@ -11,6 +11,8 @@ import { handleGetPerson } from './handlers/persons/get.js';
 import { handleListPersons } from './handlers/persons/list.js';
 import { handleSoftDeletePerson } from './handlers/persons/softDelete.js';
 import { handleUpdatePerson } from './handlers/persons/update.js';
+import { handleMcpExecute } from './mcp/execute.js';
+import { handleMcpTools } from './mcp/tools.js';
 import { parseIdentity } from './middleware/identity.js';
 import type { Actor, ContactsEnv } from './types.js';
 
@@ -18,6 +20,8 @@ const ACCOUNTS_COLLECTION_PATH = '/api/v1/accounts';
 const ACCOUNTS_ITEM_PREFIX = '/api/v1/accounts/';
 const PERSONS_COLLECTION_PATH = '/api/v1/persons';
 const PERSONS_ITEM_PREFIX = '/api/v1/persons/';
+const MCP_TOOLS_PATH = '/mcp/tools';
+const MCP_EXECUTE_PATH = '/mcp/execute';
 
 export async function route(
   request: Request,
@@ -39,6 +43,24 @@ export async function route(
 
   const actor = parseIdentity(request);
   if (!actor) return unauthenticated();
+
+  // MCP endpoints — internal-only (gateway service-binding ingress).
+  // Trust model: identity headers + X-MCP-Session-Id + X-Idempotency-Key
+  // (synthesized by the gateway for mutating tools).
+  if (pathname === MCP_TOOLS_PATH) {
+    if (method === 'GET' || method === 'HEAD') {
+      return handleMcpTools(env);
+    }
+    return methodNotAllowed(['GET', 'HEAD']);
+  }
+  if (pathname === MCP_EXECUTE_PATH) {
+    if (method === 'POST') {
+      return idempotent(request, env, actor, () =>
+        handleMcpExecute(request, env, actor),
+      );
+    }
+    return methodNotAllowed(['POST']);
+  }
 
   // /api/v1/accounts collection
   if (pathname === ACCOUNTS_COLLECTION_PATH) {
