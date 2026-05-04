@@ -10,23 +10,35 @@
     "./mcp": "./src/mcp/index.ts",
     "./auth": "./src/auth/index.ts",
     "./body-size": "./src/body-size.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./openapi": "./src/openapi/assemble.ts",
+    "./openapi/types": "./src/openapi/types.ts",
+    "./openapi/indie-spec": "./src/openapi/indie-spec.ts",
+    "./openapi/swagger-ui": "./src/openapi/swagger-ui.ts",
+    "./openapi/gateway-spec": "./src/openapi/gateway-spec.ts"
   },
   "scripts": {
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --persist-to ../../.wrangler-state",
+    "migrate:local": "wrangler d1 migrations apply DB --local --persist-to ../../.wrangler-state",
     "build": "wrangler deploy --dry-run --outdir=dist",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "spec:dump": "tsx scripts/dump-openapi.ts",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@flowpunk-indie/auth-spec": "workspace:*",
+    "@flowpunk-indie/contacts-spec": "workspace:*",
     "@flowpunk-indie/db": "workspace:*",
+    "@flowpunk-indie/pipeline-spec": "workspace:*",
+    "@flowpunk-indie/users-spec": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",
     "@flowpunk/tool-registry": "workspace:*",
     "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250620.0",
+    "tsx": "^4.19.2",
     "typescript": "5.9.3",
     "wrangler": "^4.22.0"
   }

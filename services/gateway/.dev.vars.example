@@ -1,0 +1,10 @@
+# Local-only environment variables loaded by `wrangler dev`.
+# Copy to `.dev.vars` (gitignored) and set values as needed.
+#
+# OPENAPI_ENABLED=1 turns on the local-only Swagger UI and JSON spec at:
+#   GET /api/docs
+#   GET /api/openapi.json
+#
+# This flag MUST NOT be added to `wrangler.toml` `[vars]` — that would
+# ship it to deploys. `.dev.vars` is loaded only by `wrangler dev`.
+OPENAPI_ENABLED=1

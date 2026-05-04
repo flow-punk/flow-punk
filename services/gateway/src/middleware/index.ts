@@ -15,9 +15,9 @@ export {
   routerMiddleware,
 };
 
-import { INDIE_PUBLIC_PATHS, isPublicPath } from './public-paths.js';
+import { INDIE_PUBLIC_PATHS, OPENAPI_LOCAL_PATHS, getPublicPaths, isPublicPath } from './public-paths.js';
 
-export { INDIE_PUBLIC_PATHS, isPublicPath };
+export { INDIE_PUBLIC_PATHS, OPENAPI_LOCAL_PATHS, getPublicPaths, isPublicPath };
 export const PUBLIC_PATHS = INDIE_PUBLIC_PATHS;
 
 /**

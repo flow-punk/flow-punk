@@ -37,9 +37,9 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 // indie/services/contacts/scripts → indie/services/gateway is `../../gateway`.
 const GATEWAY_DIR = resolve(SCRIPT_DIR, '../../gateway');
 // Resolved by Wrangler against process.cwd() (= GATEWAY_DIR), landing at
-// <repo-root>/.wrangler-state — same shared persistence root the managed
-// bootstrap script uses, so a single state dir backs both editions.
-const PERSIST_TO_REL = '../../../.wrangler-state';
+// <indie-root>/.wrangler-state. Kept inside the indie submodule so standalone
+// indie checkouts don't write state above the repo boundary.
+const PERSIST_TO_REL = '../../.wrangler-state';
 
 function persistFlags(mode: ParsedArgs['mode']): string[] {
   return mode === '--local' ? ['--persist-to', PERSIST_TO_REL] : [];
@@ -69,8 +69,8 @@ function printUsage(): void {
       '  --help             Show this message',
       '',
       'Wrangler always runs from indie/services/gateway and, in --local',
-      'mode, passes --persist-to <repo-root>/.wrangler-state so state is',
-      'shared with both `pnpm dev` sessions and the managed bootstrap.',
+      'mode, passes --persist-to indie/.wrangler-state so state is shared',
+      'with `pnpm dev` sessions inside the indie workspace.',
       '',
     ].join('\n'),
   );

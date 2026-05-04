@@ -35,6 +35,13 @@ export interface Env {
    * concern; it is set once per worker deployment.
    */
   EDITION: 'all' | 'managed';
+  /**
+   * Local-dev-only flag (ADR-014). When set to `'1'`, exposes the OpenAPI
+   * spec at `/openapi.json` and Swagger UI at `/docs`. The flag MUST live
+   * in `.dev.vars` only — never in `wrangler.toml` `[vars]` — so it is
+   * undefined on deployed workers.
+   */
+  OPENAPI_ENABLED?: string;
 }
 
 import type { CredentialType } from './auth/identity-headers.js';

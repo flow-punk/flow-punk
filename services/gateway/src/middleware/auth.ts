@@ -8,7 +8,7 @@ import {
 } from '../auth/identity-headers.js';
 import { unauthorized } from '../auth/unauthorized.js';
 import { validateSession } from '../auth/validate-session.js';
-import { isPublicPath, INDIE_PUBLIC_PATHS } from './public-paths.js';
+import { getPublicPaths, isPublicPath, INDIE_PUBLIC_PATHS } from './public-paths.js';
 
 /**
  * Paths where a `Cookie: fp_session=...` cookie is accepted as a credential
@@ -44,7 +44,7 @@ export const authMiddleware: Middleware = async (
   next: () => Promise<Response>,
 ): Promise<Response> => {
   const url = new URL(ctx.request.url);
-  if (isPublicPath(url.pathname, INDIE_PUBLIC_PATHS)) {
+  if (isPublicPath(url.pathname, getPublicPaths(ctx.env, INDIE_PUBLIC_PATHS))) {
     ctx.request = stripIdentityHeadersFromRequest(ctx.request);
     return next();
   }

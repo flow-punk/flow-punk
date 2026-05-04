@@ -18,6 +18,13 @@ export const INDIE_PUBLIC_PATHS = [
 ] as const;
 
 /**
+ * Local-dev-only paths added to the public list when the gating env flag
+ * `OPENAPI_ENABLED === '1'` is set (ADR-014). Production deploys leave the
+ * flag undefined so these paths fall through to auth → 401.
+ */
+export const OPENAPI_LOCAL_PATHS = ['/api/openapi.json', '/api/docs'] as const;
+
+/**
  * Returns true if `path` matches any pattern in `patterns`.
  *
  * Patterns support two forms:
@@ -34,4 +41,20 @@ export function isPublicPath(
     }
     return path === pattern;
   });
+}
+
+/**
+ * Returns the effective public-path list for the current request, augmenting
+ * the base list with `OPENAPI_LOCAL_PATHS` when the local-dev flag is set.
+ * Used by the auth middleware in both editions; `INDIE_PUBLIC_PATHS` and
+ * `MANAGED_PUBLIC_PATHS` themselves remain immutable.
+ */
+export function getPublicPaths(
+  env: { OPENAPI_ENABLED?: string },
+  base: readonly string[],
+): readonly string[] {
+  if (env.OPENAPI_ENABLED === '1') {
+    return [...base, ...OPENAPI_LOCAL_PATHS];
+  }
+  return base;
 }

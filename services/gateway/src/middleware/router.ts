@@ -1,5 +1,6 @@
 import type { AppContext, Middleware } from '../types.js';
 import { handleMcp } from '../mcp/index.js';
+import { handleDocs, handleOpenApi } from '../openapi/handler.js';
 import { handleRest } from '../rest/handler.js';
 
 /**
@@ -10,6 +11,8 @@ import { handleRest } from '../rest/handler.js';
  *   - /health → health check response
  *   - /mcp → MCP handler
  *   - /api/v1/* → REST handler
+ *   - /openapi.json, /docs → local-dev OpenAPI/Swagger UI (gated by
+ *     OPENAPI_ENABLED, see ADR-014)
  *
  * Routing only dispatches; it does not own request-body enforcement.
  */
@@ -23,6 +26,11 @@ export async function dispatchIndieRoute(
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  if (ctx.env.OPENAPI_ENABLED === '1') {
+    if (pathname === '/api/openapi.json') return handleOpenApi();
+    if (pathname === '/api/docs') return handleDocs();
   }
 
   if (pathname === '/mcp') return handleMcp(ctx);
