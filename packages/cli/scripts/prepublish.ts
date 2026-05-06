@@ -17,7 +17,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { mkdir, copyFile, readdir } from 'node:fs/promises';
+import { mkdir, copyFile, readdir, readFile } from 'node:fs/promises';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(SCRIPT_DIR, '..');
@@ -76,6 +76,35 @@ async function main(): Promise<void> {
     },
   );
   if (cli.status !== 0) throw new Error('build-cli failed');
+
+  // Guard: the published tarball must not reference any `workspace:*` deps.
+  // Workspace packages are private and won't resolve for npm consumers; the
+  // CLI bundles them via esbuild instead, so they belong in devDependencies.
+  process.stdout.write('\n=== verifying no workspace:* in published deps ===\n');
+  const pkgJsonRaw = await readFile(resolve(PKG_ROOT, 'package.json'), 'utf8');
+  const pkg = JSON.parse(pkgJsonRaw) as {
+    dependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+  };
+  const offenders: string[] = [];
+  for (const field of ['dependencies', 'peerDependencies', 'optionalDependencies'] as const) {
+    const block = pkg[field];
+    if (!block) continue;
+    for (const [name, spec] of Object.entries(block)) {
+      if (typeof spec === 'string' && spec.startsWith('workspace:')) {
+        offenders.push(`${field}.${name}=${spec}`);
+      }
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      `workspace:* protocol found in published fields: ${offenders.join(', ')}. ` +
+        `Move these to devDependencies (esbuild bundles them into dist/cli.js).`,
+    );
+  }
+  process.stdout.write('  → ok, no workspace:* in dependencies\n');
+
   process.stdout.write('\n=== prepublish complete ===\n');
 }
 

@@ -21,14 +21,14 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.7.0",
-    "@flowpunk/cf-admin": "workspace:*",
-    "@flowpunk/service-utils": "workspace:*",
     "commander": "^12.1.0",
     "gradient-string": "^3.0.0",
     "picocolors": "^1.1.1",
     "wrangler": "^4.22.0"
   },
   "devDependencies": {
+    "@flowpunk/cf-admin": "workspace:*",
+    "@flowpunk/service-utils": "workspace:*",
     "@types/gradient-string": "^1.1.6",
     "@types/node": "20.19.39",
     "esbuild": "^0.24.0",

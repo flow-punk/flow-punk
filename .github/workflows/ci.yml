@@ -111,6 +111,12 @@ jobs:
       - name: Build all packages
         run: pnpm turbo build
 
+      - name: Smoke test flowpunk prepublish
+        # Exercises the release-time wrangler dry-run for all 5 services and
+        # the CLI bundle. Proves the publish path works without Cloudflare
+        # credentials before any release attempt depends on it.
+        run: pnpm --filter flowpunk run prepublishOnly
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

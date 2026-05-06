@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    name: Release flowpunk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build flowpunk CLI bundle
+        # `prepublishOnly` runs again at publish time; we run it once here so
+        # any failure surfaces before the changesets action attempts to publish.
+        run: pnpm --filter flowpunk run prepublishOnly
+
+      - name: Create release PR or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          publish: pnpm changeset publish
+          title: 'chore: release flowpunk'
+          commit: 'chore: release flowpunk'
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      - name: Prepend operator-upgrade block to release notes
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        run: |
+          set -euo pipefail
+          echo "$PUBLISHED" | jq -c '.[]' | while read -r entry; do
+            name=$(echo "$entry" | jq -r '.name')
+            version=$(echo "$entry" | jq -r '.version')
+            tag="${name}@${version}"
+            # changesets/action uses `<package>@<version>` as the tag for non-singleton
+            # repos; for singleton-package repos, fall back to `v<version>`.
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              tag="v${version}"
+            fi
+            existing=$(gh release view "$tag" --json body -q .body)
+            tmpl=$(cat <<EOF
+          ## Upgrading
+
+          > Before you upgrade, back up your tenant D1 databases.
+
+          Run \`flowpunk update\` to apply this release.
+
+          ## Install
+
+          - npm: \`npm i -g flowpunk@${version}\`
+          - npm tag: \`latest\` (or \`next\` for prereleases)
+
+          ## Verification
+
+          - npm provenance: run \`npm audit signatures\` after install, or inspect on https://www.npmjs.com/package/flowpunk
+          - SHA256SUMS attached for the bundled Worker artifacts and CLI entry
+          EOF
+          )
+            printf '%s\n\n---\n\n%s\n' "$tmpl" "$existing" \
+              | gh release edit "$tag" --notes-file -
+          done
+
+      - name: Upload SHA256SUMS for Worker bundles
+        if: steps.changesets.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISHED: ${{ steps.changesets.outputs.publishedPackages }}
+        working-directory: packages/cli
+        run: |
+          set -euo pipefail
+          shasum -a 256 dist/cli.js dist/workers/*/index.js dist/migrations/*.sql > SHA256SUMS
+          echo "$PUBLISHED" | jq -c '.[]' | while read -r entry; do
+            name=$(echo "$entry" | jq -r '.name')
+            version=$(echo "$entry" | jq -r '.version')
+            tag="${name}@${version}"
+            if ! gh release view "$tag" >/dev/null 2>&1; then
+              tag="v${version}"
+            fi
+            gh release upload "$tag" SHA256SUMS dist/cli.js --clobber
+          done
