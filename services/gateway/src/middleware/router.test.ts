@@ -16,6 +16,7 @@ function makeCtx(pathname: string, env: Partial<Env> = {}): AppContext {
     MCP_TOOLS_KV: {} as KVNamespace,
     MCP_SESSIONS_KV: {} as KVNamespace,
     MCP_SESSION_DO: {} as DurableObjectNamespace,
+    OAUTH_TOKEN_CACHE: {} as KVNamespace,
     DB: {} as D1Database,
     MAX_REQUEST_BODY_BYTES: '0',
     SERVICE_TIMEOUT_MS: '0',

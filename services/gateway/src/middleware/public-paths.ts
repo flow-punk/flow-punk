@@ -7,12 +7,20 @@
  *   - `/health`        — load-balancer health checks
  *   - `/.well-known/*` — OAuth/MCP discovery (RFC 8414, RFC 9728)
  *
- * Managed extends this list with `/oauth/register`, `/oauth/authorize`,
- * `/oauth/approve`, `/oauth/token` (see managed gateway's public-paths).
+ * Per ADR-019, indie also exposes the OAuth endpoints publicly. Each
+ * handler does its own credential validation per RFC; the auth middleware
+ * short-circuits before reaching them.
+ *   - `/oauth/register`   — RFC 7591 unauth Dynamic Client Registration
+ *   - `/oauth/authorize`  — consent page entry
+ *   - `/oauth/approve`    — consent submission; handler validates the
+ *     indie session itself
+ *   - `/oauth/token`      — code/refresh exchange (PKCE-bound)
+ *   - `/oauth/revoke`     — RFC 7009 (client-bound)
  */
 export const INDIE_PUBLIC_PATHS = [
   '/health',
   '/.well-known/*',
+  '/oauth/*',
   '/api/v1/auth/login',
   '/api/v1/auth/logout',
 ] as const;

@@ -31,3 +31,11 @@ migrations_dir = "../../packages/db/migrations"
 [[kv_namespaces]]
 binding = "IDEMPOTENCY_KV"
 id = "placeholder-users-idempotency-kv"
+
+# OAuth identity + revocation cache (per ADR-019 §B5). The wrapper writes
+# `user_invalidated:_system:<userId>` here on successful soft-delete so
+# the gateway's OAuth identity-cache hit path stops returning the deleted
+# user's identity within 60s. Same KV namespace the gateway binds.
+[[kv_namespaces]]
+binding = "OAUTH_TOKEN_CACHE"
+id = "placeholder-oauth-token-cache"

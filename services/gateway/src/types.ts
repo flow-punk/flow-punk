@@ -13,7 +13,27 @@ export interface Env {
   MCP_SESSIONS_KV: KVNamespace;
   MCP_SESSION_DO: DurableObjectNamespace;
 
-  // D1 — indie platform DB (users, mcp_sessions)
+  // OAuth (per ADR-019). `OAUTH_TOKEN_CACHE` carries identity-cache
+  // entries (60s TTL), revocation tombstones (`oauth:revoked:<hash>`),
+  // and user-invalidation tombstones (`user_invalidated:_system:<userId>`).
+  // First-line anti-abuse on `/oauth/register` is the per-install client
+  // cap (50) enforced inside `@flowpunk-indie/oauth`. Operators that want
+  // IP rate limiting can add Cloudflare WAF rules; managed-edition adds
+  // its own `ANON_OAUTH_RATE_LIMITER` binding via `ManagedEnv`.
+  OAUTH_TOKEN_CACHE: KVNamespace;
+  /**
+   * The canonical issuer URL for indie OAuth metadata. Single-tenant indie
+   * has one global value (e.g. `https://crm.example.com`). Required for
+   * non-loopback requests; loopback dev falls back to the request origin.
+   */
+  GATEWAY_PUBLIC_ORIGIN?: string;
+  /**
+   * Comma-separated allowed RFC 8707 `resource` values. Defaults to the
+   * configured issuer origin when unset.
+   */
+  OAUTH_RESOURCE_ALLOWLIST?: string;
+
+  // D1 — indie platform DB (users, mcp_sessions, mcp_oauth_*)
   DB: D1Database;
 
   // Configuration

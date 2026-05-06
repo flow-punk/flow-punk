@@ -20,6 +20,10 @@ MCP_TOOLS_DYNAMIC_SERVICES = ""
 # managed wrapper. Edition filters tool-registry at registry-build time
 # inside each gateway wrapper (ADR-006:41 / ADR-008:33).
 EDITION = "all"
+# OAuth issuer URL (per ADR-019). Required for non-loopback OAuth
+# metadata; loopback dev falls back to the request origin. Operators
+# override this to their public install URL during `flowpunk init`.
+GATEWAY_PUBLIC_ORIGIN = ""
 
 [[kv_namespaces]]
 binding = "MCP_TOOLS_KV"
@@ -28,6 +32,14 @@ id = "placeholder-mcp-tools-kv"
 [[kv_namespaces]]
 binding = "MCP_SESSIONS_KV"
 id = "placeholder-mcp-sessions-kv"
+
+# OAuth token + revocation + user-invalidation cache (per ADR-019 §10).
+# Identity entries: `oauth:<tokenHash>` (60s TTL).
+# Revocation tombstones: `oauth:revoked:<tokenHash>` (60s TTL).
+# User-invalidation tombstones: `user_invalidated:_system:<userId>` (60s TTL).
+[[kv_namespaces]]
+binding = "OAUTH_TOKEN_CACHE"
+id = "placeholder-oauth-token-cache"
 
 # Indie platform DB — single bound D1 per ADR-011 §Tenancy. Carries
 # `users` (multi-user, single-admin) and `mcp_sessions` for cookie-backed

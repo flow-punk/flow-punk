@@ -1,0 +1,46 @@
+{
+  "description": "Redirect URI validation cases per OAuth 2.1 + RFC 8252 + RFC 7591.",
+  "registrable": [
+    { "uri": "https://example.com/cb", "valid": true, "reason": "https" },
+    { "uri": "http://127.0.0.1/cb", "valid": true, "reason": "loopback ipv4" },
+    { "uri": "http://127.0.0.1:54321/cb", "valid": true, "reason": "loopback ipv4 with port" },
+    { "uri": "http://[::1]/cb", "valid": true, "reason": "loopback ipv6" },
+    { "uri": "http://localhost/cb", "valid": false, "reason": "localhost not permitted; use 127.0.0.1" },
+    { "uri": "http://example.com/cb", "valid": false, "reason": "non-loopback http" },
+    { "uri": "https://example.com/cb#x", "valid": false, "reason": "fragment forbidden" },
+    { "uri": "javascript:alert(1)", "valid": false, "reason": "non-http(s) scheme" },
+    { "uri": "not-a-url", "valid": false, "reason": "not a URL" }
+  ],
+  "matching": [
+    {
+      "registered": ["https://example.com/cb"],
+      "inbound": "https://example.com/cb",
+      "matches": true,
+      "reason": "exact match"
+    },
+    {
+      "registered": ["https://example.com/cb"],
+      "inbound": "https://example.com/cb?extra=1",
+      "matches": false,
+      "reason": "query differs and not loopback"
+    },
+    {
+      "registered": ["http://127.0.0.1/cb"],
+      "inbound": "http://127.0.0.1:54321/cb",
+      "matches": true,
+      "reason": "loopback port flexibility per RFC 8252 §7.3"
+    },
+    {
+      "registered": ["http://127.0.0.1/cb"],
+      "inbound": "http://127.0.0.1:54321/other",
+      "matches": false,
+      "reason": "loopback path must still match"
+    },
+    {
+      "registered": ["http://127.0.0.1/cb"],
+      "inbound": "http://[::1]:54321/cb",
+      "matches": false,
+      "reason": "registered ipv4 cannot match inbound ipv6"
+    }
+  ]
+}

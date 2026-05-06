@@ -6,6 +6,10 @@ export * as usersRepo from './users.js';
 export * as pipelinesRepo from './pipelines.js';
 export * as stagesRepo from './stages.js';
 export * as dealsRepo from './deals.js';
+export * as oauthClientsRepo from './oauth-clients.js';
+export * as oauthTokensRepo from './oauth-tokens.js';
+export * as oauthCodesRepo from './oauth-codes.js';
+export * as oauthAuthorizeRequestsRepo from './oauth-authorize-requests.js';
 export { AccountsRepoError } from './accounts.js';
 export { ApiKeysRepoError } from './api-keys.js';
 export { PersonsRepoError } from './persons.js';
@@ -13,6 +17,10 @@ export { UsersRepoError } from './users.js';
 export { PipelinesRepoError } from './pipelines.js';
 export { StagesRepoError } from './stages.js';
 export { DealsRepoError } from './deals.js';
+export { OauthClientsRepoError } from './oauth-clients.js';
+export { OauthTokensRepoError } from './oauth-tokens.js';
+export { OauthCodesRepoError } from './oauth-codes.js';
+export { OauthAuthorizeRequestsRepoError } from './oauth-authorize-requests.js';
 export type {
   CreateApiKeyInput,
   CreateApiKeyOptions,

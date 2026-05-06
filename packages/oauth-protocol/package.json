@@ -1,0 +1,27 @@
+{
+  "name": "@flowpunk-indie/oauth-protocol",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pkce": "./src/pkce.ts",
+    "./hashing": "./src/hashing.ts",
+    "./random": "./src/random.ts",
+    "./scope": "./src/scope.ts",
+    "./redirect-uri": "./src/redirect-uri.ts",
+    "./metadata-builders": "./src/metadata-builders.ts",
+    "./time": "./src/time.ts"
+  },
+  "scripts": {
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.3"
+  }
+}

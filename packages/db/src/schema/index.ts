@@ -46,3 +46,23 @@ export {
   type DealPatchableField,
   type NewDeal,
 } from './deals.js';
+export {
+  mcpOauthClients,
+  type McpOauthClient,
+  type NewMcpOauthClient,
+} from './mcp-oauth-clients.js';
+export {
+  mcpOauthTokens,
+  type McpOauthToken,
+  type NewMcpOauthToken,
+} from './mcp-oauth-tokens.js';
+export {
+  mcpOauthCodes,
+  type McpOauthCode,
+  type NewMcpOauthCode,
+} from './mcp-oauth-codes.js';
+export {
+  mcpOauthAuthorizeRequests,
+  type McpOauthAuthorizeRequest,
+  type NewMcpOauthAuthorizeRequest,
+} from './mcp-oauth-authorize-requests.js';

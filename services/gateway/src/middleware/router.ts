@@ -2,6 +2,8 @@ import type { AppContext, Middleware } from '../types.js';
 import { handleMcp } from '../mcp/index.js';
 import { handleDocs, handleOpenApi } from '../openapi/handler.js';
 import { handleRest } from '../rest/handler.js';
+import { route as oauthRoute } from '@flowpunk-indie/oauth';
+import { validateSession } from '../auth/validate-session.js';
 
 /**
  * Pure indie route dispatcher shared by indie's own router middleware and
@@ -9,6 +11,8 @@ import { handleRest } from '../rest/handler.js';
  *
  * Dispatches to the appropriate handler based on path:
  *   - /health → health check response
+ *   - /.well-known/oauth-* → OAuth discovery metadata (RFC 9728/8414)
+ *   - /oauth/* → OAuth 2.1 endpoints (per ADR-019)
  *   - /mcp → MCP handler
  *   - /api/v1/* → REST handler
  *   - /openapi.json, /docs → local-dev OpenAPI/Swagger UI (gated by
@@ -25,6 +29,25 @@ export async function dispatchIndieRoute(
     return new Response(JSON.stringify({ status: 'ok' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // OAuth discovery + endpoints. The /oauth/approve handler needs the
+  // user's session; the dispatcher resolves it (cookie-validated) before
+  // invoking the OAuth route. All other OAuth paths receive null.
+  if (
+    pathname.startsWith('/oauth/') ||
+    pathname === '/.well-known/oauth-protected-resource' ||
+    pathname === '/.well-known/oauth-authorization-server'
+  ) {
+    let session: { userId: string } | null = null;
+    if (pathname === '/oauth/approve') {
+      const validated = await validateSession(ctx.env, ctx.request);
+      if (validated) session = { userId: validated.userId };
+    }
+    return oauthRoute(ctx.request, ctx.env, {
+      requestId: ctx.requestId,
+      session,
     });
   }
 
