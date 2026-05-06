@@ -23,7 +23,7 @@ import {
 
 interface ExecuteRequest {
   jsonrpcId?: string | number | null;
-  /** Informational only — trust comes from X-MCP-Session-Id (already validated by the gateway). */
+  /** Informational only — trust comes from the gateway-validated session header. */
   sessionId?: string;
   name: string;
   arguments?: Record<string, unknown>;
@@ -35,14 +35,15 @@ interface DispatchOutcome {
   options?: MutationOptions;
 }
 
-const SESSION_HEADER = 'X-MCP-Session-Id';
+const SESSION_HEADER = 'Mcp-Session-Id';
+const LEGACY_SESSION_HEADER = 'X-MCP-Session-Id';
 
 export async function handleMcpExecute(
   request: Request,
   env: PipelineEnv,
   actor: Actor,
 ): Promise<Response> {
-  if (!request.headers.get(SESSION_HEADER)) {
+  if (!hasSessionHeader(request.headers)) {
     return envelopeResponse(
       400,
       envelopeErr('MISSING_SESSION', `${SESSION_HEADER} header is required`),
@@ -99,6 +100,10 @@ export async function handleMcpExecute(
   }
 
   return envelopeResponse(outcome.status, outcome.envelope, outcome.options);
+}
+
+function hasSessionHeader(headers: Headers): boolean {
+  return Boolean(headers.get(SESSION_HEADER) ?? headers.get(LEGACY_SESSION_HEADER));
 }
 
 async function dispatch(

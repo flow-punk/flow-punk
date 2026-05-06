@@ -57,7 +57,8 @@ export const SSE_HEADERS = {
 } as const;
 
 const JSONRPC_VERSION = '2.0';
-const SUPPORTED_PROTOCOL_VERSION = '2025-03-26';
+const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26'] as const;
+const DEFAULT_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
 const SERVER_NAME = 'flowpunk-gateway';
 const SERVER_VERSION = '0.1.0';
 const TOOLS_CACHE_TTL_SECONDS = 300;
@@ -242,6 +243,12 @@ export async function executeJsonRpc(
   }
 
   const request = parsed.request;
+  if (isJsonRpcNotification(request)) {
+    return acceptedResponse(ctx.requestId);
+  }
+  if (isJsonRpcResponse(request)) {
+    return acceptedResponse(ctx.requestId);
+  }
   if (!isValidJsonRpcRequest(request)) {
     return jsonRpcResponse(
       errorPayload(jsonRpcIdFromUnknown(request), -32600, 'Invalid Request'),
@@ -320,9 +327,9 @@ async function handleToolCall(
       return errorPayload(request.id ?? null, -32602, 'Invalid tools_search query');
     }
 
-    return successPayload(request.id ?? null, {
+    return successPayload(request.id ?? null, toolResult({
       results: adapter.searchTools(query),
-    });
+    }));
   }
 
   if (toolMetadata.availability.status !== 'available' && toolMetadata.kind !== 'domain') {
@@ -337,9 +344,9 @@ async function handleToolCall(
       return errorPayload(request.id ?? null, -32601, `Unknown tool: ${toolName}`);
     }
 
-    return successPayload(request.id ?? null, {
+    return successPayload(request.id ?? null, toolResult({
       tools: toolMetadata.tools.map(toToolDefinition),
-    });
+    }));
   }
 
   if (toolMetadata.kind === 'domain') {
@@ -602,7 +609,38 @@ async function parseJsonRpcRequest(
 function isValidJsonRpcRequest(value: unknown): value is JsonRpcRequest {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<JsonRpcRequest>;
-  return candidate.jsonrpc === JSONRPC_VERSION && typeof candidate.method === 'string';
+  return (
+    candidate.jsonrpc === JSONRPC_VERSION &&
+    typeof candidate.method === 'string' &&
+    candidate.id !== undefined
+  );
+}
+
+function isJsonRpcNotification(value: unknown): value is JsonRpcRequest {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<JsonRpcRequest>;
+  return (
+    candidate.jsonrpc === JSONRPC_VERSION &&
+    typeof candidate.method === 'string' &&
+    candidate.id === undefined
+  );
+}
+
+function isJsonRpcResponse(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as {
+    jsonrpc?: unknown;
+    method?: unknown;
+    id?: unknown;
+    result?: unknown;
+    error?: unknown;
+  };
+  return (
+    candidate.jsonrpc === JSONRPC_VERSION &&
+    candidate.method === undefined &&
+    candidate.id !== undefined &&
+    ('result' in candidate || 'error' in candidate)
+  );
 }
 
 function jsonRpcIdFromUnknown(value: unknown): JsonRpcId {
@@ -624,14 +662,10 @@ function initializePayload(
   sessionId: string,
 ): JsonRpcSuccess | JsonRpcError {
   const requestedVersion = protocolVersionFromInitializeParams(params);
-  if (requestedVersion !== null && requestedVersion !== SUPPORTED_PROTOCOL_VERSION) {
-    return errorPayload(id, -32602, `Unsupported protocol version: ${requestedVersion}`, {
-      supportedProtocolVersions: [SUPPORTED_PROTOCOL_VERSION],
-    });
-  }
+  const negotiatedVersion = negotiateProtocolVersion(requestedVersion);
 
   return successPayload(id, {
-    protocolVersion: requestedVersion ?? SUPPORTED_PROTOCOL_VERSION,
+    protocolVersion: negotiatedVersion,
     serverInfo: {
       name: SERVER_NAME,
       version: SERVER_VERSION,
@@ -649,6 +683,16 @@ function protocolVersionFromInitializeParams(params: unknown): string | null {
   if (!params || typeof params !== 'object') return null;
   const protocolVersion = (params as { protocolVersion?: unknown }).protocolVersion;
   return typeof protocolVersion === 'string' ? protocolVersion : null;
+}
+
+function negotiateProtocolVersion(requestedVersion: string | null): string {
+  if (
+    requestedVersion !== null &&
+    SUPPORTED_PROTOCOL_VERSIONS.some((version) => version === requestedVersion)
+  ) {
+    return requestedVersion;
+  }
+  return DEFAULT_PROTOCOL_VERSION;
 }
 
 function isToolCallParams(
@@ -694,6 +738,16 @@ function successPayload(id: JsonRpcId, result: unknown): JsonRpcSuccess {
   };
 }
 
+function toolResult(data: unknown): {
+  content: Array<{ type: 'text'; text: string }>;
+  isError: false;
+} {
+  return {
+    content: [{ type: 'text', text: JSON.stringify(data) }],
+    isError: false,
+  };
+}
+
 function errorPayload(
   id: JsonRpcId,
   code: number,
@@ -720,6 +774,15 @@ function jsonRpcResponse(
     status,
     headers: {
       'Content-Type': 'application/json',
+      [REQUEST_ID_HEADER]: requestId,
+    },
+  });
+}
+
+function acceptedResponse(requestId: string): Response {
+  return new Response(null, {
+    status: 202,
+    headers: {
       [REQUEST_ID_HEADER]: requestId,
     },
   });

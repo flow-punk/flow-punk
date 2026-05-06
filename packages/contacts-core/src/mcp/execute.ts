@@ -24,7 +24,7 @@ import {
 interface ExecuteRequest {
   /** JSON-RPC request id forwarded by the gateway, surfaced in audit events. */
   jsonrpcId?: string | number | null;
-  /** Informational only — trust comes from X-MCP-Session-Id (already validated by the gateway). */
+  /** Informational only — trust comes from the gateway-validated session header. */
   sessionId?: string;
   name: string;
   arguments?: Record<string, unknown>;
@@ -36,13 +36,14 @@ interface DispatchOutcome {
   options?: MutationOptions;
 }
 
-const SESSION_HEADER = 'X-MCP-Session-Id';
+const SESSION_HEADER = 'Mcp-Session-Id';
+const LEGACY_SESSION_HEADER = 'X-MCP-Session-Id';
 
 /**
  * MCP tool execution endpoint. Trust model:
  *  - parseIdentity has already populated `actor` from gateway-stamped headers.
- *  - X-MCP-Session-Id MUST be present (gateway-injected); body `sessionId` is
- *    informational only and never used for trust decisions.
+ *  - Mcp-Session-Id MUST be present (gateway-injected); body `sessionId`
+ *    is informational only and never used for trust decisions.
  *  - Mutating tools rely on X-Idempotency-Key (synthesized by the gateway and
  *    enforced by the existing `withIdempotency` wrapper at the router layer).
  *  - Routes are reachable only via the gateway service binding (no public
@@ -53,7 +54,7 @@ export async function handleMcpExecute(
   env: ContactsEnv,
   actor: Actor,
 ): Promise<Response> {
-  if (!request.headers.get(SESSION_HEADER)) {
+  if (!hasSessionHeader(request.headers)) {
     return envelopeResponse(
       400,
       envelopeErr('MISSING_SESSION', `${SESSION_HEADER} header is required`),
@@ -106,6 +107,10 @@ export async function handleMcpExecute(
   }
 
   return envelopeResponse(outcome.status, outcome.envelope, outcome.options);
+}
+
+function hasSessionHeader(headers: Headers): boolean {
+  return Boolean(headers.get(SESSION_HEADER) ?? headers.get(LEGACY_SESSION_HEADER));
 }
 
 async function dispatch(

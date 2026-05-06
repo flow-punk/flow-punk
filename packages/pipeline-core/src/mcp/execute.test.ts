@@ -27,7 +27,7 @@ function withIdentity(
   return new Request(url, { ...init, headers });
 }
 
-test('POST /mcp/execute without X-MCP-Session-Id returns 400 MISSING_SESSION', async () => {
+test('POST /mcp/execute without Mcp-Session-Id returns 400 MISSING_SESSION', async () => {
   const response = await route(
     withIdentity('http://internal/mcp/execute', {
       method: 'POST',
@@ -52,7 +52,7 @@ test('POST /mcp/execute with invalid JSON body returns 400 INVALID_BODY', async 
         body: 'not-json',
         headers: { 'Content-Type': 'application/json' },
       },
-      { 'X-MCP-Session-Id': 'mcp_sess_abcdefghijklmnopqrstuv' },
+      { 'Mcp-Session-Id': 'mcp_sess_abcdefghijklmnopqrstuv' },
     ),
     stubEnv,
   );
@@ -68,7 +68,7 @@ test('POST /mcp/execute with unknown tool returns 404 UNKNOWN_TOOL', async () =>
         body: JSON.stringify({ name: 'definitely_not_a_tool' }),
         headers: { 'Content-Type': 'application/json' },
       },
-      { 'X-MCP-Session-Id': 'mcp_sess_abcdefghijklmnopqrstuv' },
+      { 'Mcp-Session-Id': 'mcp_sess_abcdefghijklmnopqrstuv' },
     ),
     stubEnv,
   );
