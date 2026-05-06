@@ -37,7 +37,17 @@ function narrowMcpCredentialType(
 }
 import type { SessionState } from './session-do.js';
 
-export const SESSION_HEADER = 'X-MCP-Session-Id';
+// Public-facing MCP streamable-HTTP session header. Per the spec
+// (modelcontextprotocol.io 2025-03-26) this is the literal name
+// `Mcp-Session-Id` — no `X-` prefix. We use the same header name on
+// both the inbound side (clients sending it on subsequent POSTs) and
+// the response side (server returning a freshly-minted session ID on
+// the initial `initialize` POST). The same constant doubles as the
+// gateway↔DO forwarding header to keep the wire shape consistent.
+export const SESSION_HEADER = 'Mcp-Session-Id';
+// Internal-only forwarding header used by the gateway to tell the DO
+// whether the incoming request expects an existing session, an
+// explicit reattach, or fresh creation. Not part of the MCP spec.
 export const SESSION_MODE_HEADER = 'X-MCP-Session-Mode';
 export const IDEMPOTENCY_KEY_HEADER = 'X-Idempotency-Key';
 export const SSE_HEADERS = {
@@ -154,10 +164,18 @@ export async function handleMcp(ctx: AppContext): Promise<Response> {
     );
   }
 
-  const sessionId = ctx.request.method === 'GET'
+  // Per MCP streamable-HTTP spec (2025-03-26): the FIRST POST to /mcp
+  // (the `initialize` handshake) MUST NOT carry an `Mcp-Session-Id`
+  // header — the server creates the session and surfaces the ID on the
+  // response. Subsequent POSTs include the ID. We generate-on-missing
+  // for both GET (SSE channel open) and POST (initial JSON-RPC) so the
+  // DO can always handle a coherent session lifecycle.
+  const isInitialPost = ctx.request.method === 'POST' && !suppliedSessionId;
+  const shouldGenerate = ctx.request.method === 'GET' || isInitialPost;
+  const sessionId = shouldGenerate
     ? (suppliedSessionId ?? generateSessionId())
     : suppliedSessionId;
-  const sessionMode = ctx.request.method === 'GET'
+  const sessionMode = shouldGenerate
     ? (suppliedSessionId ? 'reattach' : 'create')
     : 'existing';
 

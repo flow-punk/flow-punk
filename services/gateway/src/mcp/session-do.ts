@@ -174,7 +174,17 @@ export class McpSessionDurableObject {
     identity: SessionIdentity,
     requestId: string,
   ): Promise<Response> {
-    const session = await this.requireSession(request, identity, requestId);
+    // Per MCP streamable-HTTP spec, the initial `initialize` POST has no
+    // session ID; the server creates one and returns it via Mcp-Session-Id.
+    // The gateway flags this case by setting `X-MCP-Session-Mode: create`
+    // and pre-generating the ID. On any other POST (subsequent JSON-RPC
+    // traffic) we fall back to `requireSession` and a missing/expired
+    // session 404s as before.
+    const sessionMode = request.headers.get(SESSION_MODE_HEADER);
+    const sessionIdHeader = getSessionId(request);
+    const session = sessionMode === 'create' && sessionIdHeader
+      ? await this.loadOrCreateSession(sessionIdHeader, identity)
+      : await this.requireSession(request, identity, requestId);
     if (session instanceof Response) return session;
 
     const now = new Date().toISOString();
@@ -185,7 +195,43 @@ export class McpSessionDurableObject {
     await this.persistSession(updatedSession);
 
     const ctx = createJsonRpcContext(request, this.env, requestId, updatedSession);
-    return executeJsonRpc(ctx, updatedSession);
+    const response = await executeJsonRpc(ctx, updatedSession);
+
+    // The MCP client uses Mcp-Session-Id from this response on every
+    // subsequent POST. We surface it on every JSON-RPC response (not just
+    // the create path) so reattach scenarios stay coherent.
+    const headers = new Headers(response.headers);
+    headers.set(SESSION_HEADER, updatedSession.sessionId);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  /**
+   * On the initial `initialize` POST the gateway pre-generates the
+   * session ID, sets `X-MCP-Session-Mode: create`, and forwards the
+   * request. If a session already exists for this DO instance (rare —
+   * DO stubs are keyed by session ID so collisions imply a regenerated
+   * ID hitting an existing DO) we adopt it on identity match. Otherwise
+   * we mint a fresh `SessionState` and persist below.
+   */
+  private async loadOrCreateSession(
+    sessionId: string,
+    identity: SessionIdentity,
+  ): Promise<SessionState> {
+    const existing = await this.loadSession();
+    const now = new Date().toISOString();
+    if (existing && this.isOwnedBy(existing, identity) && !this.isExpired(existing, new Date())) {
+      return existing;
+    }
+    return {
+      sessionId,
+      ...identity,
+      createdAt: now,
+      lastSeenAt: now,
+    };
   }
 
   private async closeSession(
