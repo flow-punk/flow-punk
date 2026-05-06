@@ -17,7 +17,8 @@ export interface LoginFormOptions {
  * Render the `/auth/login` paste-token form. Per ADR-019 amendment
  * 2026-05-06, this is the single in-browser path to an `fp_session`
  * cookie. Operators run `flowpunk connect` from their terminal to mint
- * a one-shot 5-minute login token, then paste it here.
+ * a one-shot 30-minute login token, then paste it here. (TTL bumped
+ * from the original 5m by the 2026-05-06-later amendment.)
  *
  * Security headers mirror `consent.ts` — the `Referrer-Policy: same-origin`
  * choice (vs `no-referrer`) is load-bearing: stricter policies cause
@@ -56,7 +57,7 @@ export function loginPage(options: LoginFormOptions): Response {
   <body>
     <main>
       <h1>Sign in</h1>
-      <p>To log in, run <code>flowpunk connect</code> in your terminal. Paste the printed login token below. Tokens expire after 5 minutes and can only be used once.</p>
+      <p>To log in, run <code>flowpunk connect</code> in your terminal. Paste the printed login token below. Tokens expire after 30 minutes and can only be used once.</p>
       ${errorBlock}
       <form method="post" action="/auth/login" autocomplete="off">
         <label for="token">Login token</label>

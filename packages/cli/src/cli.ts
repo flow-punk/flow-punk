@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
   program
     .command('connect')
-    .description('Mint a one-shot 5-minute browser-login token (paste at /auth/login).')
+    .description('Mint a one-shot 30-minute browser-login token (paste at /auth/login).')
     .action(async () => {
       const opts = program.optsWithGlobals<{
         token?: string;

@@ -8,6 +8,7 @@ import {
   getAccountSubdomain,
   migrateD1,
   putWorkerScript,
+  queryD1,
   setWorkersDevSubdomain,
   workerScriptExists,
   type CfClient,
@@ -41,6 +42,18 @@ export interface ProvisionResult {
   apiKey: string;
 }
 
+export interface ProvisionOptions {
+  /**
+   * Set when `init` detects a retained-D1 reuse path. Inserts a
+   * checklist step between `d1.migrate` and `admin.seed` that wipes all
+   * credential tables (api_keys, mcp_sessions, mcp_oauth_*,
+   * auth_login_tokens). CRM and `users` rows are preserved so
+   * `seedAdmin`'s find-by-email branch reuses the inherited owner. The
+   * step is a no-op when this flag is false.
+   */
+  revokeCredentialsBeforeSeed?: boolean;
+}
+
 /**
  * The central provision orchestrator. Idempotent at the per-resource level
  * (find-then-create).
@@ -59,6 +72,7 @@ export async function provisionFresh(
   answers: InitAnswers,
   cliVersion: string,
   persist?: (record: DeploymentRecord) => Promise<void>,
+  options: ProvisionOptions = {},
 ): Promise<ProvisionResult> {
   const { prefix } = answers;
   const inventory: ResourceInventory = {
@@ -168,6 +182,40 @@ export async function provisionFresh(
         : `${newOnes} applied (${total} total)`;
     },
   });
+
+  // 2.5. Credential revoke (retained-D1 reuse path only).
+  // Wipes auth-side rows so the operator can't accidentally keep using a
+  // forgotten old API key, and so the `flowpunk init` api-key mint below
+  // doesn't 409 on the unique-active `(user_id, label)` index. Runs after
+  // migrations so any tables introduced by migrations 0009+ are guaranteed
+  // to exist. CRM tables (accounts/persons/pipelines/stages/deals) and
+  // `users` are intentionally untouched — the inherited owner row stays
+  // so `seedAdmin`'s find-by-email branch matches and reuses it.
+  if (options.revokeCredentialsBeforeSeed) {
+    items.push({
+      key: 'credentials.revoke',
+      label: 'Revoke existing credentials (retained-D1 reuse)',
+      run: async () => {
+        const tables = [
+          'api_keys',
+          'mcp_sessions',
+          'mcp_oauth_tokens',
+          'mcp_oauth_codes',
+          'mcp_oauth_authorize_requests',
+          'mcp_oauth_clients',
+          'auth_login_tokens',
+        ];
+        for (const t of tables) {
+          await queryD1(client, {
+            databaseId: inventory.d1.id,
+            sql: `DELETE FROM ${t};`,
+            params: [],
+          });
+        }
+        return `wiped ${tables.length} tables`;
+      },
+    });
+  }
 
   // 3. KV namespaces — one per binding key.
   for (const key of KV_BINDING_KEYS) {

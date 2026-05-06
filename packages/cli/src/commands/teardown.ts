@@ -57,12 +57,22 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
     'Teardown plan',
   );
 
-  const typed = await p.text({
-    message: `Type the prefix "${dep.prefix}" to confirm teardown`,
-    validate: (s) =>
-      s === dep.prefix ? undefined : 'Must match exactly. Cancel with Ctrl+C.',
+  const ok1 = await p.confirm({
+    message: `Tear down "${dep.prefix}" on ${dep.accountName}?`,
+    initialValue: false,
   });
-  if (p.isCancel(typed)) {
+  if (p.isCancel(ok1) || !ok1) {
+    p.cancel('Cancelled.');
+    process.exit(0);
+  }
+
+  const ok2 = await p.confirm({
+    message: theme.error(
+      `Are you sure? Deletes 5 workers + 6 KV namespaces — irreversible.`,
+    ),
+    initialValue: false,
+  });
+  if (p.isCancel(ok2) || !ok2) {
     p.cancel('Cancelled.');
     process.exit(0);
   }

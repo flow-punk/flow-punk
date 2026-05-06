@@ -15,24 +15,27 @@ export interface ConnectOpts {
   prefix?: string;
 }
 
-const TOKEN_TTL_SECONDS = 5 * 60;
+const TOKEN_TTL_SECONDS = 30 * 60;
 
 /**
- * `flowpunk connect` — mint a one-shot 5-minute browser-login token and
+ * `flowpunk connect` — mint a one-shot 30-minute browser-login token and
  * print its plaintext for the operator to paste into `/auth/login`.
  *
- * Per ADR-019 amendment 2026-05-06. Authorization is implicit: this
- * command can only succeed if the operator already has Cloudflare API
- * access to the deployment's account + D1, the same authority model
- * `flowpunk init` and `flowpunk update` use. No additional indie-side
- * credential is required.
+ * Per ADR-019 amendment 2026-05-06. TTL bumped 5m → 30m by the
+ * 2026-05-06-later amendment after operator-ergonomics feedback;
+ * the phishing posture rationale is restated there.
+ * Authorization is implicit: this command can only succeed if the
+ * operator already has Cloudflare API access to the deployment's
+ * account + D1, the same authority model `flowpunk init` and
+ * `flowpunk update` use. No additional indie-side credential is
+ * required.
  *
  * Token mechanics:
  *   - 32 bytes of crypto-random base64url (matches the cookie payload
  *     entropy used elsewhere in the indie auth surface).
  *   - SHA-256 hashed before storage; plaintext is printed once and never
  *     persisted.
- *   - 5-minute expiry; one-shot consumption is enforced server-side at
+ *   - 30-minute expiry; one-shot consumption is enforced server-side at
  *     `POST /auth/login` via `auth_login_tokens.consumed_at`.
  *   - Bound to the seeded owner user (`role='owner'`); future multi-user
  *     adds `--user <id>`.
@@ -105,7 +108,7 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
     [
       '',
       theme.brand(banner),
-      theme.bold('  Login token — valid for 5 minutes, single use'),
+      theme.bold('  Login token — valid for 30 minutes, single use'),
       theme.brand(banner),
       '',
       `${theme.bold('Token:')}  ${theme.accent(token)}`,
