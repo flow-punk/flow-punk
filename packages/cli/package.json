@@ -1,0 +1,41 @@
+{
+  "name": "flowpunk",
+  "version": "0.0.1-alpha.0",
+  "description": "Provision flow-punk indie on your Cloudflare account in one command.",
+  "license": "AGPL-3.0-only",
+  "author": "Mark Zuppe",
+  "type": "module",
+  "bin": {
+    "flowpunk": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsx scripts/build-cli.ts",
+    "prepublishOnly": "tsx scripts/prepublish.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "verify:metadata": "tsx scripts/verify-metadata-matches-toml.ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "@flowpunk/cf-admin": "workspace:*",
+    "@flowpunk/service-utils": "workspace:*",
+    "commander": "^12.1.0",
+    "gradient-string": "^3.0.0",
+    "picocolors": "^1.1.1",
+    "wrangler": "^4.22.0"
+  },
+  "devDependencies": {
+    "@types/gradient-string": "^1.1.6",
+    "@types/node": "20.19.39",
+    "esbuild": "^0.24.0",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
