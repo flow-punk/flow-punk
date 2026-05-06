@@ -24,6 +24,11 @@ EDITION = "all"
 # metadata; loopback dev falls back to the request origin. Operators
 # override this to their public install URL during `flowpunk init`.
 GATEWAY_PUBLIC_ORIGIN = ""
+# RFC 8707 resource-indicator allowlist for OAuth tokens. Empty → defaults
+# to the issuer origin (the desired indie behavior). Operators that
+# protect non-root sub-paths can override post-init with a comma-separated
+# list.
+OAUTH_RESOURCE_ALLOWLIST = ""
 
 [[kv_namespaces]]
 binding = "MCP_TOOLS_KV"
