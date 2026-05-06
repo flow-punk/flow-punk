@@ -14,9 +14,8 @@ const inventory: ResourceInventory = {
     MCP_TOOLS_KV: 'kv-mcp-tools',
     MCP_SESSIONS_KV: 'kv-mcp-sessions',
     LAST_USED_KV: 'kv-last-used',
-    IDEMPOTENCY_KV_CONTACTS: 'kv-idem-c',
-    IDEMPOTENCY_KV_PIPELINE: 'kv-idem-p',
-    IDEMPOTENCY_KV_USERS: 'kv-idem-u',
+    IDEMPOTENCY_KV: 'kv-idem',
+    OAUTH_TOKEN_CACHE: 'kv-oauth',
   },
   workers: {
     gateway: { name: 'flowpunk-gateway' },

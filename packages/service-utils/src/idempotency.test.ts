@@ -231,3 +231,68 @@ test('withIdempotency rejects over-length idempotency key with 400', async () =>
   );
   assert.equal(r.status, 400);
 });
+
+test('withIdempotency without keyPrefix produces idemp:<hash> (managed compat)', async () => {
+  // Cache key shape MUST stay byte-identical to the pre-consolidation
+  // format when keyPrefix is unset, otherwise managed wrappers — which
+  // continue to omit the option — would see a 24h cache transient on
+  // deploy. Format: `idemp:` + 64-hex-char SHA-256.
+  const kv = makeKv();
+  const handler = async (): Promise<Response> =>
+    new Response('{"ok":true}', { status: 201 });
+
+  await withIdempotency(
+    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a' },
+  );
+
+  const keys = Array.from(kv._store.keys());
+  assert.equal(keys.length, 1);
+  assert.match(keys[0]!, /^idemp:[0-9a-f]{64}$/);
+});
+
+test('withIdempotency with keyPrefix prepends prefix between idemp: and the hash', async () => {
+  // Indie services pass `keyPrefix: 'contacts:' | 'pipeline:' | 'users:'`
+  // so a single shared IDEMPOTENCY_KV namespace can be listed/cleared
+  // per-service via `wrangler kv key list --prefix idem:contacts:`.
+  const kv = makeKv();
+  const handler = async (): Promise<Response> =>
+    new Response('{"ok":true}', { status: 201 });
+
+  await withIdempotency(
+    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a', keyPrefix: 'contacts:' },
+  );
+
+  const keys = Array.from(kv._store.keys());
+  assert.equal(keys.length, 1);
+  assert.match(keys[0]!, /^idemp:contacts:[0-9a-f]{64}$/);
+});
+
+test('withIdempotency keyPrefix does not collide across services', async () => {
+  // Same scope + same path + same idemKey under two different prefixes
+  // must produce two distinct cache entries — proves the prefix is part
+  // of the lookup, not just decoration.
+  const kv = makeKv();
+  const handler = async (): Promise<Response> =>
+    new Response('{"ok":true}', { status: 201 });
+
+  await withIdempotency(
+    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a', keyPrefix: 'contacts:' },
+  );
+  await withIdempotency(
+    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a', keyPrefix: 'pipeline:' },
+  );
+
+  assert.equal(kv._store.size, 2);
+});

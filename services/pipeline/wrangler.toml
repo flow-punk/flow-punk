@@ -20,9 +20,19 @@ database_name = "flowpunk-indie"
 database_id = "placeholder-flowpunk-indie-db"
 migrations_dir = "../../packages/db/migrations"
 
+[vars]
+# Unhashed prefix prepended to idempotency cache keys so the three indie
+# services can share a single consolidated `IDEMPOTENCY_KV` namespace and
+# still be listable per-service via `wrangler kv key list --prefix
+# idem:pipeline:`. Managed wranglers leave this var unset so managed
+# cache keys stay byte-identical to today.
+IDEMPOTENCY_KEY_PREFIX = "pipeline:"
+
 # Idempotency cache for mutation handlers — keyed per
 # (tenant, user, method, path, idempotency-key) with body-hash binding.
 # Default TTL 24h. See @flowpunk/service-utils withIdempotency.
+# Consolidated across indie services per ADR-017 (KV inventory 6 → 4);
+# isolation is preserved by IDEMPOTENCY_KEY_PREFIX above.
 [[kv_namespaces]]
 binding = "IDEMPOTENCY_KV"
-id = "placeholder-pipeline-idempotency-kv"
+id = "placeholder-indie-idempotency-kv"

@@ -68,9 +68,8 @@ export async function provisionFresh(
       MCP_TOOLS_KV: '',
       MCP_SESSIONS_KV: '',
       LAST_USED_KV: '',
-      IDEMPOTENCY_KV_CONTACTS: '',
-      IDEMPOTENCY_KV_PIPELINE: '',
-      IDEMPOTENCY_KV_USERS: '',
+      IDEMPOTENCY_KV: '',
+      OAUTH_TOKEN_CACHE: '',
     },
     workers: {
       gateway: { name: scriptName(prefix, 'gateway') },

@@ -170,9 +170,8 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
       MCP_TOOLS_KV: 'kv-1',
       MCP_SESSIONS_KV: 'kv-2',
       LAST_USED_KV: 'kv-3',
-      IDEMPOTENCY_KV_CONTACTS: 'kv-4',
-      IDEMPOTENCY_KV_PIPELINE: 'kv-5',
-      IDEMPOTENCY_KV_USERS: 'kv-6',
+      IDEMPOTENCY_KV: 'kv-4',
+      OAUTH_TOKEN_CACHE: 'kv-5',
     },
     workers: {
       gateway: { name: scriptName('flowpunk', 'gateway') },
@@ -293,8 +292,12 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
       }
       const cliValue = cliBinding.text;
       const tomlValue = toml.vars[key];
-      // ALLOWED_ORIGINS is computed at runtime (gateway URL), so don't byte-compare.
+      // ALLOWED_ORIGINS and GATEWAY_PUBLIC_ORIGIN are computed at runtime
+      // (gateway URL) — wrangler.toml ships them as empty placeholders
+      // and `flowpunk init` fills them in from the deployed worker URL,
+      // so don't byte-compare.
       if (key === 'ALLOWED_ORIGINS') continue;
+      if (key === 'GATEWAY_PUBLIC_ORIGIN') continue;
       if (cliValue !== tomlValue) {
         errors.push(`Var ${key}: CLI="${cliValue}" vs toml="${tomlValue}"`);
       }

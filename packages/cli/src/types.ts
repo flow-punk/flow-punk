@@ -21,17 +21,22 @@ export type KvBindingKey =
   | 'MCP_TOOLS_KV'
   | 'MCP_SESSIONS_KV'
   | 'LAST_USED_KV'
-  | 'IDEMPOTENCY_KV_CONTACTS'
-  | 'IDEMPOTENCY_KV_PIPELINE'
-  | 'IDEMPOTENCY_KV_USERS';
+  | 'IDEMPOTENCY_KV'
+  | 'OAUTH_TOKEN_CACHE';
 
 export const KV_BINDING_KEYS: ReadonlyArray<KvBindingKey> = [
   'MCP_TOOLS_KV',
   'MCP_SESSIONS_KV',
   'LAST_USED_KV',
-  'IDEMPOTENCY_KV_CONTACTS',
-  'IDEMPOTENCY_KV_PIPELINE',
-  'IDEMPOTENCY_KV_USERS',
+  // Single shared idempotency cache across contacts/pipeline/users (was 3
+  // separate KVs pre-2026-05). Per-service listability is preserved by an
+  // unhashed `IDEMPOTENCY_KEY_PREFIX` plain_text binding the CLI injects
+  // alongside this binding. See ADR-017 amendment.
+  'IDEMPOTENCY_KV',
+  // OAuth identity + revocation cache (per ADR-019). Bound by both the
+  // gateway (read+write on /oauth/*, /mcp, validate-oauth) and the users
+  // service (writes user-invalidation tombstones on soft-delete).
+  'OAUTH_TOKEN_CACHE',
 ];
 
 export interface ResourceInventory {

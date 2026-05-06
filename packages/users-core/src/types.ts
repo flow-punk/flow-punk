@@ -18,6 +18,14 @@ export interface UsersEnv {
   DB: D1Database;
   IDEMPOTENCY_KV: KVNamespace & IdempotencyKvNamespace;
   /**
+   * Optional unhashed prefix prepended to idempotency cache keys
+   * (e.g. `"users:"`). Indie sets this in `wrangler.toml [vars]` so the
+   * three indie services can share one consolidated `IDEMPOTENCY_KV`
+   * namespace and still be listable per-service. Managed leaves it
+   * unset → keys stay byte-identical.
+   */
+  IDEMPOTENCY_KEY_PREFIX?: string;
+  /**
    * Wrapper-supplied options. Each edition's worker `index.ts` constructs
    * this object before forwarding to `route()`. See ADR-011:201 + ADR-013.
    */

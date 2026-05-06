@@ -46,6 +46,13 @@ export interface IdempotencyOptions {
   ttlSeconds?: number;
   /** Defaults to 255. */
   maxKeyLength?: number;
+  /**
+   * Unhashed prefix prepended to the cache key (e.g. 'contacts:'). Lets ops
+   * list/clear keys per service via `wrangler kv key list --prefix`. Defaults
+   * to '' so existing consumers (notably managed wrappers) keep byte-identical
+   * keys.
+   */
+  keyPrefix?: string;
 }
 
 interface CachedResponse {
@@ -91,6 +98,7 @@ export async function withIdempotency(
     url.pathname,
     options.scopeKey,
     idempotencyKey,
+    options.keyPrefix ?? '',
   );
 
   const cached = await readCache(kv, cacheKey);
@@ -124,9 +132,10 @@ async function buildCacheKey(
   pathname: string,
   scopeKey: string,
   idempotencyKey: string,
+  keyPrefix: string,
 ): Promise<string> {
   const composite = `${method.toUpperCase()}:${pathname}:${scopeKey}:${idempotencyKey}`;
-  return `idemp:${await sha256Hex(composite)}`;
+  return `idemp:${keyPrefix}${await sha256Hex(composite)}`;
 }
 
 async function readCache(

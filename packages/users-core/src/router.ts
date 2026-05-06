@@ -93,6 +93,7 @@ function idempotent(
 ): Promise<Response> {
   return withIdempotency(request, env.IDEMPOTENCY_KV, handler, {
     scopeKey: `${actor.tenantId}:${actor.userId}`,
+    keyPrefix: env.IDEMPOTENCY_KEY_PREFIX,
   });
 }
 

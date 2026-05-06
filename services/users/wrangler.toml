@@ -14,8 +14,15 @@ inspector_port = 9789
 
 # EDITION flag flips the one-active-admin invariant on indie. Managed's
 # users service sets EDITION="managed" and disables the cap.
+#
+# IDEMPOTENCY_KEY_PREFIX: unhashed prefix prepended to idempotency cache
+# keys so the three indie services can share a single consolidated
+# `IDEMPOTENCY_KV` namespace and still be listable per-service via
+# `wrangler kv key list --prefix idem:users:`. Managed wranglers leave
+# this unset so managed cache keys stay byte-identical to today.
 [vars]
 EDITION = "indie"
+IDEMPOTENCY_KEY_PREFIX = "users:"
 
 # Indie platform DB — same `flowpunk-indie` D1 the gateway and contacts
 # bind (ADR-011 §Tenancy: indie is single-D1).
@@ -28,9 +35,11 @@ migrations_dir = "../../packages/db/migrations"
 # Idempotency cache for mutation handlers — keyed per
 # (tenant, user, method, path, idempotency-key) with body-hash binding.
 # Default TTL 24h. See @flowpunk/service-utils withIdempotency.
+# Consolidated across indie services per ADR-017 (KV inventory 6 → 4);
+# isolation is preserved by IDEMPOTENCY_KEY_PREFIX in [vars] above.
 [[kv_namespaces]]
 binding = "IDEMPOTENCY_KV"
-id = "placeholder-users-idempotency-kv"
+id = "placeholder-indie-idempotency-kv"
 
 # OAuth identity + revocation cache (per ADR-019 §B5). The wrapper writes
 # `user_invalidated:_system:<userId>` here on successful soft-delete so

@@ -82,6 +82,15 @@ export function buildScriptMetadata(input: BuildInput): ScriptMetadata {
         type: 'kv_namespace',
         namespace_id: inventory.kv.MCP_SESSIONS_KV,
       });
+      // OAuth identity + revocation cache (per ADR-019). Carries cached
+      // identity entries (60s TTL), `oauth:revoked:<hash>` tombstones,
+      // and `user_invalidated:_system:<userId>` tombstones written by
+      // the users service on soft-delete.
+      bindings.push({
+        name: 'OAUTH_TOKEN_CACHE',
+        type: 'kv_namespace',
+        namespace_id: inventory.kv.OAUTH_TOKEN_CACHE,
+      });
       break;
     case 'auth':
       bindings.push({
@@ -91,25 +100,35 @@ export function buildScriptMetadata(input: BuildInput): ScriptMetadata {
       });
       break;
     case 'contacts':
-      bindings.push({
-        name: 'IDEMPOTENCY_KV',
-        type: 'kv_namespace',
-        namespace_id: inventory.kv.IDEMPOTENCY_KV_CONTACTS,
-      });
-      break;
     case 'pipeline':
-      bindings.push({
-        name: 'IDEMPOTENCY_KV',
-        type: 'kv_namespace',
-        namespace_id: inventory.kv.IDEMPOTENCY_KV_PIPELINE,
-      });
-      break;
     case 'users':
+      // Indie consolidates a single `IDEMPOTENCY_KV` namespace across all
+      // three mutating services (was 3 separate KVs pre-2026-05). Per-service
+      // listability is preserved by `IDEMPOTENCY_KEY_PREFIX` (mirrors each
+      // service's wrangler.toml `[vars]` block; read by the `-core` router
+      // and forwarded into `withIdempotency` as `keyPrefix`).
       bindings.push({
         name: 'IDEMPOTENCY_KV',
         type: 'kv_namespace',
-        namespace_id: inventory.kv.IDEMPOTENCY_KV_USERS,
+        namespace_id: inventory.kv.IDEMPOTENCY_KV,
       });
+      bindings.push({
+        name: 'IDEMPOTENCY_KEY_PREFIX',
+        type: 'plain_text',
+        text: `${service}:`,
+      });
+      if (service === 'users') {
+        // OAuth user-invalidation tombstone target (per ADR-019 §B5). The
+        // users wrapper writes `user_invalidated:_system:<userId>` on
+        // successful soft-delete so the gateway's identity-cache hit path
+        // stops returning the deleted user's identity within 60s. Same KV
+        // namespace the gateway binds.
+        bindings.push({
+          name: 'OAUTH_TOKEN_CACHE',
+          type: 'kv_namespace',
+          namespace_id: inventory.kv.OAUTH_TOKEN_CACHE,
+        });
+      }
       break;
   }
 
@@ -163,6 +182,24 @@ export function buildScriptMetadata(input: BuildInput): ScriptMetadata {
       // wrangler.toml example are not appropriate on a deployed worker —
       // operators add custom origins via post-init configuration.
       text: gatewayUrl ?? '',
+    });
+    // OAuth issuer URL (per ADR-019). RFC 9728/8414 metadata, token
+    // audience, and approve-origin policy all derive from this. We seed
+    // it to the gateway's own URL; operators that bind a custom domain
+    // post-init must update this var (and re-deploy) so the OAuth flow
+    // advertises the right origin.
+    bindings.push({
+      name: 'GATEWAY_PUBLIC_ORIGIN',
+      type: 'plain_text',
+      text: gatewayUrl ?? '',
+    });
+    // RFC 8707 resource allowlist for OAuth tokens. Empty → defaults to
+    // the issuer origin (which is what indie wants). Operators that
+    // protect non-root sub-paths can override post-init.
+    bindings.push({
+      name: 'OAUTH_RESOURCE_ALLOWLIST',
+      type: 'plain_text',
+      text: '',
     });
     bindings.push({
       name: 'MCP_TOOLS_DYNAMIC_SERVICES',
