@@ -34,8 +34,16 @@ export async function route(
   const url = new URL(request.url);
   const pathname = url.pathname;
 
-  // Discovery (always GET).
-  if (pathname === '/.well-known/oauth-protected-resource') {
+  // Discovery (always GET). Per RFC 9728 §3.1, when the protected
+  // resource URI has a path (ours is `<origin>/mcp`), clients fetch the
+  // metadata document at `/.well-known/oauth-protected-resource{path}`.
+  // Accept the bare form for issuer-as-resource installs and the `/mcp`
+  // form for the canonical MCP endpoint resource. The metadata payload
+  // is the same — both refer to the same `<origin>/mcp` resource.
+  if (
+    pathname === '/.well-known/oauth-protected-resource' ||
+    pathname === '/.well-known/oauth-protected-resource/mcp'
+  ) {
     if (request.method !== 'GET') return oauthMethodNotAllowed('GET');
     return handleProtectedResourceMetadata(request, env);
   }

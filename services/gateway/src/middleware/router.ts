@@ -37,9 +37,19 @@ export async function dispatchIndieRoute(
   // amendment 2026-05-06): /oauth/authorize redirects unauthenticated
   // browsers to /auth/login, and /oauth/approve fails closed with 401 as
   // defense in depth. All other OAuth paths receive null.
+  //
+  // PRM lookup: per RFC 9728 §3.1, when the protected resource URI has a
+  // path component, clients construct the metadata URL by inserting
+  // `/.well-known/oauth-protected-resource` BEFORE that path. Our
+  // resource is `<origin>/mcp` (per ADR-019 amendment 2026-05-06b), so
+  // Anthropic and other compliant MCP clients fetch the metadata at
+  // `/.well-known/oauth-protected-resource/mcp` — NOT the bare suffix.
+  // Match anything under `/.well-known/oauth-protected-resource` so both
+  // shapes resolve to the same handler.
   if (
     pathname.startsWith('/oauth/') ||
     pathname === '/.well-known/oauth-protected-resource' ||
+    pathname.startsWith('/.well-known/oauth-protected-resource/') ||
     pathname === '/.well-known/oauth-authorization-server'
   ) {
     let session: { userId: string } | null = null;

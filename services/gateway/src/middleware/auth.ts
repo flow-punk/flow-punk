@@ -221,9 +221,12 @@ function challengeHeaders(
   ctx: AppContext,
   challenge: string,
 ): Headers {
-  // The metadata URL lives at the issuer origin's `/.well-known/` —
-  // NOT under the protected-resource path (which is now `<origin>/mcp`
-  // per ADR-019 amendment 2026-05-06b).
+  // Per RFC 9728 §3.1, when the protected resource URI has a path
+  // component (ours is `<origin>/mcp`), the metadata document lives at
+  // `/.well-known/oauth-protected-resource{path}`. The bare-suffix form
+  // is also served for issuer-as-resource clients, but compliant MCP
+  // clients (Claude.ai) fetch the path-appended form, so we advertise
+  // that explicitly here.
   const issuer = (() => {
     try {
       return getIssuerOrigin(ctx.env, ctx.request);
@@ -232,7 +235,7 @@ function challengeHeaders(
     }
   })();
   return new Headers({
-    'WWW-Authenticate': `${challenge}, resource_metadata="${issuer}/.well-known/oauth-protected-resource"`,
+    'WWW-Authenticate': `${challenge}, resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp"`,
     'Content-Type': 'application/json',
   });
 }
