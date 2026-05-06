@@ -39,10 +39,23 @@ export function getIssuerOrigin(env: OAuthEnv, request: Request): string {
   );
 }
 
+/**
+ * Canonical protected-resource identifier advertised in
+ * `/.well-known/oauth-protected-resource` and used as the audience the
+ * gateway expects on incoming OAuth tokens.
+ *
+ * Per RFC 9728 + the MCP authorization convention, the protected
+ * resource for the MCP server is the **MCP endpoint URL** itself
+ * (`<origin>/mcp`), not the bare issuer origin. Clients like Claude.ai's
+ * MCP connector use this advertised value to know where to POST MCP
+ * traffic; advertising bare `<origin>` makes them try the root path and
+ * 404 with `McpEndpointNotFound` — see ADR-019 amendment 2026-05-06b.
+ *
+ * The OAuth issuer (`getIssuerOrigin`) remains the bare origin; only the
+ * resource identifier moves to the `/mcp` form.
+ */
 export function getProtectedResource(env: OAuthEnv, request: Request): string {
-  // Indie protects the gateway itself (resource = issuer); /mcp and
-  // /api/v1/* are sub-paths under the same audience.
-  return getIssuerOrigin(env, request);
+  return `${getIssuerOrigin(env, request)}/mcp`;
 }
 
 export function getAllowedResources(env: OAuthEnv, request: Request): string[] {
@@ -51,15 +64,15 @@ export function getAllowedResources(env: OAuthEnv, request: Request): string[] {
     .map(stripTrailingSlash)
     .filter(Boolean);
   if (configured && configured.length > 0) return configured;
-  // By default, accept both the bare issuer origin AND the canonical MCP
-  // endpoint URL `<origin>/mcp`. MCP clients (Claude.ai, ChatGPT custom
-  // connectors) follow the latest MCP-OAuth convention and send the MCP
-  // server URL itself as the `resource` parameter; older clients and
-  // RFC 9728 PRM consumers may send the bare origin. Allowing both means
-  // the canonical setup works without operators having to configure
-  // `OAUTH_RESOURCE_ALLOWLIST` post-init.
-  const origin = getProtectedResource(env, request);
-  return [origin, `${origin}/mcp`];
+  // Accept both the bare issuer origin AND the canonical MCP endpoint
+  // URL `<origin>/mcp`. Some MCP clients (Claude.ai's earlier flow) send
+  // the bare origin as the `resource` parameter at /authorize; current
+  // implementations follow PRM and send the canonical `<origin>/mcp`.
+  // Tokens minted from either path remain valid for /mcp validation
+  // because the validator widens its audience check across this same
+  // list.
+  const issuer = getIssuerOrigin(env, request);
+  return [issuer, `${issuer}/mcp`];
 }
 
 export function getSingleResource(

@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getAllowedResources, getSingleResource } from './origin.js';
+import {
+  getAllowedResources,
+  getIssuerOrigin,
+  getProtectedResource,
+  getSingleResource,
+} from './origin.js';
 import type { OAuthEnv } from './env.js';
 
 const ORIGIN = 'https://flowpunk-gateway.mark-29f.workers.dev';
@@ -15,6 +20,18 @@ function envWith(overrides: Partial<OAuthEnv> = {}): OAuthEnv {
 }
 
 const dummyRequest = new Request(`${ORIGIN}/oauth/authorize`);
+
+test('getIssuerOrigin returns the configured GATEWAY_PUBLIC_ORIGIN unchanged', () => {
+  assert.equal(getIssuerOrigin(envWith(), dummyRequest), ORIGIN);
+});
+
+test('getProtectedResource returns <origin>/mcp (canonical MCP endpoint URL)', () => {
+  // Per ADR-019 amendment 2026-05-06b — bare origin caused
+  // McpEndpointNotFound from Claude.ai because they used the advertised
+  // resource as the URL to POST MCP traffic to. PRM and the audience
+  // semantics now point at the actual `/mcp` endpoint.
+  assert.equal(getProtectedResource(envWith(), dummyRequest), `${ORIGIN}/mcp`);
+});
 
 test('getAllowedResources defaults to [origin, origin/mcp]', () => {
   const got = getAllowedResources(envWith(), dummyRequest);

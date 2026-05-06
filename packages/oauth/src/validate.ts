@@ -29,11 +29,18 @@ interface CachedIdentity extends OAuthIdentity {
 }
 
 /**
- * Validate an indie OAuth bearer token against the resource `audience`.
- * Returns null on any rejection (unknown / malformed / revoked / expired
- * / user soft-deleted / wrong audience). The gateway middleware must
- * translate null into a 401 with `WWW-Authenticate: Bearer …` per
- * RFC 9728 §5.1.
+ * Validate an indie OAuth bearer token against an allowlist of accepted
+ * resource audiences. Returns null on any rejection (unknown / malformed
+ * / revoked / expired / user soft-deleted / wrong audience). The gateway
+ * middleware must translate null into a 401 with `WWW-Authenticate:
+ * Bearer …` per RFC 9728 §5.1.
+ *
+ * `allowedAudiences` is a list because indie advertises the canonical
+ * MCP endpoint URL (`<origin>/mcp`) in PRM but historically accepted
+ * tokens minted with the bare-origin audience. Both forms are valid;
+ * the validator passes if `row.audience` matches any entry. Per-request
+ * routing concerns (e.g., the gateway requiring the MCP-form audience
+ * for /mcp specifically) live in the gateway middleware.
  *
  * Cache flow per ADR-019 §10:
  *   1. Token-revocation tombstone (`oauth:revoked:<hash>`) — fail closed.
@@ -49,9 +56,10 @@ interface CachedIdentity extends OAuthIdentity {
 export async function validateOAuthToken(
   env: OAuthEnv,
   rawCredential: string,
-  audience: string,
+  allowedAudiences: readonly string[],
 ): Promise<OAuthIdentity | null> {
   if (!isIndieToken(rawCredential)) return null;
+  if (allowedAudiences.length === 0) return null;
 
   const tokenHash = await oauthTokenHashFromRawToken(rawCredential);
   const cacheKey = oauthTokenCacheKeyFromTokenHash(tokenHash);
@@ -66,7 +74,7 @@ export async function validateOAuthToken(
     if (cached.tokenHash !== tokenHash) {
       // KV value should never disagree with key; defensive.
       await env.OAUTH_TOKEN_CACHE.delete(cacheKey).catch(() => {});
-    } else if (cached.audience !== audience) {
+    } else if (!allowedAudiences.includes(cached.audience)) {
       // Audience mismatch is not a cache problem — it's a per-request
       // policy reject. Don't evict; just deny.
       return null;
@@ -93,7 +101,7 @@ export async function validateOAuthToken(
   if (row.tokenType !== 'access') return null;
   if (row.revokedAt) return null;
   if (isExpired(row.expiresAt)) return null;
-  if (row.audience !== audience) return null;
+  if (!allowedAudiences.includes(row.audience)) return null;
 
   // Defense-in-depth user soft-delete check.
   const user = await usersRepo.findById(db, row.userId, { includeDeleted: true });

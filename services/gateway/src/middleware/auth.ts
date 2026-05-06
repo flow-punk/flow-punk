@@ -14,7 +14,11 @@ import {
   INDIE_PUBLIC_PATHS,
   INDIE_BOOTSTRAP_PUBLIC_PATHS,
 } from './public-paths.js';
-import { getProtectedResource, validateOAuthToken } from '@flowpunk-indie/oauth';
+import {
+  getAllowedResources,
+  getIssuerOrigin,
+  validateOAuthToken,
+} from '@flowpunk-indie/oauth';
 
 /**
  * Paths where a `Cookie: fp_session=...` cookie is accepted as a credential
@@ -164,8 +168,13 @@ async function handleOAuthCredential(
     return next();
   }
 
-  const audience = getProtectedResource(ctx.env, ctx.request);
-  const identity = await validateOAuthToken(ctx.env, rawCredential, audience);
+  // Accept tokens minted with EITHER the bare issuer audience or the
+  // canonical MCP endpoint audience. PRM advertises the latter; older
+  // clients that sent the bare origin at /authorize landed in the
+  // former. Both must validate cleanly across the gateway's auth surface.
+  // See ADR-019 amendment 2026-05-06b.
+  const audiences = getAllowedResources(ctx.env, ctx.request);
+  const identity = await validateOAuthToken(ctx.env, rawCredential, audiences);
   if (!identity) {
     return oauthInvalidToken(ctx);
   }
@@ -212,9 +221,12 @@ function challengeHeaders(
   ctx: AppContext,
   challenge: string,
 ): Headers {
+  // The metadata URL lives at the issuer origin's `/.well-known/` —
+  // NOT under the protected-resource path (which is now `<origin>/mcp`
+  // per ADR-019 amendment 2026-05-06b).
   const issuer = (() => {
     try {
-      return getProtectedResource(ctx.env, ctx.request);
+      return getIssuerOrigin(ctx.env, ctx.request);
     } catch {
       return new URL(ctx.request.url).origin;
     }

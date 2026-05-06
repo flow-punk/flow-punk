@@ -90,4 +90,8 @@ export {
 } from './revoke-cache.js';
 export { isIndieToken, isIndieClientId } from './codec.js';
 export { ALLOWED_SCOPES, AS_SCOPES_SUPPORTED, PRM_SCOPES_SUPPORTED } from './policy.js';
-export { getIssuerOrigin, getProtectedResource } from './origin.js';
+export {
+  getAllowedResources,
+  getIssuerOrigin,
+  getProtectedResource,
+} from './origin.js';
