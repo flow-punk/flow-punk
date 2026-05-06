@@ -38,7 +38,6 @@ const DO_MIGRATION_TAG = 'mcp-session-do-v1';
 
 export interface ProvisionResult {
   record: DeploymentRecord;
-  cookieValue: string;
   apiKey: string;
 }
 
@@ -302,7 +301,11 @@ export async function provisionFresh(
   await runChecklist(items);
   await flush();
 
-  return { record: snapshotRecord(), cookieValue, apiKey };
+  // `cookieValue` is intentionally not returned. Per ADR-019 amendment
+  // 2026-05-06 it's an init-internal credential used only to authenticate
+  // the immediate `mintApiKey` call; nothing outside this function needs
+  // it. Operators establish a fresh browser session via `flowpunk connect`.
+  return { record: snapshotRecord(), apiKey };
 }
 
 /**

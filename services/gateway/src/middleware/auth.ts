@@ -8,7 +8,12 @@ import {
 } from '../auth/identity-headers.js';
 import { unauthorized } from '../auth/unauthorized.js';
 import { validateSession } from '../auth/validate-session.js';
-import { getPublicPaths, isPublicPath, INDIE_PUBLIC_PATHS } from './public-paths.js';
+import {
+  getPublicPaths,
+  isPublicPath,
+  INDIE_PUBLIC_PATHS,
+  INDIE_BOOTSTRAP_PUBLIC_PATHS,
+} from './public-paths.js';
 import { getProtectedResource, validateOAuthToken } from '@flowpunk-indie/oauth';
 
 /**
@@ -45,7 +50,16 @@ export const authMiddleware: Middleware = async (
   next: () => Promise<Response>,
 ): Promise<Response> => {
   const url = new URL(ctx.request.url);
-  if (isPublicPath(url.pathname, getPublicPaths(ctx.env, INDIE_PUBLIC_PATHS))) {
+  // Indie-only bootstrap paths (e.g. /auth/login) are appended via the
+  // `indieAuthBootstrapMiddleware` chain entry but the auth middleware
+  // still runs first; treat them as public here so the request flows
+  // through. Managed's chain doesn't include `INDIE_BOOTSTRAP_PUBLIC_PATHS`,
+  // so this only opens the surface on indie.
+  const indiePublicPaths = [
+    ...INDIE_PUBLIC_PATHS,
+    ...INDIE_BOOTSTRAP_PUBLIC_PATHS,
+  ];
+  if (isPublicPath(url.pathname, getPublicPaths(ctx.env, indiePublicPaths))) {
     ctx.request = stripIdentityHeadersFromRequest(ctx.request);
     return next();
   }

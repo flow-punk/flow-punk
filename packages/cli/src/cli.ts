@@ -72,6 +72,19 @@ async function main(): Promise<void> {
     });
 
   program
+    .command('connect')
+    .description('Mint a one-shot 5-minute browser-login token (paste at /auth/login).')
+    .action(async () => {
+      const opts = program.optsWithGlobals<{
+        token?: string;
+        account?: string;
+        prefix?: string;
+      }>();
+      const { connectCommand } = await import('./commands/connect.js');
+      await connectCommand(opts);
+    });
+
+  program
     .command('logout')
     .description('Clear stored Cloudflare credentials.')
     .action(async () => {

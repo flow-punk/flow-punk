@@ -1,6 +1,7 @@
 export * as accountsRepo from './accounts.js';
 export * as apiKeysRepo from './api-keys.js';
 export * as mcpSessionsRepo from './mcp-sessions.js';
+export * as authLoginTokensRepo from './auth-login-tokens.js';
 export * as personsRepo from './persons.js';
 export * as usersRepo from './users.js';
 export * as pipelinesRepo from './pipelines.js';

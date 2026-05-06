@@ -1,7 +1,11 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 
-import { mcpSessions, type McpSession } from '../schema/mcp-sessions.js';
+import {
+  mcpSessions,
+  type McpSession,
+  type NewMcpSession,
+} from '../schema/mcp-sessions.js';
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -21,4 +25,12 @@ export async function findByCookieHash(
     .where(eq(mcpSessions.cookieHash, cookieHash))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * Persist a new session row. Used by `/auth/login` after consuming a
+ * one-shot connect token (per ADR-019 amendment 2026-05-06).
+ */
+export async function insert(db: Db, row: NewMcpSession): Promise<void> {
+  await db.insert(mcpSessions).values(row);
 }

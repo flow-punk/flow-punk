@@ -146,7 +146,6 @@ export async function initCommand(opts: InitOpts): Promise<void> {
 
 function printSuccessCard(result: {
   record: { resources: { workers: { gateway: { url?: string } } } };
-  cookieValue: string;
   apiKey: string;
 }): void {
   const url = result.record.resources.workers.gateway.url ?? '<gateway-url>';
@@ -154,15 +153,18 @@ function printSuccessCard(result: {
   const lines = [
     '',
     theme.brand(banner),
-    theme.bold('  flow-punk indie is live — credentials below are shown ONCE'),
+    theme.bold('  flow-punk indie is live — API key below is shown ONCE'),
     theme.brand(banner),
     '',
-    `${theme.bold('Gateway URL:')}    ${theme.accent(url)}`,
-    `${theme.bold('API key:')}        ${theme.accent(result.apiKey)}`,
-    `${theme.bold('Session cookie:')} ${theme.accent(result.cookieValue)}`,
-    `${theme.dim('                 (browser/REST only — never valid for MCP)')}`,
+    `${theme.bold('Gateway URL:')}  ${theme.accent(url)}`,
+    `${theme.bold('API key:')}      ${theme.accent(result.apiKey)}`,
     '',
-    theme.bold('Try it:'),
+    theme.bold('First-time browser login:'),
+    `  ${theme.accent('flowpunk connect')}`,
+    `  ${theme.dim('then visit')} ${theme.accent(`${url}/auth/login`)}`,
+    `  ${theme.dim('and paste the printed login token (5-minute one-shot).')}`,
+    '',
+    theme.bold('Try the API:'),
     `  ${theme.accent(`curl -H "Authorization: Bearer ${result.apiKey}" \\`)}`,
     `  ${theme.accent(`     ${url}/api/v1/contacts`)}`,
     '',

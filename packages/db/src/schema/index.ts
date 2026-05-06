@@ -1,5 +1,6 @@
 export * from './users.js';
 export * from './mcp-sessions.js';
+export * from './auth-login-tokens.js';
 export * from './api-keys.js';
 
 // Per-table modules each export their own `ALLOWED_PATCH_FIELDS`,

@@ -6,6 +6,7 @@
 import type { OAuthEnv } from './env.js';
 import { handleAuthorize } from './handlers/authorize.js';
 import { handleApprove, type ApproveSession } from './handlers/approve.js';
+import { handleLoginPage, handleLoginSubmit } from './handlers/login.js';
 import { handleRegister } from './handlers/register.js';
 import { handleRevoke } from './handlers/revoke.js';
 import { handleToken } from './handlers/token.js';
@@ -50,7 +51,16 @@ export async function route(
   }
   if (pathname === '/oauth/authorize') {
     if (request.method !== 'GET') return oauthMethodNotAllowed('GET');
-    return handleAuthorize(request, env, ctx.requestId);
+    return handleAuthorize(request, env, ctx.requestId, ctx.session);
+  }
+  if (pathname === '/auth/login') {
+    if (request.method === 'GET') {
+      return handleLoginPage(request, env, ctx.requestId);
+    }
+    if (request.method === 'POST') {
+      return handleLoginSubmit(request, env, ctx.requestId);
+    }
+    return oauthMethodNotAllowed('GET, POST');
   }
   if (pathname === '/oauth/approve') {
     if (request.method !== 'POST') return oauthMethodNotAllowed('POST');

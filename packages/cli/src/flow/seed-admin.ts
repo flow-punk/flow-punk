@@ -4,17 +4,24 @@ import { queryD1, type CfClient } from '@flowpunk/cf-admin';
 import { generateId } from '@flowpunk/service-utils';
 
 /**
- * Seed the first admin user + session in the indie D1.
+ * Seed the first owner user + a transient session in the indie D1.
  *
- * Replicates `indie/services/contacts/scripts/bootstrap-admin.ts` byte-for-byte:
- *  - cookie payload = base64(crypto random 32 bytes), stripped of `=+/`,
- *    sliced to 32 chars
- *  - cookie value   = `_system.<payload>`
- *  - cookie_hash    = sha256 hex of the FULL cookie value
- *  - users row:    role='owner', status='active'
- *  - mcp_sessions: cookie_hash, expires_at = now + 30d
+ * Per ADR-019 amendment 2026-05-06: the cookie this returns is for
+ * INTERNAL init-time use only — it authenticates the immediate-next
+ * `mintApiKey` call to `/api/v1/auth/keys`. It is NEVER printed in the
+ * success card and never returned outside the init flow's own scope.
+ * After init, the operator establishes a fresh browser session via
+ * `flowpunk connect` + `/auth/login` (a separate, one-shot bootstrap).
  *
- * Returns the cookie value ONCE — caller prints it once and never persists.
+ * Cookie encoding (matches `validateSession`'s expectations):
+ *   - cookie payload = base64(crypto random 32 bytes), stripped of `=+/`,
+ *     sliced to 32 chars
+ *   - cookie value   = `_system.<payload>`
+ *   - cookie_hash    = sha256 hex of the FULL cookie value
+ *
+ * Idempotent on resume: a previously-inserted active owner is reused;
+ * we always insert a fresh `mcp_sessions` row (the prior session's
+ * cookie value isn't recoverable from the hash, so we can't reuse it).
  */
 
 const TENANT_SENTINEL = '_system';
@@ -28,9 +35,11 @@ export interface SeedAdminInput {
 
 export interface SeedAdminOutput {
   userId: string;
-  sessionId: string;
+  /**
+   * Init-internal cookie value. Used to authenticate the `mintApiKey`
+   * call later in the same provision run. NEVER printed to stdout.
+   */
   cookieValue: string;
-  expiresAt: string;
 }
 
 export function generateCookiePayload(): string {
@@ -57,11 +66,11 @@ export async function seedAdmin(
     Date.now() + SESSION_LIFETIME_DAYS * 86_400_000,
   ).toISOString();
 
-  // Idempotent on resume: if a previous init already inserted an active
-  // owner with this email, reuse it. The unique index
-  // `idx_users_email_active_unique` (status = 'active') would otherwise
-  // reject a fresh insert on retry.
-  const existing = await findActiveOwnerByEmail(client, input.databaseId, input.email);
+  const existing = await findActiveOwnerByEmail(
+    client,
+    input.databaseId,
+    input.email,
+  );
   let userId: string;
   if (existing) {
     userId = existing;
@@ -82,7 +91,7 @@ export async function seedAdmin(
     params: [sessionId, cookieHash, userId, expiresIso, nowIso, nowIso],
   });
 
-  return { userId, sessionId, cookieValue, expiresAt: expiresIso };
+  return { userId, cookieValue };
 }
 
 async function findActiveOwnerByEmail(

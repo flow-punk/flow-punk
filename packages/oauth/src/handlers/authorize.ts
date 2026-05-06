@@ -23,7 +23,7 @@ import {
   OAUTH_ACTOR,
 } from '../policy.js';
 import { consentPage } from '../consent.js';
-import { getAllowedResources, getSingleResource } from '../origin.js';
+import { getAllowedResources, getIssuerOrigin, getSingleResource } from '../origin.js';
 import { oauthJsonError, oauthRedirectError } from '../responses.js';
 
 interface ParsedClientRow {
@@ -42,6 +42,7 @@ export async function handleAuthorize(
   request: Request,
   env: OAuthEnv,
   requestId: string,
+  session: { userId: string } | null,
 ): Promise<Response> {
   const url = new URL(request.url);
   const clientId = url.searchParams.get('client_id');
@@ -90,6 +91,33 @@ export async function handleAuthorize(
 
   if (!codeChallenge || !isSupportedPkceMethod(codeChallengeMethod)) {
     return oauthRedirectError(redirectUri, 'invalid_request', state);
+  }
+
+  // Session gate — per ADR-019 amendment 2026-05-06. We send unauthenticated
+  // browsers to /auth/login with the full authorize URL preserved as
+  // `return_to`. Runs AFTER all parameter validation so a malformed request
+  // surfaces as 400 immediately rather than bouncing the operator through
+  // login first only to fail right after.
+  if (!session) {
+    let issuerOrigin: string;
+    try {
+      issuerOrigin = getIssuerOrigin(env, request);
+    } catch {
+      return oauthJsonError(500, 'server_error');
+    }
+    const loginUrl = new URL('/auth/login', issuerOrigin);
+    loginUrl.searchParams.set(
+      'return_to',
+      `${url.pathname}${url.search}`,
+    );
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: loginUrl.toString(),
+        'Cache-Control': 'no-store',
+        'X-Request-ID': requestId,
+      },
+    });
   }
 
   const cookieBindingValue = randomBase64Url(24);

@@ -32,16 +32,18 @@ export async function dispatchIndieRoute(
     });
   }
 
-  // OAuth discovery + endpoints. The /oauth/approve handler needs the
-  // user's session; the dispatcher resolves it (cookie-validated) before
-  // invoking the OAuth route. All other OAuth paths receive null.
+  // OAuth discovery + endpoints. /oauth/authorize and /oauth/approve both
+  // need the user's session for the indie bootstrap flow (per ADR-019
+  // amendment 2026-05-06): /oauth/authorize redirects unauthenticated
+  // browsers to /auth/login, and /oauth/approve fails closed with 401 as
+  // defense in depth. All other OAuth paths receive null.
   if (
     pathname.startsWith('/oauth/') ||
     pathname === '/.well-known/oauth-protected-resource' ||
     pathname === '/.well-known/oauth-authorization-server'
   ) {
     let session: { userId: string } | null = null;
-    if (pathname === '/oauth/approve') {
+    if (pathname === '/oauth/authorize' || pathname === '/oauth/approve') {
       const validated = await validateSession(ctx.env, ctx.request);
       if (validated) session = { userId: validated.userId };
     }

@@ -26,6 +26,17 @@ export const INDIE_PUBLIC_PATHS = [
 ] as const;
 
 /**
+ * Indie-only bootstrap surfaces that managed MUST NOT expose. Per ADR-019
+ * amendment 2026-05-06 (`/auth/login` paste-token form): managed has a
+ * different, multi-tenant login UX out of scope here, and its
+ * `MANAGED_PUBLIC_PATHS` deliberately omits this list.
+ *
+ * Consumed only by `createIndieChain` via `indieAuthBootstrapMiddleware`.
+ * Do NOT spread into `MANAGED_PUBLIC_PATHS`.
+ */
+export const INDIE_BOOTSTRAP_PUBLIC_PATHS = ['/auth/login'] as const;
+
+/**
  * Local-dev-only paths added to the public list when the gating env flag
  * `OPENAPI_ENABLED === '1'` is set (ADR-014). Production deploys leave the
  * flag undefined so these paths fall through to auth → 401.
