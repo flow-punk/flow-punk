@@ -48,9 +48,18 @@ export function getProtectedResource(env: OAuthEnv, request: Request): string {
 export function getAllowedResources(env: OAuthEnv, request: Request): string[] {
   const configured = env.OAUTH_RESOURCE_ALLOWLIST?.split(',')
     .map((value) => value.trim())
+    .map(stripTrailingSlash)
     .filter(Boolean);
   if (configured && configured.length > 0) return configured;
-  return [getProtectedResource(env, request)];
+  // By default, accept both the bare issuer origin AND the canonical MCP
+  // endpoint URL `<origin>/mcp`. MCP clients (Claude.ai, ChatGPT custom
+  // connectors) follow the latest MCP-OAuth convention and send the MCP
+  // server URL itself as the `resource` parameter; older clients and
+  // RFC 9728 PRM consumers may send the bare origin. Allowing both means
+  // the canonical setup works without operators having to configure
+  // `OAUTH_RESOURCE_ALLOWLIST` post-init.
+  const origin = getProtectedResource(env, request);
+  return [origin, `${origin}/mcp`];
 }
 
 export function getSingleResource(
@@ -60,9 +69,17 @@ export function getSingleResource(
   if (values.length !== 1) {
     return { ok: false, error: 'invalid_target' };
   }
-  const resource = values[0];
-  if (!resource || !allowedResources.includes(resource)) {
+  const raw = values[0];
+  if (!raw) {
     return { ok: false, error: 'invalid_target' };
   }
-  return { ok: true, resource };
+  // Tolerate trailing-slash variants on both sides — clients commonly
+  // canonicalize bare origins by appending `/`. Match is otherwise
+  // exact (no fuzzy path / scheme handling).
+  const normalized = stripTrailingSlash(raw);
+  const allowed = allowedResources.map(stripTrailingSlash);
+  if (!allowed.includes(normalized)) {
+    return { ok: false, error: 'invalid_target' };
+  }
+  return { ok: true, resource: normalized };
 }
