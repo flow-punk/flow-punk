@@ -254,6 +254,22 @@ export async function provisionFresh(
     },
   });
 
+  // 5.5. Wait for the gateway's workers.dev subdomain to start serving.
+  // After `setWorkersDevSubdomain(enabled=true)` returns, CF takes up to a
+  // few seconds to actually route `<name>.<account>.workers.dev` to the
+  // worker. Hitting it during that window returns Cloudflare's HTML 404
+  // (not the worker's JSON 404), which would fail the next step.
+  items.push({
+    key: 'gateway.ready',
+    label: 'Wait for gateway to be reachable',
+    run: async () => {
+      const url = inventory.workers.gateway.url;
+      if (!url) throw new Error('Gateway URL not set');
+      await smokeGateway(url);
+      return undefined;
+    },
+  });
+
   // 6. Mint first API key.
   items.push({
     key: 'admin.api-key',
