@@ -48,7 +48,15 @@ export function consentPage(options: ConsentPageOptions): Response {
     status: 200,
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      'Referrer-Policy': 'no-referrer',
+      // `same-origin` preserves the `Origin` header on the same-origin
+      // form POST to /oauth/approve, while still stripping referrer for
+      // any cross-origin navigation. The previous `no-referrer` value
+      // caused Chrome to send `Origin: null` on the approve submission
+      // (per WHATWG Fetch §4.4), which broke the Origin gate. The URL
+      // here contains authorize-request fields, but the form action is
+      // same-origin, so leaking the full URL as Referer to ourselves is
+      // not a concern.
+      'Referrer-Policy': 'same-origin',
       'X-Frame-Options': 'DENY',
       'Content-Security-Policy': "frame-ancestors 'none'",
       'X-Request-ID': options.responseRequestId,

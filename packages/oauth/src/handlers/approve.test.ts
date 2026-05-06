@@ -22,8 +22,23 @@ test('isApproveOriginAllowed: rejects Origin from a different host', () => {
   assert.equal(isApproveOriginAllowed(r, ISSUER), false);
 });
 
-test('isApproveOriginAllowed: rejects literal `Origin: null` (sandboxed iframe)', () => {
+test('isApproveOriginAllowed: rejects literal `Origin: null` without Sec-Fetch-Site (sandboxed iframe / non-browser)', () => {
   const r = reqWith({ Origin: 'null' });
+  assert.equal(isApproveOriginAllowed(r, ISSUER), false);
+});
+
+test('isApproveOriginAllowed: accepts literal `Origin: null` + Sec-Fetch-Site=same-origin (Chrome strict-referrer navigation)', () => {
+  // When the consent page response has a strict Referrer-Policy, Chrome
+  // serializes the form submission's request origin as the literal string
+  // "null" per WHATWG Fetch §4.4. The Sec-Fetch-Site header (browser-set,
+  // unforgeable from page JS) confirms the request actually came from the
+  // same-origin browsing context, so the gate must pass.
+  const r = reqWith({ Origin: 'null', 'Sec-Fetch-Site': 'same-origin' });
+  assert.equal(isApproveOriginAllowed(r, ISSUER), true);
+});
+
+test('isApproveOriginAllowed: rejects literal `Origin: null` + Sec-Fetch-Site=cross-site (real cross-origin attack)', () => {
+  const r = reqWith({ Origin: 'null', 'Sec-Fetch-Site': 'cross-site' });
   assert.equal(isApproveOriginAllowed(r, ISSUER), false);
 });
 

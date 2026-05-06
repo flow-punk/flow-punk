@@ -32,15 +32,20 @@ export interface ApproveSession {
  * cookie-binding, hashed single-use CSRF nonce, and SameSite=Strict on
  * `fp_oauth_approve`. Per ADR-019 §B4.
  *
- * Accepts either:
- *   1. `Origin` == resolved issuer origin — the spec-conformant path
- *      taken by Chrome and Firefox.
- *   2. `Origin` absent AND `Sec-Fetch-Site: same-origin` — Safari has
- *      historically omitted `Origin` for same-origin POSTs;
+ * Accepts when the request demonstrably originated from a same-origin
+ * browser context, via any of:
+ *   1. `Origin` == resolved issuer origin (spec-conformant path).
+ *   2. `Origin` is absent (Safari has historically omitted it for
+ *      same-origin POSTs) AND `Sec-Fetch-Site: same-origin`.
+ *   3. `Origin` is the literal string `"null"` (Chrome serializes the
+ *      origin as `"null"` for navigation form submissions when the
+ *      response that produced the form had a strict referrer policy,
+ *      per WHATWG Fetch §4.4) AND `Sec-Fetch-Site: same-origin`.
  *      `Sec-Fetch-Site` is browser-set and unforgeable from page JS,
- *      so it's a sound same-origin signal.
+ *      so it's a sound same-origin attestation in cases (2) and (3).
  *
- * `Origin: null` (sandboxed iframe / opaque origin) is always rejected.
+ * Cross-origin requests, sandboxed iframes that lack `Sec-Fetch-Site:
+ * same-origin`, and non-browser clients (no Sec-Fetch-Site) are rejected.
  */
 export function isApproveOriginAllowed(
   request: Request,
@@ -48,7 +53,7 @@ export function isApproveOriginAllowed(
 ): boolean {
   const origin = request.headers.get('Origin');
   if (origin === issuerOrigin) return true;
-  if (origin === null) {
+  if (origin === null || origin === 'null') {
     return request.headers.get('Sec-Fetch-Site') === 'same-origin';
   }
   return false;
