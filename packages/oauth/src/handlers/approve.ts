@@ -28,6 +28,33 @@ export interface ApproveSession {
 }
 
 /**
+ * Origin gate for `POST /oauth/approve`. Defense in depth alongside the AR
+ * cookie-binding, hashed single-use CSRF nonce, and SameSite=Strict on
+ * `fp_oauth_approve`. Per ADR-019 §B4.
+ *
+ * Accepts either:
+ *   1. `Origin` == resolved issuer origin — the spec-conformant path
+ *      taken by Chrome and Firefox.
+ *   2. `Origin` absent AND `Sec-Fetch-Site: same-origin` — Safari has
+ *      historically omitted `Origin` for same-origin POSTs;
+ *      `Sec-Fetch-Site` is browser-set and unforgeable from page JS,
+ *      so it's a sound same-origin signal.
+ *
+ * `Origin: null` (sandboxed iframe / opaque origin) is always rejected.
+ */
+export function isApproveOriginAllowed(
+  request: Request,
+  issuerOrigin: string,
+): boolean {
+  const origin = request.headers.get('Origin');
+  if (origin === issuerOrigin) return true;
+  if (origin === null) {
+    return request.headers.get('Sec-Fetch-Site') === 'same-origin';
+  }
+  return false;
+}
+
+/**
  * POST /oauth/approve — consume the authorize-request atomically and
  * mint an authorization code (or redirect with `access_denied`).
  *
@@ -45,14 +72,14 @@ export async function handleApprove(
   session: ApproveSession | null,
 ): Promise<Response> {
   // Origin gate: only the issuer's own browser surface may submit consent.
-  const origin = request.headers.get('Origin');
+  // See ADR-019 §B4 + `isApproveOriginAllowed` for the full rule.
   let issuerOrigin: string;
   try {
     issuerOrigin = getIssuerOrigin(env, request);
   } catch {
     return oauthJsonError(500, 'server_error');
   }
-  if (!origin || origin !== issuerOrigin) {
+  if (!isApproveOriginAllowed(request, issuerOrigin)) {
     return oauthJsonError(400, 'invalid_request');
   }
 
