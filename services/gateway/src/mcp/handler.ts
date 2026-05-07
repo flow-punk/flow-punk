@@ -314,50 +314,38 @@ async function handleToolCall(
     return errorPayload(request.id ?? null, -32601, `Unknown tool: ${toolName}`);
   }
 
-  const requiredScope = adapter.requiredScopeForTool(toolName);
+  const requiredScope = adapter.requiredScopeForTool(toolName, params.arguments);
   if (!hasToolExecutionScope(narrowMcpCredentialType(ctx.credentialType), ctx.scope, requiredScope)) {
     return errorPayload(request.id ?? null, -32003, 'Insufficient scope', {
       requiredScope,
     });
   }
 
-  if (toolName === 'tools_search') {
-    const query = toolSearchQuery(params.arguments);
-    if (query === null) {
-      return errorPayload(request.id ?? null, -32602, 'Invalid tools_search query');
-    }
-
-    return successPayload(request.id ?? null, toolResult({
-      results: adapter.searchTools(query),
-    }));
-  }
-
-  if (toolMetadata.availability.status !== 'available' && toolMetadata.kind !== 'domain') {
+  if (toolMetadata.availability.status !== 'available') {
     return errorPayload(request.id ?? null, -32004, 'Tool is not available for this tenant', {
       reason: toolMetadata.availability.reason,
       nextStep: toolMetadata.availability.nextStep,
     });
   }
 
-  if (isDomainExpandCall(toolMetadata, params.arguments)) {
-    if (!toolMetadata.tools) {
-      return errorPayload(request.id ?? null, -32601, `Unknown tool: ${toolName}`);
-    }
-
-    return successPayload(request.id ?? null, toolResult({
-      tools: toolMetadata.tools.map(toToolDefinition),
-    }));
+  const description = adapter.describeModelAction(toolName, params.arguments);
+  if (description) {
+    return successPayload(request.id ?? null, toolResult(description));
   }
 
-  if (toolMetadata.kind === 'domain') {
+  const modelActionCall = adapter.resolveModelAction(toolName, params.arguments);
+  if (toolMetadata.kind === 'model' && !modelActionCall) {
     return errorPayload(
       request.id ?? null,
       -32602,
-      `Domain tool ${toolName} requires action="expand"`,
+      `Model tool ${toolName} requires action="describe" or a known executable action`,
     );
   }
 
-  const service = bindingForTool(toolMetadata.service, ctx);
+  const downstreamToolName = modelActionCall?.downstreamName ?? toolName;
+  const downstreamArguments = modelActionCall?.arguments ?? params.arguments ?? {};
+  const downstreamMetadata = modelActionCall?.metadata ?? toolMetadata;
+  const service = bindingForTool(downstreamMetadata.service, ctx);
   if (!service) {
     return errorPayload(
       request.id ?? null,
@@ -384,9 +372,15 @@ async function handleToolCall(
   const headers = buildDownstreamServiceHeaders(ctx.request.headers, ctx.requestId, session.sessionId);
 
   if (requiredScope === 'write') {
+    const argumentsHash = await hashArguments(downstreamArguments);
     headers.set(
       IDEMPOTENCY_KEY_HEADER,
-      await synthesizeIdempotencyKey(session.sessionId, request.id ?? null, toolName),
+      await synthesizeIdempotencyKey(
+        session.sessionId,
+        request.id ?? null,
+        downstreamToolName,
+        argumentsHash,
+      ),
     );
   }
 
@@ -405,8 +399,8 @@ async function handleToolCall(
         // in the `X-Request-ID` header (set by buildDownstreamServiceHeaders).
         body: JSON.stringify({
           sessionId: session.sessionId,
-          name: toolName,
-          arguments: params.arguments ?? {},
+          name: downstreamToolName,
+          arguments: downstreamArguments,
           jsonrpcId: request.id ?? null,
         }),
       },
@@ -414,7 +408,7 @@ async function handleToolCall(
     );
   } catch (error) {
     bindLogger(ctx).error('mcp_tool_dispatch_failed', {
-      toolName,
+      toolName: downstreamToolName,
       sessionId: session.sessionId,
       errorName: error instanceof Error ? error.name : 'UnknownError',
       errorMessage: error instanceof Error ? error.message : 'unknown error',
@@ -428,7 +422,7 @@ async function handleToolCall(
   } catch (error) {
     if (error instanceof BodyTooLargeError) {
       bindLogger(ctx).warn('mcp_tool_response_too_large', {
-        toolName,
+        toolName: downstreamToolName,
         sessionId: session.sessionId,
         maxBytes,
       });
@@ -444,7 +438,7 @@ async function handleToolCall(
 
   if (!response.ok) {
     bindLogger(ctx).warn('mcp_tool_dispatch_rejected', {
-      toolName,
+      toolName: downstreamToolName,
       sessionId: session.sessionId,
       statusCode: response.status,
     });
@@ -716,20 +710,6 @@ function isToolCallParams(
   return true;
 }
 
-function isDomainExpandCall(
-  toolMetadata: ToolMetadata,
-  args: Record<string, unknown> | undefined,
-): boolean {
-  if (toolMetadata.kind !== 'domain') return false;
-  return args?.action === 'expand';
-}
-
-function toolSearchQuery(args: Record<string, unknown> | undefined): string | null {
-  if (!args) return '';
-  if (args.query === undefined) return '';
-  return typeof args.query === 'string' ? args.query : null;
-}
-
 function successPayload(id: JsonRpcId, result: unknown): JsonRpcSuccess {
   return {
     jsonrpc: JSONRPC_VERSION,
@@ -834,27 +814,57 @@ function generateSessionId(): string {
 
 /**
  * Stable per-call idempotency key derived from the MCP session, JSON-RPC
- * request id, and tool name. Identical retries (same session, same id,
- * same tool) collapse to a single side-effect via `withIdempotency` at
- * the service layer.
+ * request id, tool name, and a hash of the downstream arguments. Identical
+ * retries (same session, same id, same tool, same args) collapse to a single
+ * side-effect via `withIdempotency` at the service layer.
+ *
+ * Folding the arguments hash in is defensive against MCP clients that
+ * violate the spec's id-uniqueness rule (per
+ * https://modelcontextprotocol.io/specification/2025-06-18/basic — "The
+ * request ID MUST NOT have been previously used by the requestor within the
+ * same session"). Claude.ai's MCP connector has been observed reusing
+ * `id: 1` for every tool call within a session, which without this hash
+ * would synthesize the same idempotency key for two genuinely-different
+ * `deals_create` calls and trip `withIdempotency`'s 422 IDEMPOTENCY_KEY_REUSED
+ * guard. Including the args hash makes "different payload" produce a
+ * different key, so distinct logical operations succeed independently.
+ *
+ * For spec-compliant clients (fresh id per request) the args hash is
+ * redundant — `(sessionId, jsonRpcId, toolName)` already varies per call.
  *
  * The composite preserves the JSON-RPC id's type (string vs number) so
  * `id: 0` and `id: "0"` produce different keys — JSON.stringify of a typed
- * tuple is the canonical form. Full SHA-256 hex (no truncation) — `withIdempotency`
- * accepts up to 255 chars by default.
+ * tuple is the canonical form. Full SHA-256 hex (no truncation) —
+ * `withIdempotency` accepts up to 255 chars by default.
  */
 async function synthesizeIdempotencyKey(
   sessionId: string,
   jsonrpcId: JsonRpcId,
   toolName: string,
+  argumentsHash: string,
 ): Promise<string> {
-  const composite = JSON.stringify(['mcp', sessionId, typeof jsonrpcId, jsonrpcId, toolName]);
+  const composite = JSON.stringify([
+    'mcp',
+    sessionId,
+    typeof jsonrpcId,
+    jsonrpcId,
+    toolName,
+    argumentsHash,
+  ]);
   const bytes = new TextEncoder().encode(composite);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const hex = Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
   return `mcp_${hex}`;
+}
+
+async function hashArguments(args: Record<string, unknown>): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(args));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function base64UrlEncode(bytes: Uint8Array): string {
@@ -865,7 +875,8 @@ function base64UrlEncode(bytes: Uint8Array): string {
 
 /**
  * Per-worker registry. Each gateway wrapper sets `env.EDITION` in its
- * wrangler config — `'all'` for indie, `'managed'` for managed. Cached
+ * wrangler config — `'indie'` for the community edition, `'managed'` for
+ * managed. Cached
  * here so we build it once per worker boot rather than per request.
  */
 const REGISTRY_CACHE = new Map<Edition, ToolRegistry>();
@@ -879,8 +890,15 @@ function registryForEdition(edition: Edition): ToolRegistry {
   return cached;
 }
 
+export function configureGatewayToolRegistry(
+  edition: Edition,
+  registry: ToolRegistry,
+): void {
+  REGISTRY_CACHE.set(edition, registry);
+}
+
 function envEdition(env: Env): Edition {
-  return env.EDITION === 'managed' ? 'managed' : 'all';
+  return env.EDITION === 'managed' ? 'managed' : 'indie';
 }
 
 function parseDynamicServices(raw: string | undefined): Set<Exclude<McpServiceName, 'gateway'>> {

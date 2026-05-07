@@ -14,14 +14,14 @@ export async function handleCreatePipeline(
   try {
     const db = getDb(env);
     const now = new Date().toISOString();
-    const pipeline = await pipelinesRepo.create(
+    const result = await pipelinesRepo.createWithStandardStages(
       db,
       body.value,
       _actor.userId,
       now,
     );
     // audit emission deferred — see plan §Out of scope
-    return jsonResponse(201, { pipeline });
+    return jsonResponse(201, result);
   } catch (err) {
     return mapRepoError(err);
   }

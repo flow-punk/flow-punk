@@ -47,7 +47,7 @@ function makeCtx(env: Partial<Env> = {}, tenantId = 'ten_a'): AppContext {
     SERVICE_TIMEOUT_MS: '0',
     ALLOWED_ORIGINS: '',
     MCP_TOOLS_DYNAMIC_SERVICES: '',
-    EDITION: 'all',
+    EDITION: 'indie',
     ...env,
   };
   return {
@@ -58,9 +58,9 @@ function makeCtx(env: Partial<Env> = {}, tenantId = 'ten_a'): AppContext {
   };
 }
 
-function makeJsonRpcCtx(body: unknown): AppContext {
+function makeJsonRpcCtx(body: unknown, env: Partial<Env> = {}): AppContext {
   return {
-    ...makeCtx({ MAX_REQUEST_BODY_BYTES: '2048' }, '_system'),
+    ...makeCtx({ MAX_REQUEST_BODY_BYTES: '2048', ...env }, '_system'),
     request: new Request('http://internal/mcp/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,11 +174,107 @@ test('initialized notification is accepted without a JSON-RPC response body', as
   assert.equal(await response.text(), '');
 });
 
-test('domain expand returns an MCP tool-call content envelope', async () => {
+test('tools/list returns compact model tools only', async () => {
   const response = await executeJsonRpc(
     makeJsonRpcCtx({
       jsonrpc: '2.0',
       id: 2,
+      method: 'tools/list',
+    }),
+    makeSession(),
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json() as {
+    result: { tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> };
+  };
+  const names = body.result.tools.map((tool) => tool.name).sort();
+  assert.deepEqual(names, ['accounts', 'deals', 'persons', 'pipelines', 'stages']);
+  assert.equal(names.includes('contacts'), false);
+  assert.equal(names.includes('pipeline'), false);
+  assert.equal(names.includes('tools_search'), false);
+});
+
+test('model describe returns an MCP tool-call content envelope with action schema', async () => {
+  const response = await executeJsonRpc(
+    makeJsonRpcCtx({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: {
+        name: 'persons',
+        arguments: { action: 'describe', arguments: { action: 'create' } },
+      },
+    }),
+    makeSession(),
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json() as {
+    result: { content: Array<{ type: string; text: string }>; isError: boolean };
+  };
+  assert.equal(body.result.isError, false);
+  assert.equal(body.result.content[0]?.type, 'text');
+  const payload = JSON.parse(body.result.content[0]!.text) as {
+    model: string;
+    action: string;
+    downstreamName: string;
+    inputSchema: { required?: string[] };
+  };
+  assert.equal(payload.model, 'persons');
+  assert.equal(payload.action, 'create');
+  assert.equal(payload.downstreamName, 'persons_create');
+  assert.deepEqual(payload.inputSchema.required, ['displayName']);
+});
+
+test('model action dispatches to downstream service with underlying tool name', async () => {
+  const calls: Array<{ headers: Headers; body: unknown }> = [];
+  const contactsService = {
+    async fetch(request: Request) {
+      calls.push({ headers: request.headers, body: await request.json() });
+      return new Response(JSON.stringify({
+        content: [{ type: 'text', text: JSON.stringify({ id: 'per_123' }) }],
+        isError: false,
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    },
+  } as Fetcher;
+
+  const response = await executeJsonRpc(
+    makeJsonRpcCtx({
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: {
+        name: 'persons',
+        arguments: {
+          action: 'create',
+          arguments: { displayName: 'Alex Morgan' },
+        },
+      },
+    }, { CONTACTS_SERVICE: contactsService }),
+    makeSession(),
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0]!.headers.get('Mcp-Session-Id'), 'mcp_sess_abcdefghijklmnopqrstuv');
+  assert.equal(calls[0]!.headers.has(IDEMPOTENCY_KEY_HEADER), true);
+  assert.deepEqual(calls[0]!.body, {
+    sessionId: 'mcp_sess_abcdefghijklmnopqrstuv',
+    name: 'persons_create',
+    arguments: { displayName: 'Alex Morgan' },
+    jsonrpcId: 4,
+  });
+});
+
+test('old domain expand tool is not exposed', async () => {
+  const response = await executeJsonRpc(
+    makeJsonRpcCtx({
+      jsonrpc: '2.0',
+      id: 5,
       method: 'tools/call',
       params: {
         name: 'contacts',
@@ -189,39 +285,7 @@ test('domain expand returns an MCP tool-call content envelope', async () => {
   );
 
   assert.equal(response.status, 200);
-  const body = await response.json() as {
-    result: { content: Array<{ type: string; text: string }>; isError: boolean };
-  };
-  assert.equal(body.result.isError, false);
-  assert.equal(body.result.content[0]?.type, 'text');
-  const payload = JSON.parse(body.result.content[0]!.text) as {
-    tools: Array<{ name: string }>;
-  };
-  assert.ok(payload.tools.some((tool) => tool.name === 'persons_create'));
-});
-
-test('tools_search returns an MCP tool-call content envelope', async () => {
-  const response = await executeJsonRpc(
-    makeJsonRpcCtx({
-      jsonrpc: '2.0',
-      id: 3,
-      method: 'tools/call',
-      params: {
-        name: 'tools_search',
-        arguments: { query: 'person' },
-      },
-    }),
-    makeSession(),
-  );
-
-  assert.equal(response.status, 200);
-  const body = await response.json() as {
-    result: { content: Array<{ type: string; text: string }>; isError: boolean };
-  };
-  assert.equal(body.result.isError, false);
-  assert.equal(body.result.content[0]?.type, 'text');
-  const payload = JSON.parse(body.result.content[0]!.text) as {
-    results: Array<{ name: string }>;
-  };
-  assert.ok(payload.results.some((tool) => tool.name === 'persons_create'));
+  const body = await response.json() as { error: { code: number; message: string } };
+  assert.equal(body.error.code, -32601);
+  assert.equal(body.error.message, 'Unknown tool: contacts');
 });

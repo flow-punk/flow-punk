@@ -45,43 +45,37 @@ const AVAILABILITY_RULES: AvailabilityRule[] = [
     toolName: 'persons_search',
     available: (e) => e.hasPersons,
     reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call persons_create to add the first person, then re-run tools/list.',
+    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
   },
   {
     toolName: 'persons_get',
     available: (e) => e.hasPersons,
     reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call persons_create to add the first person, then re-run tools/list.',
+    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
   },
   {
     toolName: 'persons_update',
     available: (e) => e.hasPersons,
     reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call persons_create to add the first person, then re-run tools/list.',
+    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
   },
   {
     toolName: 'accounts_search',
     available: (e) => e.hasAccounts,
     reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call accounts_create to add the first account, then re-run tools/list.',
+    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
   },
   {
     toolName: 'accounts_get',
     available: (e) => e.hasAccounts,
     reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call accounts_create to add the first account, then re-run tools/list.',
+    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
   },
   {
     toolName: 'accounts_update',
     available: (e) => e.hasAccounts,
     reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call accounts_create to add the first account, then re-run tools/list.',
-  },
-  {
-    toolName: 'contacts_search',
-    available: (e) => e.hasPersons || e.hasAccounts,
-    reason: 'no person or account records exist for this tenant yet',
-    nextStep: 'Call persons_create or accounts_create to add a record first.',
+    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
   },
 ];
 
@@ -90,8 +84,8 @@ const ALWAYS_AVAILABLE_TOOLS = new Set(['persons_create', 'accounts_create']);
 /**
  * Build the contacts service's per-tenant tool state. Tools backed by data
  * the tenant has not created yet are emitted as `unavailable` so the gateway
- * surfaces them via `tools_search` with `reason` + `nextStep` (ADR-006
- * §"Tool Availability Model"). Always-available tools (creates) and
+ * can describe unavailable-but-known actions with `reason` + `nextStep`
+ * (ADR-006 §"Tool Availability Model"). Always-available tools (creates) and
  * data-gated tools live in the same registry — the difference is the
  * availability bit.
  */
@@ -99,11 +93,7 @@ export async function buildContactsToolState(env: ContactsEnv): Promise<McpToolS
   const db = getDb(env);
   const existence = await checkExistence(db);
 
-  const registry = buildToolRegistry('all');
-  const contactsDomain = registry.domainSeeds.find((seed) => seed.name === 'contacts');
-  if (!contactsDomain) {
-    return { availableTools: [], unavailableTools: [], dynamicTools: [] };
-  }
+  const registry = buildToolRegistry('indie');
 
   const availableTools: ToolMetadata[] = [];
   const unavailableTools: ToolMetadata[] = [];

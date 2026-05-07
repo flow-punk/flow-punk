@@ -55,6 +55,8 @@ const NAME_MAX = 256;
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MAX_ACTIVE_STAGES_PER_PIPELINE = 12;
+const MIN_ACTIVE_STAGES_PER_PIPELINE = 2;
 
 const TERMINAL_KIND_SET = new Set<string>(TERMINAL_KIND_VALUES);
 
@@ -99,6 +101,7 @@ export async function create(
   const normalized = validateCreate(input);
 
   await assertPipelineActive(db, normalized.pipelineId);
+  await assertPipelineCanAcceptStage(db, normalized.pipelineId);
 
   const row: NewStage = {
     id: generateId('stg'),
@@ -287,8 +290,9 @@ export async function update(
 
 /**
  * Soft-delete a stage. Atomic guard: blocked when ANY active deal
- * references this stage. Concurrent deal inserts/transitions cannot slip
- * through between a pre-check and the write because the `NOT EXISTS`
+ * references this stage, and when deletion would leave the pipeline with
+ * fewer than two active stages. Concurrent deal inserts/transitions cannot
+ * slip through between a pre-check and the write because the `NOT EXISTS`
  * clause is in the same UPDATE.
  */
 export async function softDelete(
@@ -311,6 +315,7 @@ export async function softDelete(
         eq(stages.id, id),
         eq(stages.status, 'active'),
         sql`NOT EXISTS (SELECT 1 FROM deals WHERE stage_id = ${id} AND status = 'active')`,
+        sql`(SELECT COUNT(*) FROM stages AS active_stages WHERE active_stages.pipeline_id = ${stages.pipelineId} AND active_stages.status = 'active') > ${MIN_ACTIVE_STAGES_PER_PIPELINE}`,
       ),
     )
     .returning();
@@ -319,7 +324,7 @@ export async function softDelete(
   if (row) return row;
 
   const existing = await db
-    .select({ status: stages.status })
+    .select({ status: stages.status, pipelineId: stages.pipelineId })
     .from(stages)
     .where(eq(stages.id, id))
     .limit(1);
@@ -340,10 +345,39 @@ export async function softDelete(
       `stage "${id}" has active deals`,
     );
   }
+  const activeStageCount = await countActiveStages(db, existing[0].pipelineId);
+  if (activeStageCount <= MIN_ACTIVE_STAGES_PER_PIPELINE) {
+    throw new StagesRepoError(
+      'wrong_state',
+      `pipeline "${existing[0].pipelineId}" must keep at least ${MIN_ACTIVE_STAGES_PER_PIPELINE} active stages`,
+    );
+  }
   throw new StagesRepoError(
     'invariant_violation',
     `stage "${id}" softDelete failed for unknown reason`,
   );
+}
+
+async function assertPipelineCanAcceptStage(
+  db: Db,
+  pipelineId: string,
+): Promise<void> {
+  const activeStageCount = await countActiveStages(db, pipelineId);
+  if (activeStageCount >= MAX_ACTIVE_STAGES_PER_PIPELINE) {
+    throw new StagesRepoError(
+      'wrong_state',
+      `pipeline "${pipelineId}" already has the maximum ${MAX_ACTIVE_STAGES_PER_PIPELINE} active stages`,
+    );
+  }
+}
+
+async function countActiveStages(db: Db, pipelineId: string): Promise<number> {
+  const rows = await db
+    .select({ id: stages.id })
+    .from(stages)
+    .where(and(eq(stages.pipelineId, pipelineId), eq(stages.status, 'active')))
+    .limit(MAX_ACTIVE_STAGES_PER_PIPELINE + 1);
+  return rows.length;
 }
 
 // ---------- pre-checks ----------

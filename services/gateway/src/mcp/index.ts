@@ -1,5 +1,6 @@
 export { handleMcp } from './handler.js';
 export {
+  configureGatewayToolRegistry,
   INVALIDATE_TOOLS_HEADER,
   INVALIDATE_TOOLS_REASON_HEADER,
   SESSION_MODE_HEADER,

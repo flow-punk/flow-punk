@@ -209,7 +209,7 @@ export function buildScriptMetadata(input: BuildInput): ScriptMetadata {
     bindings.push({
       name: 'EDITION',
       type: 'plain_text',
-      text: 'all',
+      text: 'indie',
     });
   }
 

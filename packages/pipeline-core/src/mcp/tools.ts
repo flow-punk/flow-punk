@@ -45,13 +45,25 @@ const AVAILABILITY_RULES: AvailabilityRule[] = [
     toolName: 'pipeline_search',
     available: (e) => e.hasPipelines,
     reason: 'no pipelines exist for this tenant yet',
-    nextStep: 'Create a pipeline via POST /api/v1/pipelines, then re-run tools/list.',
+    nextStep: 'Call the pipelines create action to create a standard sales pipeline, then re-run tools/list.',
   },
   {
     toolName: 'stages_search',
     available: (e) => e.hasStages,
     reason: 'no stages exist for this tenant yet',
     nextStep: 'Create at least one stage via POST /api/v1/stages, then re-run tools/list.',
+  },
+  {
+    toolName: 'stages_create',
+    available: (e) => e.hasPipelines,
+    reason: 'no active pipelines exist for this tenant yet',
+    nextStep: 'Call the pipelines create action first.',
+  },
+  {
+    toolName: 'stages_delete',
+    available: (e) => e.hasStages,
+    reason: 'no active stages exist for this tenant yet',
+    nextStep: 'Create a pipeline with the standard sales template first.',
   },
   {
     toolName: 'deals_create',
@@ -63,19 +75,19 @@ const AVAILABILITY_RULES: AvailabilityRule[] = [
     toolName: 'deals_search',
     available: (e) => e.hasDeals,
     reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call deals_create to add the first deal, then re-run tools/list.',
+    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
   },
   {
     toolName: 'deals_get',
     available: (e) => e.hasDeals,
     reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call deals_create to add the first deal, then re-run tools/list.',
+    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
   },
   {
     toolName: 'deals_update',
     available: (e) => e.hasDeals,
     reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call deals_create to add the first deal, then re-run tools/list.',
+    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
   },
   {
     toolName: 'deals_move_stage',
@@ -85,7 +97,7 @@ const AVAILABILITY_RULES: AvailabilityRule[] = [
   },
 ];
 
-const ALWAYS_AVAILABLE_TOOLS = new Set<string>(); // pipeline domain has no always-available tools
+const ALWAYS_AVAILABLE_TOOLS = new Set<string>(['pipeline_create']);
 
 /**
  * Build the pipeline service's per-tenant tool state. List-time availability
@@ -97,7 +109,7 @@ export async function buildPipelineToolState(env: PipelineEnv): Promise<McpToolS
   const db = getDb(env);
   const existence = await checkExistence(db);
 
-  const registry = buildToolRegistry('all');
+  const registry = buildToolRegistry('indie');
   const availableTools: ToolMetadata[] = [];
   const unavailableTools: ToolMetadata[] = [];
 

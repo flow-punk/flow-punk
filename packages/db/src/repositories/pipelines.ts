@@ -31,6 +31,7 @@ import {
   type PipelinePatchableField,
 } from '../schema/pipelines.js';
 import { stages } from '../schema/stages.js';
+import type { Stage, StageTerminalKind } from '../schema/stages.js';
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -54,11 +55,27 @@ const DESCRIPTION_MAX = 1024;
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+const MIN_PIPELINE_STAGES = 2;
+const MAX_PIPELINE_STAGES = 12;
 
 export interface CreatePipelineInput {
   name: string;
   description?: string | null;
   isDefault?: boolean | number;
+  template?: 'standard_sales';
+  stages?: CreatePipelineStageInput[];
+}
+
+export interface CreatePipelineStageInput {
+  name: string;
+  position: number;
+  terminalKind?: StageTerminalKind | null;
+  probability?: number | null;
+}
+
+export interface CreatePipelineWithStandardStagesResult {
+  pipeline: Pipeline;
+  stages: Stage[];
 }
 
 export type UpdatePipelinePatch = Partial<{
@@ -124,6 +141,174 @@ export async function create(
     }
     throw err;
   }
+}
+
+const STANDARD_SALES_STAGES: Array<{
+  name: string;
+  terminalKind?: StageTerminalKind | null;
+  probability?: number | null;
+}> = [
+  { name: 'New', probability: 10 },
+  { name: 'Qualified', probability: 25 },
+  { name: 'Proposal', probability: 50 },
+  { name: 'Agreement', probability: 75 },
+  { name: 'Complete', terminalKind: 'won', probability: 100 },
+  { name: 'Closed Lost', terminalKind: 'lost', probability: 0 },
+];
+
+export async function createWithStandardStages(
+  db: Db,
+  input: CreatePipelineInput,
+  actorId: string,
+  now: string,
+): Promise<CreatePipelineWithStandardStagesResult> {
+  const stageInputs = resolvePipelineStageInputs(input);
+  const pipeline = await create(db, input, actorId, now);
+  const stageRows = stageInputs.map((stage) => ({
+    id: generateId('stg'),
+    pipelineId: pipeline.id,
+    name: stage.name,
+    position: stage.position,
+    terminalKind: stage.terminalKind ?? null,
+    probability: stage.probability ?? null,
+    status: 'active' as const,
+    deletedAt: null,
+    deletedBy: null,
+    createdAt: now,
+    createdBy: actorId,
+    updatedAt: now,
+    updatedBy: actorId,
+  }));
+
+  try {
+    const insertedStages = await db.insert(stages).values(stageRows).returning();
+    if (insertedStages.length !== stageRows.length) {
+      throw new PipelinesRepoError(
+        'invariant_violation',
+        'pipeline stage insert returned an unexpected row count',
+      );
+    }
+    return { pipeline, stages: insertedStages };
+  } catch (err) {
+    try {
+      await softDelete(db, pipeline.id, actorId, now);
+    } catch {
+      // Best-effort compensation. Surface the original create failure.
+    }
+    throw err;
+  }
+}
+
+function resolvePipelineStageInputs(input: CreatePipelineInput): CreatePipelineStageInput[] {
+  const hasTemplate = input.template !== undefined;
+  const hasStages = input.stages !== undefined;
+  if (hasTemplate && hasStages) {
+    throw new PipelinesRepoError(
+      'invalid_input',
+      'provide either template or stages, not both',
+    );
+  }
+  if (hasStages) return validateCustomStages(input.stages);
+  if (hasTemplate && input.template !== 'standard_sales') {
+    throw new PipelinesRepoError(
+      'invalid_input',
+      'template must be "standard_sales"',
+    );
+  }
+  return STANDARD_SALES_STAGES.map((stage, position) => ({ ...stage, position }));
+}
+
+function validateCustomStages(value: unknown): CreatePipelineStageInput[] {
+  if (!Array.isArray(value)) {
+    throw new PipelinesRepoError('invalid_input', 'stages must be an array');
+  }
+  if (value.length < MIN_PIPELINE_STAGES || value.length > MAX_PIPELINE_STAGES) {
+    throw new PipelinesRepoError(
+      'invalid_input',
+      `stages must contain ${MIN_PIPELINE_STAGES}-${MAX_PIPELINE_STAGES} items`,
+    );
+  }
+
+  const seenPositions = new Set<number>();
+  const out = value.map((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new PipelinesRepoError('invalid_input', `stages[${index}] must be an object`);
+    }
+    const stage = raw as Record<string, unknown>;
+    if (typeof stage.name !== 'string') {
+      throw new PipelinesRepoError('invalid_input', `stages[${index}].name is required`);
+    }
+    const name = stage.name.trim();
+    validateName(name);
+
+    if (
+      typeof stage.position !== 'number' ||
+      !Number.isInteger(stage.position) ||
+      stage.position < 0
+    ) {
+      throw new PipelinesRepoError(
+        'invalid_input',
+        `stages[${index}].position must be a non-negative integer`,
+      );
+    }
+    if (seenPositions.has(stage.position)) {
+      throw new PipelinesRepoError('invalid_input', 'stage positions must be unique');
+    }
+    seenPositions.add(stage.position);
+
+    const terminalKind = stage.terminalKind;
+    if (
+      terminalKind !== undefined &&
+      terminalKind !== null &&
+      terminalKind !== 'won' &&
+      terminalKind !== 'lost'
+    ) {
+      throw new PipelinesRepoError(
+        'invalid_input',
+        `stages[${index}].terminalKind must be "won" or "lost"`,
+      );
+    }
+
+    const probability = stage.probability;
+    if (
+      probability !== undefined &&
+      probability !== null &&
+      (typeof probability !== 'number' ||
+        !Number.isFinite(probability) ||
+        probability < 0 ||
+        probability > 100)
+    ) {
+      throw new PipelinesRepoError(
+        'invalid_input',
+        `stages[${index}].probability must be a number in [0, 100]`,
+      );
+    }
+
+    return {
+      name,
+      position: stage.position,
+      terminalKind: terminalKind as StageTerminalKind | null | undefined,
+      probability: probability as number | null | undefined,
+    };
+  });
+
+  const sortedPositions = [...seenPositions].sort((a, b) => a - b);
+  for (let i = 0; i < sortedPositions.length; i++) {
+    if (sortedPositions[i] !== i) {
+      throw new PipelinesRepoError(
+        'invalid_input',
+        'stage positions must be contiguous starting at 0',
+      );
+    }
+  }
+  if (!out.some((stage) => stage.terminalKind === 'won')) {
+    throw new PipelinesRepoError(
+      'invalid_input',
+      'custom pipeline stages must include at least one terminalKind "won" stage',
+    );
+  }
+
+  return out;
 }
 
 export async function findById(

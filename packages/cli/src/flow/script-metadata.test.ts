@@ -102,7 +102,7 @@ test('gateway metadata vars match wrangler.toml', () => {
   assert.equal(byName.get('SERVICE_TIMEOUT_MS'), '10000');
   assert.equal(byName.get('ALLOWED_ORIGINS'), 'https://gw.example.workers.dev');
   assert.equal(byName.get('MCP_TOOLS_DYNAMIC_SERVICES'), '');
-  assert.equal(byName.get('EDITION'), 'all');
+  assert.equal(byName.get('EDITION'), 'indie');
 });
 
 test('users service has EDITION=indie', () => {

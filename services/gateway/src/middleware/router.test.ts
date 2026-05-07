@@ -22,7 +22,7 @@ function makeCtx(pathname: string, env: Partial<Env> = {}): AppContext {
     SERVICE_TIMEOUT_MS: '0',
     ALLOWED_ORIGINS: '',
     MCP_TOOLS_DYNAMIC_SERVICES: '',
-    EDITION: 'all' as const,
+    EDITION: 'indie' as const,
     ...env,
   } satisfies Env;
   return {

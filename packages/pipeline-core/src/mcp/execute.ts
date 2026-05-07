@@ -6,6 +6,8 @@ import {
   pipelinesRepo,
   stagesRepo,
   type CreateDealInput,
+  type CreatePipelineInput,
+  type CreateStageInput,
   type UpdateDealPatch,
 } from '@flowpunk-indie/db';
 import { createLogger } from '@flowpunk/service-utils';
@@ -115,10 +117,16 @@ async function dispatch(
   now: string,
 ): Promise<DispatchOutcome> {
   switch (name) {
+    case 'pipeline_create':
+      return executePipelineCreate(db, args, actor, env, now);
     case 'pipeline_search':
       return executePipelineSearch(db, args, env);
+    case 'stages_create':
+      return executeStagesCreate(db, args, actor, env, now);
     case 'stages_search':
       return executeStagesSearch(db, args, env);
+    case 'stages_delete':
+      return executeStagesDelete(db, args, actor, env, now);
     case 'deals_create':
       return executeDealsCreate(db, args, actor, env, now);
     case 'deals_get':
@@ -135,6 +143,26 @@ async function dispatch(
         envelope: envelopeErr('UNKNOWN_TOOL', `unknown tool: ${name}`),
       };
   }
+}
+
+async function executePipelineCreate(
+  db: Db,
+  args: Record<string, unknown>,
+  actor: Actor,
+  _env: PipelineEnv,
+  now: string,
+): Promise<DispatchOutcome> {
+  const result = await pipelinesRepo.createWithStandardStages(
+    db,
+    args as unknown as CreatePipelineInput,
+    actor.userId,
+    now,
+  );
+  return {
+    status: 200,
+    envelope: envelopeOk(result),
+    options: { invalidateTools: { reason: 'pipelines_table_mutated' } },
+  };
 }
 
 async function ensureAvailable(
@@ -191,6 +219,42 @@ async function executeStagesSearch(
     includeDeleted: false,
   });
   return { status: 200, envelope: envelopeOk(result) };
+}
+
+async function executeStagesCreate(
+  db: Db,
+  args: Record<string, unknown>,
+  actor: Actor,
+  env: PipelineEnv,
+  now: string,
+): Promise<DispatchOutcome> {
+  const guard = await ensureAvailable('stages_create', env);
+  if (guard) return guard;
+  const stage = await stagesRepo.create(db, args as unknown as CreateStageInput, actor.userId, now);
+  return {
+    status: 200,
+    envelope: envelopeOk({ stage }),
+    options: { invalidateTools: { reason: 'stages_table_mutated' } },
+  };
+}
+
+async function executeStagesDelete(
+  db: Db,
+  args: Record<string, unknown>,
+  actor: Actor,
+  env: PipelineEnv,
+  now: string,
+): Promise<DispatchOutcome> {
+  const guard = await ensureAvailable('stages_delete', env);
+  if (guard) return guard;
+  const id = stringArg(args, 'id');
+  if (!id) return invalidArg('id is required');
+  const stage = await stagesRepo.softDelete(db, id, actor.userId, now);
+  return {
+    status: 200,
+    envelope: envelopeOk({ stage }),
+    options: { invalidateTools: { reason: 'stages_table_mutated' } },
+  };
 }
 
 async function executeDealsCreate(

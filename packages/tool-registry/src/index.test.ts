@@ -4,111 +4,124 @@ import test from 'node:test';
 import {
   buildToolRegistry,
   createMcpToolAdapter,
-  type McpToolState,
   type ToolMetadata,
 } from './index.js';
 
-test('buildToolRegistry trims out-of-scope domains', () => {
-  const registry = buildToolRegistry('all');
-  const domains = new Set(registry.domainSeeds.map((seed) => seed.name));
-  assert.deepEqual([...domains].sort(), ['contacts', 'pipeline']);
-  assert.equal(registry.staticExecutableTools.some((tool) => tool.domain === 'cms'), false);
-  assert.equal(registry.staticExecutableTools.some((tool) => tool.domain === 'forms'), false);
-  assert.equal(registry.staticExecutableTools.some((tool) => tool.domain === 'automations'), false);
+test("buildToolRegistry('indie') exposes compact CRM model tools", () => {
+  const registry = buildToolRegistry('indie');
+  assert.deepEqual(
+    registry.modelTools.map((tool) => tool.name).sort(),
+    ['accounts', 'deals', 'persons', 'pipelines', 'stages'],
+  );
+  assert.equal(registry.modelTools.some((tool) => tool.name === 'contacts'), false);
+  assert.equal(registry.modelTools.some((tool) => tool.name === 'pipeline'), false);
+  assert.equal(registry.modelTools.some((tool) => tool.name === 'tools_search'), false);
 });
 
-test("buildToolRegistry('all') includes only edition='all' tools", () => {
-  const registry = buildToolRegistry('all');
-  for (const tool of registry.staticExecutableTools) {
-    assert.equal(tool.edition, 'all', `tool ${tool.name} should be edition=all`);
-  }
-});
-
-test("buildToolRegistry('managed') is a superset of 'all'", () => {
-  const all = buildToolRegistry('all');
+test("buildToolRegistry('managed') starts from the same shared CRM model surface", () => {
+  const indie = buildToolRegistry('indie');
   const managed = buildToolRegistry('managed');
-  for (const tool of all.staticExecutableTools) {
-    assert.ok(
-      managed.staticExecutableTools.some((m) => m.name === tool.name),
-      `managed registry must include ${tool.name}`,
-    );
-  }
+  assert.deepEqual(
+    managed.modelTools.map((tool) => tool.name).sort(),
+    indie.modelTools.map((tool) => tool.name).sort(),
+  );
 });
 
-test('adapter listAvailableTools includes domain tools + tools_search only', () => {
-  const adapter = createMcpToolAdapter({});
-  const names = adapter.listAvailableTools().map((t) => t.name).sort();
-  assert.deepEqual(names, ['contacts', 'pipeline', 'tools_search']);
+test('model descriptions explain relationships between CRM records', () => {
+  const adapter = createMcpToolAdapter();
+  const byName = new Map(adapter.listAvailableTools().map((tool) => [tool.name, tool]));
+  assert.match(byName.get('persons')!.description, /accountId/);
+  assert.match(byName.get('accounts')!.description, /many persons/);
+  assert.match(byName.get('deals')!.description, /stages in a pipeline/);
+  assert.match(byName.get('stages')!.description, /belongs to a pipeline/);
 });
 
-test('adapter excludes static catalog when includeStaticCatalog=false and no dynamic tools provided', () => {
-  const adapter = createMcpToolAdapter({ includeStaticCatalog: false });
-  const names = adapter.listAvailableTools().map((t) => t.name);
-  assert.deepEqual(names, ['tools_search']);
+test('model tool schema lists describe plus executable actions', () => {
+  const persons = createMcpToolAdapter()
+    .listAvailableTools()
+    .find((tool) => tool.name === 'persons');
+  assert.ok(persons);
+  const properties = persons.inputSchema.properties as {
+    action: { enum: string[] };
+  };
+  assert.deepEqual(properties.action.enum, ['describe', 'search', 'get', 'create', 'update']);
 });
 
-test('adapter merges dynamic available tools when includeStaticCatalog=false', () => {
-  const dynamicTools: ToolMetadata[] = [
-    {
-      name: 'persons_create',
-      description: 'Create a person',
-      inputSchema: { type: 'object', additionalProperties: true },
-      kind: 'static',
-      domain: 'contacts',
-      service: 'contacts',
-      requiredScope: 'write',
-      availability: { status: 'available' },
-      edition: 'all',
-    },
-  ];
-  const adapter = createMcpToolAdapter({
-    includeStaticCatalog: false,
-    availableTools: dynamicTools,
+test('describe returns the full schema for one action', () => {
+  const adapter = createMcpToolAdapter();
+  const description = adapter.describeModelAction('persons', {
+    action: 'describe',
+    arguments: { action: 'create' },
   });
-  const names = adapter.listAvailableTools().map((t) => t.name).sort();
-  assert.deepEqual(names, ['contacts', 'tools_search']);
+  assert.ok(description);
+  assert.equal(description.downstreamName, 'persons_create');
+  assert.deepEqual(description.inputSchema.required, ['displayName']);
+  assert.equal(description.examples?.[0]?.displayName, 'Alex Morgan');
 });
 
-test('adapter searchTools surfaces unavailable tools with availability', () => {
+test('resolveModelAction maps public model calls to downstream action names', () => {
+  const adapter = createMcpToolAdapter();
+  const call = adapter.resolveModelAction('persons', {
+    action: 'create',
+    arguments: { displayName: 'Alex Morgan' },
+  });
+  assert.ok(call);
+  assert.equal(call.downstreamName, 'persons_create');
+  assert.deepEqual(call.arguments, { displayName: 'Alex Morgan' });
+  assert.equal(call.metadata.requiredScope, 'write');
+});
+
+test('downstream action names are not public MCP tools', () => {
+  const adapter = createMcpToolAdapter();
+  assert.equal(adapter.getToolMetadata('persons_create'), null);
+});
+
+test('unavailable actions are omitted from model action enum but still describable', () => {
   const unavailable: ToolMetadata = {
     name: 'persons_search',
     description: 'Search person records',
     inputSchema: { type: 'object', additionalProperties: true },
-    kind: 'static',
-    domain: 'contacts',
+    kind: 'action',
+    model: 'persons',
     service: 'contacts',
     requiredScope: 'read',
     availability: {
       status: 'unavailable',
-      reason: 'no persons created yet',
-      nextStep: 'Create your first person',
+      reason: 'contacts table is not ready',
+      nextStep: 'Run migrations',
     },
-    edition: 'all',
+    editions: ['indie', 'managed'],
+    action: 'search',
+    downstreamName: 'persons_search',
   };
+
   const adapter = createMcpToolAdapter({
     includeStaticCatalog: false,
+    availableTools: [
+      {
+        ...unavailable,
+        name: 'persons_create',
+        action: 'create',
+        downstreamName: 'persons_create',
+        description: 'Create a person record',
+        requiredScope: 'write',
+        availability: { status: 'available' },
+      },
+    ],
     unavailableTools: [unavailable],
   });
-  const results = adapter.searchTools('persons');
-  const hit = results.find((r) => r.name === 'persons_search');
-  assert.ok(hit, 'persons_search must be discoverable');
-  assert.equal(hit.availability.status, 'unavailable');
-  assert.equal(hit.availability.nextStep, 'Create your first person');
-});
 
-test('adapter requiredScopeForTool resolves from static catalog by default', () => {
-  const adapter = createMcpToolAdapter({});
-  assert.equal(adapter.requiredScopeForTool('persons_create'), 'write');
-  assert.equal(adapter.requiredScopeForTool('persons_search'), 'read');
-});
-
-test('domain tool is omitted when its domain has zero available tools (dynamic mode)', () => {
-  const state: McpToolState = {
-    availableTools: [],
-    unavailableTools: [],
-    dynamicTools: [],
+  const persons = adapter.listAvailableTools().find((tool) => tool.name === 'persons');
+  assert.ok(persons);
+  const properties = persons.inputSchema.properties as {
+    action: { enum: string[] };
   };
-  const adapter = createMcpToolAdapter({ includeStaticCatalog: false, ...state });
-  const names = adapter.listAvailableTools().map((t) => t.name);
-  assert.deepEqual(names, ['tools_search']);
+  assert.deepEqual(properties.action.enum, ['describe', 'create']);
+
+  const description = adapter.describeModelAction('persons', {
+    action: 'describe',
+    arguments: { action: 'search' },
+  });
+  assert.equal(description?.availability.status, 'unavailable');
+  assert.equal(description?.availability.nextStep, 'Run migrations');
 });

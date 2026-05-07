@@ -16,10 +16,10 @@ ALLOWED_ORIGINS = "http://localhost:4321,http://localhost:3000"
 # "contacts,pipeline" once those services are deployed and their
 # `GET /mcp/tools` endpoints have been smoke-tested.
 MCP_TOOLS_DYNAMIC_SERVICES = ""
-# Build-time edition marker. `'all'` for indie; `'managed'` for the
+# Build-time edition marker. `'indie'` for the community edition; `'managed'` for the
 # managed wrapper. Edition filters tool-registry at registry-build time
 # inside each gateway wrapper (ADR-006:41 / ADR-008:33).
-EDITION = "all"
+EDITION = "indie"
 # OAuth issuer URL (per ADR-019). Required for non-loopback OAuth
 # metadata; loopback dev falls back to the request origin. Operators
 # override this to their public install URL during `flowpunk init`.
