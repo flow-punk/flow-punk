@@ -145,7 +145,11 @@ test('withIdempotency does not cache 5xx responses', async () => {
   assert.equal(kv._store.size, 0);
 });
 
-test('withIdempotency does cache 4xx responses (validation error pinning)', async () => {
+test('withIdempotency does not cache 4xx responses (no validation-error pinning)', async () => {
+  // 4xx means the request was rejected before any side effect — a corrected
+  // retry under the same key must reach the handler. Caching the 4xx would
+  // wedge MCP tool-call slots whose JSON-RPC id (and thus synthesized
+  // idempotency key) is reused across in-turn retries.
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -154,7 +158,7 @@ test('withIdempotency does cache 4xx responses (validation error pinning)', asyn
   };
 
   const headers = { 'X-Idempotency-Key': 'key-1' };
-  await withIdempotency(
+  const r1 = await withIdempotency(
     makeRequest('POST', '{"slug":"BAD"}', headers),
     kv,
     handler,
@@ -167,9 +171,44 @@ test('withIdempotency does cache 4xx responses (validation error pinning)', asyn
     { scopeKey: 'ten_a:usr_a' },
   );
 
-  assert.equal(callCount, 1);
+  assert.equal(callCount, 2);
+  assert.equal(r1.status, 400);
   assert.equal(r2.status, 400);
-  assert.equal(r2.headers.get('Idempotency-Replayed'), 'true');
+  assert.equal(r2.headers.get('Idempotency-Replayed'), null);
+  assert.equal(kv._store.size, 0);
+});
+
+test('withIdempotency lets corrected payload succeed after a prior 4xx under the same key', async () => {
+  // Regression for the MCP-connector pin: same idempotency key, first call
+  // returns 4xx (validation), second call has a corrected body and must
+  // execute normally rather than 422 IDEMPOTENCY_KEY_REUSED.
+  const kv = makeKv();
+  let callCount = 0;
+  const handler = async (): Promise<Response> => {
+    callCount++;
+    if (callCount === 1) {
+      return new Response('{"error":"BAD_PHONE"}', { status: 400 });
+    }
+    return new Response('{"id":"per_1"}', { status: 201 });
+  };
+
+  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const r1 = await withIdempotency(
+    makeRequest('POST', '{"phone":"1-617-555-0100"}', headers),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a' },
+  );
+  const r2 = await withIdempotency(
+    makeRequest('POST', '{"phone":"+1-617-555-0100"}', headers),
+    kv,
+    handler,
+    { scopeKey: 'ten_a:usr_a' },
+  );
+
+  assert.equal(r1.status, 400);
+  assert.equal(r2.status, 201);
+  assert.equal(callCount, 2);
 });
 
 test('withIdempotency isolates by scopeKey (no cross-tenant collision)', async () => {

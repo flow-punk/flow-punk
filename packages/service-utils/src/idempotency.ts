@@ -1,12 +1,18 @@
 /**
  * Idempotency middleware for write requests.
  *
- * Caches successful (status < 500) responses keyed on a tuple of
+ * Caches successful (2xx) responses keyed on a tuple of
  * `(method, pathname, scopeKey, idempotency-key)` plus a hash of the request
  * body. Reusing the same key with a different request body returns
- * `422 IDEMPOTENCY_KEY_REUSED` (Stripe-style contract) — this prevents both
- * stale-success replays across different payloads and corrected-body-pinned-
- * to-stale-4xx footguns.
+ * `422 IDEMPOTENCY_KEY_REUSED` — this prevents stale-success replays from
+ * silently returning the wrong resource id when the payload changed.
+ *
+ * Non-2xx responses (4xx and 5xx) are NOT cached. A 4xx means the request
+ * was rejected before any side effect occurred, so a corrected retry under
+ * the same key is safe and expected — and some MCP clients pin a single
+ * JSON-RPC id (and therefore a single synthesized idempotency key) to a
+ * tool-call slot across in-turn retries, so caching the 4xx would wedge the
+ * slot for the rest of the conversation.
  *
  * Header: `X-Idempotency-Key`. Empty/over-length keys → 400.
  *
@@ -118,7 +124,7 @@ export async function withIdempotency(
 
   const response = await handler();
 
-  if (response.status < 500) {
+  if (response.status >= 200 && response.status < 300) {
     const stored = await materializeForCache(response, requestBodyHash);
     await writeCache(kv, cacheKey, stored, ttlSeconds);
     return reviveStoredButFresh(stored);
