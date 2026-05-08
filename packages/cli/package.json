@@ -1,6 +1,6 @@
 {
   "name": "flowpunk",
-  "version": "0.0.1-alpha.1",
+  "version": "0.1.0",
   "description": "Provision flow-punk indie on your Cloudflare account in one command.",
   "license": "AGPL-3.0-only",
   "author": "Mark Zuppe",
