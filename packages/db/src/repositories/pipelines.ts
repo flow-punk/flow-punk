@@ -108,7 +108,7 @@ export async function create(
 ): Promise<Pipeline> {
   const normalized = validateCreate(input);
   const row: NewPipeline = {
-    id: generateId('pl'),
+    id: generateId('pipe'),
     name: normalized.name,
     description: normalized.description ?? null,
     isDefault: normalized.isDefault ?? 0,
@@ -165,7 +165,7 @@ export async function createWithStandardStages(
   const stageInputs = resolvePipelineStageInputs(input);
   const pipeline = await create(db, input, actorId, now);
   const stageRows = stageInputs.map((stage) => ({
-    id: generateId('stg'),
+    id: generateId('stag'),
     pipelineId: pipeline.id,
     name: stage.name,
     position: stage.position,

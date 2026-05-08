@@ -56,9 +56,9 @@ export class DealsRepoError extends Error {
   }
 }
 
-const DEAL_ID_REGEX = /^del_[a-z0-9]{21}$/;
-const PIPELINE_ID_REGEX = /^pl_[a-z0-9]{21}$/;
-const STAGE_ID_REGEX = /^stg_[a-z0-9]{21}$/;
+const DEAL_ID_REGEX = /^deal_[a-z0-9]{21}$/;
+const PIPELINE_ID_REGEX = /^pipe_[a-z0-9]{21}$/;
+const STAGE_ID_REGEX = /^stag_[a-z0-9]{21}$/;
 const ACCOUNT_ID_REGEX = /^acct_[a-z0-9]{21}$/;
 const PERSON_ID_REGEX = /^per_[a-z0-9]{21}$/;
 const CURRENCY_REGEX = /^[A-Z]{3}$/;
@@ -134,7 +134,7 @@ export async function create(
   }
 
   const row: NewDeal = {
-    id: generateId('del'),
+    id: generateId('deal'),
     name: normalized.name,
     pipelineId: normalized.pipelineId,
     stageId: normalized.stageId,
@@ -187,7 +187,7 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
     if (!PIPELINE_ID_REGEX.test(options.pipelineId)) {
       throw new DealsRepoError(
         'invalid_input',
-        'pipelineId must match "pl_<21 lowercase alphanumeric>"',
+        'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
       );
     }
     filters.push(eq(deals.pipelineId, options.pipelineId));
@@ -196,7 +196,7 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
     if (!STAGE_ID_REGEX.test(options.stageId)) {
       throw new DealsRepoError(
         'invalid_input',
-        'stageId must match "stg_<21 lowercase alphanumeric>"',
+        'stageId must match "stag_<21 lowercase alphanumeric>"',
       );
     }
     filters.push(eq(deals.stageId, options.stageId));
@@ -278,7 +278,7 @@ export async function update(
   if (!DEAL_ID_REGEX.test(id)) {
     throw new DealsRepoError(
       'invalid_input',
-      'deal id must match "del_<21 lowercase alphanumeric>"',
+      'deal id must match "deal_<21 lowercase alphanumeric>"',
     );
   }
 
@@ -636,13 +636,13 @@ function validateCreate(input: CreateDealInput): NormalizedCreate {
   if (typeof input.pipelineId !== 'string' || !PIPELINE_ID_REGEX.test(input.pipelineId)) {
     throw new DealsRepoError(
       'invalid_input',
-      'pipelineId must match "pl_<21 lowercase alphanumeric>"',
+      'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
   if (typeof input.stageId !== 'string' || !STAGE_ID_REGEX.test(input.stageId)) {
     throw new DealsRepoError(
       'invalid_input',
-      'stageId must match "stg_<21 lowercase alphanumeric>"',
+      'stageId must match "stag_<21 lowercase alphanumeric>"',
     );
   }
 
@@ -682,7 +682,7 @@ function validateField(field: DealPatchableField, value: unknown): void {
       if (typeof value !== 'string' || !STAGE_ID_REGEX.test(value)) {
         throw new DealsRepoError(
           'invalid_input',
-          'stageId must match "stg_<21 lowercase alphanumeric>"',
+          'stageId must match "stag_<21 lowercase alphanumeric>"',
         );
       }
       return;

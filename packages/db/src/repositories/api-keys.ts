@@ -81,7 +81,7 @@ export async function create(
     );
   }
 
-  const id = generateId('apk');
+  const id = generateId('akey');
   const row: NewApiKey = {
     id,
     userId: normalized.userId,

@@ -46,7 +46,7 @@ assert_status 200 "$(req GET /api/v1/auth/keys)" 'GET /api/v1/auth/keys (admin)'
 assert_status 401 "$(req_unauth GET /api/v1/auth/keys)" 'GET /api/v1/auth/keys (no cookie)'
 
 # Bogus id → 404.
-assert_status 404 "$(req GET /api/v1/auth/keys/apk_missing)" 'GET .../<missing>'
+assert_status 404 "$(req GET /api/v1/auth/keys/akey_missing)" 'GET .../<missing>'
 
 # Wrong method → 405.
 assert_status 405 "$(req PUT /api/v1/auth/keys)" 'PUT /api/v1/auth/keys (405)'

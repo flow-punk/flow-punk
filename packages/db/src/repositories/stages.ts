@@ -49,7 +49,7 @@ export class StagesRepoError extends Error {
   }
 }
 
-const PIPELINE_ID_REGEX = /^pl_[a-z0-9]{21}$/;
+const PIPELINE_ID_REGEX = /^pipe_[a-z0-9]{21}$/;
 const NAME_MIN = 1;
 const NAME_MAX = 256;
 
@@ -104,7 +104,7 @@ export async function create(
   await assertPipelineCanAcceptStage(db, normalized.pipelineId);
 
   const row: NewStage = {
-    id: generateId('stg'),
+    id: generateId('stag'),
     pipelineId: normalized.pipelineId,
     name: normalized.name,
     position: normalized.position,
@@ -162,7 +162,7 @@ export async function list(db: Db, options: ListOptions): Promise<ListResult> {
   if (!PIPELINE_ID_REGEX.test(options.pipelineId)) {
     throw new StagesRepoError(
       'invalid_input',
-      'pipelineId must match "pl_<21 lowercase alphanumeric>"',
+      'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
   const limit = clampLimit(options.limit);
@@ -429,7 +429,7 @@ function validateCreate(input: CreateStageInput): NormalizedCreate {
   if (typeof input.pipelineId !== 'string' || !PIPELINE_ID_REGEX.test(input.pipelineId)) {
     throw new StagesRepoError(
       'invalid_input',
-      'pipelineId must match "pl_<21 lowercase alphanumeric>"',
+      'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
   if (typeof input.name !== 'string') {

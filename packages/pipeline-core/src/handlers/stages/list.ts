@@ -4,7 +4,7 @@ import type { Actor, PipelineEnv } from '../../types.js';
 import { badRequest, getDb, jsonResponse, mapRepoError } from '../_shared.js';
 
 const MAX_LIMIT = 200;
-const PIPELINE_ID_REGEX = /^pl_[a-z0-9]{21}$/;
+const PIPELINE_ID_REGEX = /^pipe_[a-z0-9]{21}$/;
 
 export async function handleListStages(
   request: Request,
@@ -23,7 +23,7 @@ export async function handleListStages(
   if (!PIPELINE_ID_REGEX.test(pipelineIdRaw)) {
     return badRequest(
       'INVALID_INPUT',
-      'pipelineId must match "pl_<21 lowercase alphanumeric>"',
+      'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
 

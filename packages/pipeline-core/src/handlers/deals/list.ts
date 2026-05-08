@@ -4,8 +4,8 @@ import type { Actor, PipelineEnv } from '../../types.js';
 import { badRequest, getDb, jsonResponse, mapRepoError } from '../_shared.js';
 
 const MAX_LIMIT = 200;
-const PIPELINE_ID_REGEX = /^pl_[a-z0-9]{21}$/;
-const STAGE_ID_REGEX = /^stg_[a-z0-9]{21}$/;
+const PIPELINE_ID_REGEX = /^pipe_[a-z0-9]{21}$/;
+const STAGE_ID_REGEX = /^stag_[a-z0-9]{21}$/;
 const ACCOUNT_ID_REGEX = /^acct_[a-z0-9]{21}$/;
 const PERSON_ID_REGEX = /^per_[a-z0-9]{21}$/;
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;

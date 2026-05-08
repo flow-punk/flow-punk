@@ -90,7 +90,7 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
   // chars (matches `seedAdmin.generateCookiePayload`).
   const token = base64UrlPayload();
   const tokenHash = sha256Hex(token);
-  const tokenId = generateId('alt');
+  const tokenId = generateId('logn');
   const nowIso = new Date().toISOString();
   const expiresIso = new Date(
     Date.now() + TOKEN_TTL_SECONDS * 1000,
