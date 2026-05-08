@@ -4,6 +4,13 @@
   "description": "Provision flow-punk indie on your Cloudflare account in one command.",
   "license": "AGPL-3.0-only",
   "author": "Mark Zuppe",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flow-punk/flow-punk.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/flow-punk/flow-punk#readme",
+  "bugs": "https://github.com/flow-punk/flow-punk/issues",
   "type": "module",
   "bin": {
     "flowpunk": "dist/cli.js"
