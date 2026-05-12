@@ -48,6 +48,13 @@ export {
   type NewDeal,
 } from './deals.js';
 export {
+  dealContacts,
+  type DealContact,
+  type DealContactRole,
+  type NewDealContact,
+  DEAL_CONTACT_ROLE_VALUES,
+} from './deal-contacts.js';
+export {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,

@@ -26,6 +26,7 @@ import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { generateId } from '@flowpunk/service-utils';
 
 import { accounts } from '../schema/accounts.js';
+import { dealContacts } from '../schema/deal-contacts.js';
 import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
@@ -161,6 +162,25 @@ export async function create(
   if (!deal) {
     throw new DealsRepoError('invariant_violation', 'insert returned no row');
   }
+
+  // primaryPersonId ↔ deal_contacts consistency: a deal with a non-null
+  // primaryPersonId must have a matching deal_contacts row. Active pre-check
+  // already happened above; this is an idempotent upsert (no role).
+  if (deal.primaryPersonId) {
+    await db
+      .insert(dealContacts)
+      .values({
+        dealId: deal.id,
+        personId: deal.primaryPersonId,
+        role: null,
+        createdAt: now,
+        createdBy: actorId,
+      })
+      .onConflictDoNothing({
+        target: [dealContacts.dealId, dealContacts.personId],
+      });
+  }
+
   return deal;
 }
 
@@ -371,6 +391,7 @@ export async function update(
     throw new DealsRepoError('not_found', `deal "${id}" not found`);
   }
 
+  await maybeUpsertPrimaryAsContact(db, row, changes, actorId, now);
   return { deal: row, fieldsChanged };
 }
 
@@ -463,6 +484,13 @@ async function applyStageTransition(
     .returning();
 
   if (transitioned[0]) {
+    await maybeUpsertPrimaryAsContact(
+      db,
+      transitioned[0],
+      changes,
+      actorId,
+      now,
+    );
     return { deal: transitioned[0], fieldsChanged };
   }
 
@@ -513,6 +541,7 @@ async function applyStageTransition(
     }
     // Drop stageId from fieldsChanged since it didn't actually change.
     const filtered = fieldsChanged.filter((f) => f !== 'stageId');
+    await maybeUpsertPrimaryAsContact(db, row, changes, actorId, now);
     return { deal: row, fieldsChanged: filtered };
   }
 
@@ -522,6 +551,42 @@ async function applyStageTransition(
     'invalid_input',
     `stage "${targetStageId}" is not active or does not belong to deal's pipeline`,
   );
+}
+
+// ---------- primaryPersonId ↔ deal_contacts consistency ----------
+
+/**
+ * When a PATCH (or stage transition) sets `primaryPersonId` to a non-null
+ * value, ensure a matching `deal_contacts(dealId, personId)` row exists.
+ * Idempotent — preserves any existing role on the join row. The active
+ * pre-check was already performed earlier in `update()`.
+ *
+ * This mirrors the auto-upsert in `create()`. Together they preserve the
+ * invariant: every deal with a non-null `primaryPersonId` has a row in
+ * `deal_contacts`.
+ */
+async function maybeUpsertPrimaryAsContact(
+  db: Db,
+  deal: Deal,
+  changes: Partial<Record<DealPatchableField, unknown>>,
+  actorId: string,
+  now: string,
+): Promise<void> {
+  if (!('primaryPersonId' in changes)) return;
+  const newPrimary = changes.primaryPersonId;
+  if (typeof newPrimary !== 'string') return; // null / undefined → no upsert
+  await db
+    .insert(dealContacts)
+    .values({
+      dealId: deal.id,
+      personId: newPrimary,
+      role: null,
+      createdAt: now,
+      createdBy: actorId,
+    })
+    .onConflictDoNothing({
+      target: [dealContacts.dealId, dealContacts.personId],
+    });
 }
 
 // ---------- pre-checks ----------

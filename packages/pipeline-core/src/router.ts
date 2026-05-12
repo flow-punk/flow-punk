@@ -1,6 +1,9 @@
 import type { Logger } from '@flowpunk/service-utils';
 import { withIdempotency } from '@flowpunk/service-utils';
 
+import { handleAddDealContact } from './handlers/deal-contacts/add.js';
+import { handleListDealContacts } from './handlers/deal-contacts/list.js';
+import { handleRemoveDealContact } from './handlers/deal-contacts/remove.js';
 import { handleCreateDeal } from './handlers/deals/create.js';
 import { handleGetDeal } from './handlers/deals/get.js';
 import { handleListDeals } from './handlers/deals/list.js';
@@ -144,6 +147,35 @@ export async function route(
     return methodNotAllowed(['GET', 'HEAD', 'POST']);
   }
   if (pathname.startsWith(DEALS_ITEM_PREFIX)) {
+    // Sub-resource: /api/v1/deals/:id/contacts(/:personId)?
+    // Matched BEFORE the generic `:id` branch — `id.includes('/')` would
+    // otherwise return 404 for any path containing a sub-resource.
+    const dealContactsMatch = matchDealContactsPath(
+      pathname.slice(DEALS_ITEM_PREFIX.length),
+    );
+    if (dealContactsMatch) {
+      const { dealId, personId } = dealContactsMatch;
+      if (personId === null) {
+        // Collection: /api/v1/deals/:id/contacts
+        if (method === 'GET' || method === 'HEAD') {
+          return handleListDealContacts(request, env, actor, dealId);
+        }
+        if (method === 'POST') {
+          return idempotent(request, env, actor, () =>
+            handleAddDealContact(request, env, actor, dealId),
+          );
+        }
+        return methodNotAllowed(['GET', 'HEAD', 'POST']);
+      }
+      // Item: /api/v1/deals/:id/contacts/:personId
+      if (method === 'DELETE') {
+        return idempotent(request, env, actor, () =>
+          handleRemoveDealContact(request, env, actor, dealId, personId),
+        );
+      }
+      return methodNotAllowed(['DELETE']);
+    }
+
     const id = pathname.slice(DEALS_ITEM_PREFIX.length);
     if (id.length === 0 || id.includes('/')) return notFound();
     if (method === 'GET' || method === 'HEAD') {
@@ -208,6 +240,27 @@ function methodNotAllowed(allow: string[]): Response {
       },
     },
   );
+}
+
+/**
+ * Match `<dealId>(/contacts(/<personId>)?)?` tail of `/api/v1/deals/`.
+ * Returns `{ dealId, personId }` for the contacts sub-resource (personId
+ * is null on the collection path) or null when the tail is not a contacts
+ * sub-resource (caller falls through to the generic item dispatch).
+ */
+function matchDealContactsPath(
+  tail: string,
+): { dealId: string; personId: string | null } | null {
+  const parts = tail.split('/');
+  // Expect: [dealId, 'contacts'] or [dealId, 'contacts', personId]
+  if (parts.length < 2 || parts.length > 3) return null;
+  const dealId = parts[0];
+  if (!dealId || dealId.length === 0) return null;
+  if (parts[1] !== 'contacts') return null;
+  if (parts.length === 2) return { dealId, personId: null };
+  const personId = parts[2];
+  if (!personId || personId.length === 0) return null;
+  return { dealId, personId };
 }
 
 function notFound(): Response {

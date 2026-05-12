@@ -46,6 +46,7 @@ const COUNTRY_REGEX = /^[A-Z]{2}$/;
 const PHONE_COUNTRY_CODE_REGEX = /^\+\d{1,3}$/;
 const DOMAIN_REGEX =
   /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 const DISPLAY_NAME_MIN = 1;
 const DISPLAY_NAME_MAX = 256;
 const URL_MAX = 2048;
@@ -77,6 +78,7 @@ export interface CreateAccountInput {
   phone2Number?: string | null;
   phone2Ext?: string | null;
   imageLogo?: string | null;
+  ownerUserId?: string | null;
 }
 
 export type UpdateAccountPatch = Partial<{
@@ -128,6 +130,7 @@ export async function create(
     phone2Number: normalized.phone2Number ?? null,
     phone2Ext: normalized.phone2Ext ?? null,
     imageLogo: normalized.imageLogo ?? null,
+    ownerUserId: normalized.ownerUserId ?? null,
     status: 'active',
     deletedAt: null,
     deletedBy: null,
@@ -434,6 +437,14 @@ function validateField(field: AccountPatchableField, value: unknown): void {
       return;
     case 'imageLogo':
       validateUrl('imageLogo', value);
+      return;
+    case 'ownerUserId':
+      if (typeof value !== 'string' || !USER_ID_REGEX.test(value)) {
+        throw new AccountsRepoError(
+          'invalid_input',
+          'ownerUserId must be 1-64 chars [A-Za-z0-9_-]',
+        );
+      }
       return;
   }
 }

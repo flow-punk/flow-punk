@@ -1,6 +1,7 @@
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { createLogger } from '@flowpunk/service-utils';
 import {
+  DealContactsRepoError,
   DealsRepoError,
   PipelinesRepoError,
   StagesRepoError,
@@ -87,7 +88,8 @@ export function mapRepoError(err: unknown): Response {
   if (
     !(err instanceof PipelinesRepoError) &&
     !(err instanceof StagesRepoError) &&
-    !(err instanceof DealsRepoError)
+    !(err instanceof DealsRepoError) &&
+    !(err instanceof DealContactsRepoError)
   ) {
     throw err;
   }
@@ -96,7 +98,9 @@ export function mapRepoError(err: unknown): Response {
       ? 'pipelines'
       : err instanceof StagesRepoError
         ? 'stages'
-        : 'deals';
+        : err instanceof DealsRepoError
+          ? 'deals'
+          : 'deal_contacts';
   switch (err.code) {
     case 'not_found':
       return errorResponse(404, 'NOT_FOUND', err.message);
@@ -104,6 +108,8 @@ export function mapRepoError(err: unknown): Response {
       return errorResponse(400, 'INVALID_INPUT', err.message);
     case 'wrong_state':
       return errorResponse(409, 'WRONG_STATE', err.message);
+    case 'already_exists':
+      return errorResponse(409, 'CONFLICT', err.message);
     case 'invariant_violation': {
       const logger = createLogger({ service: 'pipeline' });
       logger.error(`${repoLabel} repo invariant violation`, {

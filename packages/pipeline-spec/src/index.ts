@@ -22,6 +22,10 @@ import {
   NULLABLE_PATCH_FIELDS as DEAL_NULLABLE,
   deals,
 } from '@flowpunk-indie/db/schema/deals';
+import {
+  DEAL_CONTACT_ROLE_VALUES,
+  dealContacts,
+} from '@flowpunk-indie/db/schema/deal-contacts';
 
 const PIPELINE_STATUSES = ['active', 'deleted'] as const;
 const STAGE_STATUSES = ['active', 'deleted'] as const;
@@ -41,6 +45,15 @@ const dealSchemas = tableToSchemas(deals, {
   name: 'Deal',
   enums: { status: DEAL_STATUSES },
   patch: { allowed: DEAL_PATCH, nullable: DEAL_NULLABLE },
+});
+// `dealId` is path-derived (POST /deals/{id}/contacts); `createdAt` /
+// `createdBy` are server-managed. Override `audit` to drop these from the
+// generated DealContactCreate body. No PATCH for v1 — clients DELETE+POST
+// to change role.
+const dealContactSchemas = tableToSchemas(dealContacts, {
+  name: 'DealContact',
+  enums: { role: DEAL_CONTACT_ROLE_VALUES },
+  audit: ['dealId', 'createdAt', 'createdBy'],
 });
 
 const ERROR_REF = { $ref: '#/components/schemas/ErrorResponse' } as const;
@@ -172,9 +185,15 @@ export const pipelineSpec = {
     { name: 'Pipelines', description: 'Sales pipelines.' },
     { name: 'Stages', description: 'Stages within a pipeline.' },
     { name: 'Deals', description: 'Deals (opportunities) flowing through stages.' },
+    { name: 'Deal contacts', description: 'Persons associated with a deal (many-to-many).' },
   ],
   components: {
-    schemas: { ...pipelineSchemas, ...stageSchemas, ...dealSchemas },
+    schemas: {
+      ...pipelineSchemas,
+      ...stageSchemas,
+      ...dealSchemas,
+      ...dealContactSchemas,
+    },
   },
   paths: {
     ...crudPaths({
@@ -216,5 +235,69 @@ export const pipelineSpec = {
       },
       noun: 'deal',
     }),
+    '/api/v1/deals/{id}/contacts': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      get: {
+        operationId: 'listDealContacts',
+        summary: 'List contacts on a deal',
+        tags: ['Deal contacts'],
+        responses: {
+          '200': listResponse('#/components/schemas/DealContact'),
+          '401': stdErrors['401'],
+          '404': stdErrors['404'],
+        },
+      },
+      post: {
+        operationId: 'addDealContact',
+        summary: 'Add a person as a contact on a deal',
+        tags: ['Deal contacts'],
+        requestBody: jsonBody('#/components/schemas/DealContactCreate'),
+        responses: {
+          '201': itemResponse(
+            'Contact added',
+            '#/components/schemas/DealContact',
+          ),
+          '400': stdErrors['400'],
+          '401': stdErrors['401'],
+          '404': stdErrors['404'],
+          '409': stdErrors['409'],
+        },
+      },
+    },
+    '/api/v1/deals/{id}/contacts/{personId}': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        {
+          name: 'personId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+        },
+      ],
+      delete: {
+        operationId: 'removeDealContact',
+        summary: 'Remove a contact from a deal',
+        tags: ['Deal contacts'],
+        responses: {
+          '200': {
+            description: 'Contact removed',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['success'],
+                  properties: { success: { type: 'boolean', enum: [true] } },
+                },
+              },
+            },
+          },
+          '401': stdErrors['401'],
+          '404': stdErrors['404'],
+          '409': stdErrors['409'],
+        },
+      },
+    },
   },
 } as const;

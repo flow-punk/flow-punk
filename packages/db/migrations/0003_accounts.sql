@@ -19,6 +19,7 @@ CREATE TABLE accounts (
   phone2_number TEXT,
   phone2_ext TEXT,
   image_logo TEXT,
+  owner_user_id TEXT,
   status TEXT NOT NULL,
   deleted_at TEXT,
   deleted_by TEXT,
@@ -31,4 +32,5 @@ CREATE TABLE accounts (
 
 CREATE INDEX idx_accounts_status ON accounts(status);
 CREATE INDEX idx_accounts_domain ON accounts(domain);
+CREATE INDEX idx_accounts_owner_user_id ON accounts(owner_user_id);
 CREATE INDEX idx_accounts_created_at ON accounts(created_at, id);

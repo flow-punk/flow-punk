@@ -48,6 +48,12 @@ export const accounts = sqliteTable(
     phone2Number: pii(text('phone2_number')),
     phone2Ext: pii(text('phone2_ext')),
     imageLogo: pii(text('image_logo')),
+    // ownerUserId is not declared as a Drizzle `references()` FK: users
+    // live in a different concern, and the schema/users.ts and
+    // schema/accounts.ts modules are loaded independently. Mirrors the
+    // `deals.ownerUserId` posture (`schema/deals.ts:34-37`). Repo treats
+    // this as a free-form user id; format-validated only.
+    ownerUserId: text('owner_user_id'),
     status: text('status').notNull().$type<AccountStatus>(),
     deletedAt: text('deleted_at'),
     deletedBy: text('deleted_by'),
@@ -59,6 +65,7 @@ export const accounts = sqliteTable(
   (t) => ({
     statusIdx: index('idx_accounts_status').on(t.status),
     domainIdx: index('idx_accounts_domain').on(t.domain),
+    ownerUserIdIdx: index('idx_accounts_owner_user_id').on(t.ownerUserId),
     createdAtIdx: index('idx_accounts_created_at').on(t.createdAt, t.id),
     statusCheck: check(
       'accounts_status_check',
@@ -97,6 +104,7 @@ export const ALLOWED_PATCH_FIELDS = [
   'phone2Number',
   'phone2Ext',
   'imageLogo',
+  'ownerUserId',
 ] as const;
 export type AccountPatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
@@ -140,4 +148,5 @@ export const NULLABLE_PATCH_FIELDS = new Set<AccountPatchableField>([
   'phone2Number',
   'phone2Ext',
   'imageLogo',
+  'ownerUserId',
 ]);
