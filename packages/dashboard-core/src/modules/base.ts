@@ -3,6 +3,7 @@ import { apiKeysModule } from "./api-keys/index.js";
 import { settingsModule } from "./settings/index.js";
 import { accountsModule } from "./accounts/index.js";
 import { peopleModule } from "./people/index.js";
+import { pipelinesModule } from "./pipelines/index.js";
 
 /**
  * Edition-agnostic base modules. The users module is NOT included here:
@@ -25,4 +26,5 @@ export const baseModules: ReadonlyArray<DashboardModule> = [
   settingsModule,
   accountsModule,
   peopleModule,
+  pipelinesModule,
 ];

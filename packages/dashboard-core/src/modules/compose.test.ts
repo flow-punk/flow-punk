@@ -125,7 +125,7 @@ test("indie compose registers all base modules + users cleanly", () => {
   const ids = out.modules.map((m) => m.id).sort();
   assert.deepEqual(
     ids,
-    ["accounts", "api-keys", "people", "settings", "users"],
+    ["accounts", "api-keys", "people", "pipelines", "settings", "users"],
   );
 });
 
