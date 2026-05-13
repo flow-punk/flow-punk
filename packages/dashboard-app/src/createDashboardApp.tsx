@@ -1,9 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { QueryClientProvider } from "@tanstack/react-query";
 import {
-  QueryClientProvider,
-} from "@tanstack/react-query";
-import { createQueryClient } from "@flowpunk-indie/dashboard-core";
+  ApiOriginProvider,
+  createQueryClient,
+} from "@flowpunk-indie/dashboard-core";
 import { TooltipProvider, Toaster } from "@flowpunk-indie/dashboard-ui";
 import type { CreateDashboardAppInput } from "./types.js";
 import { AppRouter, createAppRouter } from "./routes.js";
@@ -19,17 +20,22 @@ export interface DashboardApp {
 export function createDashboardApp(input: CreateDashboardAppInput): DashboardApp {
   return {
     mount(target: Element): void {
-      // Session is null at startup; Phase 1 swaps this for a better-auth
-      // bootstrap that hydrates `session` before the first paint.
-      const router = createAppRouter(input, null);
+      // Session hydration runs inside the protected layout via
+      // `useSession` (Phase 1.3 — ADR-021). Router context no longer
+      // carries the session; the router doesn't gate on auth, the
+      // `_app` layout does (so the redirect-on-no-session path is
+      // exercised the moment a protected route renders).
+      const router = createAppRouter(input);
       const queryClient = createQueryClient();
       createRoot(target).render(
         <StrictMode>
           <QueryClientProvider client={queryClient}>
-            <TooltipProvider>
-              <AppRouter router={router} />
-              <Toaster />
-            </TooltipProvider>
+            <ApiOriginProvider apiOrigin={input.apiOrigin}>
+              <TooltipProvider>
+                <AppRouter router={router} />
+                <Toaster />
+              </TooltipProvider>
+            </ApiOriginProvider>
           </QueryClientProvider>
         </StrictMode>,
       );

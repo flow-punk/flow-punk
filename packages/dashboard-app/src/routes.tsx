@@ -1,13 +1,14 @@
+import { Suspense } from "react";
 import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
   Outlet,
-  redirect,
   RouterProvider,
   useNavigate,
   useRouter,
   useRouterState,
+  useSearch,
 } from "@tanstack/react-router";
 import {
   AppShell,
@@ -18,22 +19,20 @@ import {
   TopbarSearch,
   TopbarIconButton,
   Icon,
-  Button,
-  Input,
-  Label,
 } from "@flowpunk-indie/dashboard-ui";
-import type {
-  DashboardModule,
-  ModuleRequirements,
-  NavItem,
-  Session,
-  SessionUser,
+import {
+  ForgotPasswordScreen,
+  ResetPasswordConfirmScreen,
+  SignInScreen,
+  useSession,
+  type DashboardModule,
+  type ModuleRequirements,
+  type NavItem,
+  type SessionUser,
 } from "@flowpunk-indie/dashboard-core";
 import { type CreateDashboardAppInput } from "./types.js";
 
 interface RouterContext {
-  /** Current session if signed in. Phase 1 wires this to better-auth. */
-  session: Session | null;
   /** Modules resolved at build-time. */
   modules: ReadonlyArray<DashboardModule>;
   /** Gateway origin. */
@@ -53,7 +52,8 @@ function ShellLayout() {
   const navigate = useNavigate();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { modules, session } = router.options.context as RouterContext;
+  const { modules } = router.options.context as RouterContext;
+  const { session } = useSession();
 
   const navSections = modules
     .filter((mod) => requirementsSatisfied(session?.user ?? null, mod.requires))
@@ -139,94 +139,136 @@ function NoModulesIndex() {
   );
 }
 
-function LoginPlaceholder() {
+interface LoginSearch {
+  redirect?: string;
+}
+
+function LoginRoute() {
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as LoginSearch;
   return (
-    <div className="grid min-h-screen place-items-center bg-background-muted px-5 py-10">
-      <div className="flex w-full max-w-[380px] flex-col gap-6">
-        <div className="flex items-center justify-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-[#4f46e5] to-[#7c3aed] text-[13px] font-semibold text-white">
-            FP
-          </span>
-          <span className="text-base font-semibold tracking-tight">flow-punk</span>
-        </div>
-        <h1 className="m-0 text-center text-[22px] font-semibold tracking-tight">
-          Sign in
-        </h1>
-        <p className="-mt-3 text-center text-[13.5px] text-foreground-muted">
-          Real sign-in flow lands in Phase 1 (ADR-021 — better-auth).
-        </p>
-        <form className="flex flex-col gap-3.5" onSubmit={(e) => e.preventDefault()}>
-          <div>
-            <Label htmlFor="email" className="mb-1.5 block">
-              Email
-            </Label>
-            <Input id="email" type="email" autoComplete="email" disabled />
-          </div>
-          <Button type="submit" variant="default" disabled className="w-full">
-            Continue
-          </Button>
-        </form>
-      </div>
-    </div>
+    <SignInScreen
+      onSignedIn={() =>
+        navigate({ to: (search?.redirect ?? "/") as "/" })
+      }
+      onForgotPassword={() => navigate({ to: "/login/reset" })}
+    />
   );
+}
+
+function ForgotPasswordRoute() {
+  const navigate = useNavigate();
+  return <ForgotPasswordScreen onBack={() => navigate({ to: "/login" })} />;
+}
+
+interface ResetSearch {
+  token?: string;
+}
+
+function ResetPasswordConfirmRoute() {
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as ResetSearch;
+  const token = search?.token ?? "";
+  if (!token) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background-muted px-5 py-10">
+        <p className="text-[13.5px] text-foreground-muted">
+          Invalid reset link.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <ResetPasswordConfirmScreen
+      token={token}
+      onDone={() => navigate({ to: "/login" })}
+    />
+  );
+}
+
+/**
+ * Wrapper component that gates the protected shell on the better-auth
+ * session resolving. While `useSession` is fetching for the first time we
+ * render a minimal splash so the user never sees the shell flash before
+ * the redirect-to-login fires.
+ *
+ * `beforeLoad` cannot read React-Query state, so the redirect happens
+ * here in a synchronous render path once `isLoading === false`.
+ */
+function ProtectedShellGate() {
+  const { session, isLoading } = useSession();
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  if (isLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background-muted">
+        <p className="text-sm text-foreground-muted">Loading…</p>
+      </div>
+    );
+  }
+  if (!session) {
+    queueMicrotask(() =>
+      navigate({
+        to: "/login",
+        search: { redirect: pathname },
+      }),
+    );
+    return null;
+  }
+  return <ShellLayout />;
 }
 
 function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
   const rootRoute = createRootRouteWithContext<RouterContext>()({
-    component: Outlet,
+    component: () => (
+      <Suspense fallback={<SuspenseFallback />}>
+        <Outlet />
+      </Suspense>
+    ),
   });
 
-  // Public routes — reachable without a session. The Phase-0 empty-shell
-  // index lives here so the "no modules registered" landing is visible
-  // before better-auth bootstrap exists; Phase 1 will move `/` under the
-  // protected layout once a real session can be hydrated.
   const loginRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/login",
-    component: LoginPlaceholder,
+    component: LoginRoute,
+  });
+  const forgotRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/login/reset",
+    component: ForgotPasswordRoute,
+  });
+  const resetConfirmRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/login/reset/confirm",
+    component: ResetPasswordConfirmRoute,
   });
 
-  const shellRoute = createRoute({
+  // Protected shell — every authenticated route lives under this layout.
+  // ProtectedShellGate hydrates the session in-place; the index route now
+  // sits under it (the Phase-0 lift to a public `_shell` is reverted now
+  // that `useSession` hydrates pre-paint).
+  const protectedShell = createRoute({
     getParentRoute: () => rootRoute,
-    id: "_shell",
-    component: ShellLayout,
+    id: "_app",
+    component: ProtectedShellGate,
   });
 
   const indexRoute = createRoute({
-    getParentRoute: () => shellRoute,
+    getParentRoute: () => protectedShell,
     path: "/",
     component: NoModulesIndex,
-  });
-
-  // Protected layout — module routes mount here. beforeLoad redirects to
-  // /login when no session is present, so the auth-redirect path is
-  // exercised the moment a module-contributed route is hit.
-  const protectedLayout = createRoute({
-    getParentRoute: () => shellRoute,
-    id: "_app",
-    component: Outlet,
-    beforeLoad: ({ context, location }) => {
-      if (!context.session) {
-        throw redirect({
-          to: "/login",
-          search: { redirect: location.href },
-        });
-      }
-    },
   });
 
   const moduleRoutes = modules.flatMap((mod) =>
     (mod.routes ?? [])
       .filter(
         (r) =>
-          // Module-level requirements gate at compose time; route-level
-          // requirements are evaluated client-side. Hidden routes are
-          // omitted from the tree so unauthorized direct navigation 404s.
           requirementsSatisfied(null, r.requires) || mod.requires,
       )
       .map((r) =>
         createRoute({
-          getParentRoute: () => protectedLayout,
+          getParentRoute: () => protectedShell,
           path: r.path,
           component: r.component,
         }),
@@ -235,19 +277,25 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
 
   return rootRoute.addChildren([
     loginRoute,
-    shellRoute.addChildren([
-      indexRoute,
-      protectedLayout.addChildren(moduleRoutes),
-    ]),
+    forgotRoute,
+    resetConfirmRoute,
+    protectedShell.addChildren([indexRoute, ...moduleRoutes]),
   ]);
 }
 
-export function createAppRouter(input: CreateDashboardAppInput, session: Session | null) {
+function SuspenseFallback() {
+  return (
+    <div className="grid min-h-screen place-items-center bg-background-muted">
+      <p className="text-sm text-foreground-muted">Loading…</p>
+    </div>
+  );
+}
+
+export function createAppRouter(input: CreateDashboardAppInput) {
   const routeTree = buildRoutes(input.modules);
   return createRouter({
     routeTree,
     context: {
-      session,
       modules: input.modules,
       apiOrigin: input.apiOrigin,
     },
@@ -262,3 +310,4 @@ export function AppRouter({
 }) {
   return <RouterProvider router={router} />;
 }
+

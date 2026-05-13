@@ -1,20 +1,36 @@
-/** Better-auth client + `useAuth` / `useSession` hooks land in Phase 1.
- *  Phase 0 ships only the type surface so consumers can compile. */
-
-export interface AuthProviderDescriptor {
-  id: "google" | "apple" | "emailPassword" | (string & {});
-  /** Display label, e.g., "Continue with Google". */
-  label: string;
-}
-
-export interface SessionUser {
-  id: string;
-  email: string;
-  name: string | null;
-  role: "platform-admin" | "tenant-admin" | "tenant-member";
-}
-
-export interface Session {
-  user: SessionUser;
-  expiresAt: string;
-}
+export type {
+  AuthProviderDescriptor,
+  Session,
+  SessionUser,
+} from "./types.js";
+export { ApiOriginProvider, useApiOrigin } from "./api-origin.js";
+export { useSession, SESSION_QUERY_KEY } from "./use-session.js";
+export type { UseSessionResult } from "./use-session.js";
+export { useProviders } from "./use-providers.js";
+export type { UseProvidersResult } from "./use-providers.js";
+export { SignInScreen } from "./SignInScreen.js";
+export type { SignInScreenProps } from "./SignInScreen.js";
+export {
+  ForgotPasswordScreen,
+  ResetPasswordConfirmScreen,
+} from "./ResetPasswordScreens.js";
+export {
+  getSession,
+  listProviders,
+  signInWithEmail,
+  signUpWithEmail,
+  signInWithSocial,
+  signOut,
+  requestPasswordReset,
+  resetPassword,
+  SignInError,
+} from "./api.js";
+export type {
+  BetterAuthSession,
+  BetterAuthUser,
+  GetSessionResponse,
+  ProvidersResponse,
+  SignInEmailInput,
+  SignInResponse,
+  SignUpEmailInput,
+} from "./api.js";
