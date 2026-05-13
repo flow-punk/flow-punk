@@ -1,24 +1,38 @@
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { createQueryClient } from "@flowpunk-indie/dashboard-core";
+import { TooltipProvider, Toaster } from "@flowpunk-indie/dashboard-ui";
 import type { CreateDashboardAppInput } from "./types.js";
+import { AppRouter, createAppRouter } from "./routes.js";
 
-/** Phase 0 placeholder. The TanStack-Start factory lands in a follow-up step
- *  along with the route tree, auth-redirect, and host-driven layout. */
 export interface DashboardApp {
-  /** Mount the app into a DOM node (browser entry) or return a request handler
-   *  (Worker entry). The exact shape is finalized when the framework is wired. */
+  /** Mount the dashboard into a DOM node (browser entry). The Worker SSR
+   *  entry is added when TanStack Start + Cloudflare Nitro preset wiring
+   *  lands; for now both apps build to a static SPA bundle served by a
+   *  Worker via Cloudflare Workers Assets. */
   mount(target: Element): void;
 }
 
 export function createDashboardApp(input: CreateDashboardAppInput): DashboardApp {
-  const { modules } = input;
   return {
     mount(target: Element): void {
-      // Empty shell while modules/factory are scaffolded. Per the Phase 0 DoD,
-      // an unconfigured app must render "no modules registered" and redirect
-      // unauthenticated requests to /login. The framework wiring lands next.
-      target.textContent =
-        modules.length === 0
-          ? "no modules registered"
-          : `${modules.length} module(s) registered`;
+      // Session is null at startup; Phase 1 swaps this for a better-auth
+      // bootstrap that hydrates `session` before the first paint.
+      const router = createAppRouter(input, null);
+      const queryClient = createQueryClient();
+      createRoot(target).render(
+        <StrictMode>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <AppRouter router={router} />
+              <Toaster />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </StrictMode>,
+      );
     },
   };
 }

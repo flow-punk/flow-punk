@@ -1,0 +1,26 @@
+name = "flowpunk-indie-dashboard"
+compatibility_date = "2025-06-01"
+
+# Cloudflare Workers Assets — the Vite SPA build (dist/) is served by a
+# Worker with SPA fallback so deep links resolve to index.html and let
+# TanStack Router handle them client-side.
+[assets]
+directory = "dist"
+not_found_handling = "single-page-application"
+
+# SSR via TanStack Start + Nitro Cloudflare preset is the planned follow-up
+# (ADR-016 §3 "Worker bundle"). When that lands, this file gets a `main`
+# entry pointing at the Nitro-compiled Worker and `[assets].directory` flips
+# to the public output, with the same SPA fallback.
+
+[vars]
+# Gateway origin baked into the dashboard at build time via Vite's
+# VITE_API_ORIGIN. The build script reads from CI-provided env; the
+# variable below is kept for runtime knobs the Worker entry may need
+# after the SSR migration.
+GATEWAY_PUBLIC_ORIGIN = ""
+
+# `wrangler dev` here serves the built assets from `dist/`. Day-to-day dev
+# uses `pnpm dev` (Vite on :3000); wrangler dev is for testing the Workers
+# Assets binding before deploy. Port left to wrangler's default to keep it
+# out of the service-port table.

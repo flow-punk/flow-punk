@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, FunctionComponent } from "react";
 
 /** A single navigation entry rendered in the sidebar. */
 export interface NavItem {
@@ -62,8 +62,9 @@ export interface DashboardModule {
 export interface DashboardRoute {
   /** Pathname under the dashboard root. */
   path: string;
-  /** React component for the route. */
-  component: ComponentType<{ children?: ReactNode }>;
+  /** React component for the route. Function components only; TanStack
+   *  Router rejects ComponentClass-shaped values. */
+  component: FunctionComponent;
   /** Optional capability gate on this specific route. */
   requires?: ModuleRequirements;
 }
