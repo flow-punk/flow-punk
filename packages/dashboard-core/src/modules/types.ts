@@ -32,6 +32,16 @@ export interface SlotFiller<TProps = unknown> {
   /** Render order; lower comes first. Defaults to 0. */
   order?: number;
   component: ComponentType<TProps>;
+  /**
+   * Capability requirements; filler is omitted at render time if the
+   * current session does not satisfy. Mirrors the same gating contract
+   * as modules + nav + routes (see `ModuleRequirements`).
+   *
+   * Server-side authorization remains authoritative — this is a UI
+   * surface gate (don't render a Billing panel for a session that
+   * can't reach the billing endpoint) not a security boundary.
+   */
+  requires?: ModuleRequirements;
 }
 
 /** Capability requirements gating a module/route/nav. */

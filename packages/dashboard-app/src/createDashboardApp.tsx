@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   ApiOriginProvider,
+  SlotsProvider,
   createQueryClient,
 } from "@flowpunk-indie/dashboard-core";
 import { TooltipProvider, Toaster } from "@flowpunk-indie/dashboard-ui";
@@ -31,10 +32,12 @@ export function createDashboardApp(input: CreateDashboardAppInput): DashboardApp
         <StrictMode>
           <QueryClientProvider client={queryClient}>
             <ApiOriginProvider apiOrigin={input.apiOrigin}>
-              <TooltipProvider>
-                <AppRouter router={router} />
-                <Toaster />
-              </TooltipProvider>
+              <SlotsProvider fillers={input.fillers ?? []}>
+                <TooltipProvider>
+                  <AppRouter router={router} />
+                  <Toaster />
+                </TooltipProvider>
+              </SlotsProvider>
             </ApiOriginProvider>
           </QueryClientProvider>
         </StrictMode>,

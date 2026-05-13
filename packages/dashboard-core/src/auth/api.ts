@@ -195,6 +195,98 @@ export async function resetPassword(
   }
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+  /** When true, revokes every OTHER session for this user (better-auth
+   *  rotates the current session and returns the new token). */
+  revokeOtherSessions?: boolean;
+}
+
+/**
+ * Change the signed-in user's password. Maps to better-auth 1.6.x
+ * `POST /api/auth/change-password` (verified in
+ * `node_modules/better-auth/dist/api/routes/update-user.mjs`).
+ */
+export async function changePassword(
+  apiOrigin: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  const res = await authFetch(apiOrigin, "/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}) as Record<string, unknown>);
+    throw new SignInError(
+      typeof (body as { message?: unknown }).message === "string"
+        ? ((body as { message: string }).message)
+        : `change-password failed (${res.status})`,
+      res.status,
+    );
+  }
+}
+
+/** Active-session row returned by better-auth's `/list-sessions`. */
+export interface BetterAuthSessionRow {
+  id: string;
+  token: string;
+  userId: string;
+  expiresAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
+/**
+ * List the signed-in user's active sessions. Maps to better-auth 1.6.x
+ * `GET /api/auth/list-sessions` (verified in
+ * `node_modules/better-auth/dist/api/routes/session.mjs`).
+ */
+export async function listSessions(
+  apiOrigin: string,
+): Promise<BetterAuthSessionRow[]> {
+  const res = await authFetch(apiOrigin, "/api/auth/list-sessions");
+  if (!res.ok) {
+    if (res.status === 401) throw new SessionExpiredError();
+    throw new Error(`listSessions failed: ${res.status}`);
+  }
+  return (await res.json()) as BetterAuthSessionRow[];
+}
+
+/**
+ * Revoke a single session by its token. Maps to better-auth 1.6.x
+ * `POST /api/auth/revoke-session`.
+ */
+export async function revokeSession(
+  apiOrigin: string,
+  token: string,
+): Promise<void> {
+  const res = await authFetch(apiOrigin, "/api/auth/revoke-session", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) {
+    throw new Error(`revokeSession failed: ${res.status}`);
+  }
+}
+
+/**
+ * Sign the user out of every OTHER active session, leaving the current
+ * cookie alive. Maps to better-auth 1.6.x
+ * `POST /api/auth/revoke-other-sessions`.
+ */
+export async function signOutEverywhere(apiOrigin: string): Promise<void> {
+  const res = await authFetch(apiOrigin, "/api/auth/revoke-other-sessions", {
+    method: "POST",
+    body: "{}",
+  });
+  if (!res.ok) {
+    throw new Error(`revoke-other-sessions failed: ${res.status}`);
+  }
+}
+
 export class SignInError extends Error {
   constructor(
     message: string,

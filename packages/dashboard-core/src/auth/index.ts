@@ -23,11 +23,17 @@ export {
   signOut,
   requestPasswordReset,
   resetPassword,
+  changePassword,
+  listSessions,
+  revokeSession,
+  signOutEverywhere,
   SignInError,
 } from "./api.js";
 export type {
   BetterAuthSession,
+  BetterAuthSessionRow,
   BetterAuthUser,
+  ChangePasswordInput,
   GetSessionResponse,
   ProvidersResponse,
   SignInEmailInput,
