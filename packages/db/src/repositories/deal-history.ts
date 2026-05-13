@@ -22,27 +22,27 @@
  *
  * Row id prefix: `dhx_<21>` (per ADR-022, decision §IDs).
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import type { SQL } from 'drizzle-orm';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import type { SQL } from "drizzle-orm";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
 import {
   dealHistory,
   type DealHistoryCredentialType,
   type DealHistoryKind,
   type DealHistoryRow,
-} from '../schema/deal-history.js';
+} from "../schema/deal-history.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class DealHistoryRepoError extends Error {
   constructor(
-    public readonly code: 'not_found' | 'invalid_input',
+    public readonly code: "not_found" | "invalid_input",
     message: string,
   ) {
     super(message);
-    this.name = 'DealHistoryRepoError';
+    this.name = "DealHistoryRepoError";
   }
 }
 
@@ -73,7 +73,7 @@ export async function findById(
 ): Promise<DealHistoryRow | null> {
   if (!HISTORY_ID_REGEX.test(id)) {
     throw new DealHistoryRepoError(
-      'invalid_input',
+      "invalid_input",
       'history id must match "dhx_<21 lowercase alphanumeric>"',
     );
   }
@@ -92,7 +92,7 @@ export async function listByDeal(
 ): Promise<ListByDealResult> {
   if (!DEAL_ID_REGEX.test(dealId)) {
     throw new DealHistoryRepoError(
-      'invalid_input',
+      "invalid_input",
       'dealId must match "deal_<21 lowercase alphanumeric>"',
     );
   }
@@ -150,7 +150,7 @@ export interface HistoryInsertInput {
  * agree on the row identity.
  */
 export function generateHistoryId(): string {
-  return generateId('dhx');
+  return generateId("dhx");
 }
 
 /**
@@ -205,7 +205,7 @@ export function buildHistoryInsertUnconditional(
 function clampLimit(input: number | undefined): number {
   if (input === undefined) return DEFAULT_LIMIT;
   if (!Number.isFinite(input) || input < 1) {
-    throw new DealHistoryRepoError('invalid_input', 'limit must be >= 1');
+    throw new DealHistoryRepoError("invalid_input", "limit must be >= 1");
   }
   return Math.min(Math.floor(input), MAX_LIMIT);
 }
@@ -219,14 +219,11 @@ function decodeCursor(raw: string): CursorPayload {
   try {
     const json = atob(raw);
     const parsed = JSON.parse(json) as Partial<CursorPayload>;
-    if (
-      typeof parsed.createdAt !== 'string' ||
-      typeof parsed.id !== 'string'
-    ) {
-      throw new Error('invalid cursor payload');
+    if (typeof parsed.createdAt !== "string" || typeof parsed.id !== "string") {
+      throw new Error("invalid cursor payload");
     }
     return { createdAt: parsed.createdAt, id: parsed.id };
   } catch {
-    throw new DealHistoryRepoError('invalid_input', 'cursor is malformed');
+    throw new DealHistoryRepoError("invalid_input", "cursor is malformed");
   }
 }

@@ -1,17 +1,21 @@
-import * as p from '@clack/prompts';
-import { findD1ByName, queryD1 } from '@flowpunk/cf-admin';
-import { renderLogo } from '../ui/logo.js';
-import { theme } from '../ui/theme.js';
-import { resolveAndVerify } from './helpers.js';
-import { provisionFresh } from '../flow/provision.js';
-import { deploymentKey, readDeployment, writeDeployment } from '../auth/token-store.js';
-import type { InitAnswers } from '../types.js';
-import { CliError } from '../util/errors.js';
+import * as p from "@clack/prompts";
+import { findD1ByName, queryD1 } from "@flowpunk/cf-admin";
+import { renderLogo } from "../ui/logo.js";
+import { theme } from "../ui/theme.js";
+import { resolveAndVerify } from "./helpers.js";
+import { provisionFresh } from "../flow/provision.js";
+import {
+  deploymentKey,
+  readDeployment,
+  writeDeployment,
+} from "../auth/token-store.js";
+import type { InitAnswers } from "../types.js";
+import { CliError } from "../util/errors.js";
 
 type OwnerSummary =
-  | { kind: 'one'; email: string; displayName: string }
-  | { kind: 'multi'; count: number }
-  | { kind: 'none' };
+  | { kind: "one"; email: string; displayName: string }
+  | { kind: "multi"; count: number }
+  | { kind: "none" };
 
 export interface InitOpts {
   token?: string;
@@ -19,7 +23,7 @@ export interface InitOpts {
   account?: string;
 }
 
-const CLI_VERSION = '0.0.1-alpha.0';
+const CLI_VERSION = "0.0.1-alpha.0";
 
 export async function initCommand(opts: InitOpts): Promise<void> {
   process.stdout.write(renderLogo());
@@ -34,16 +38,19 @@ export async function initCommand(opts: InitOpts): Promise<void> {
 
   if (accounts.length > 1 && !opts.account) {
     const choice = await p.select({
-      message: 'Which Cloudflare account should we deploy to?',
-      options: accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.id})` })),
+      message: "Which Cloudflare account should we deploy to?",
+      options: accounts.map((a) => ({
+        value: a.id,
+        label: `${a.name} (${a.id})`,
+      })),
     });
     if (p.isCancel(choice)) {
-      p.cancel('Cancelled.');
+      p.cancel("Cancelled.");
       process.exit(0);
     }
     account = accounts.find((a) => a.id === choice)!;
     // Rebuild client with the chosen account ID.
-    const { createCfClient } = await import('@flowpunk/cf-admin');
+    const { createCfClient } = await import("@flowpunk/cf-admin");
     client = createCfClient({ apiToken: token, accountId: account.id });
   }
 
@@ -51,16 +58,16 @@ export async function initCommand(opts: InitOpts): Promise<void> {
     opts.prefix ??
     (await (async () => {
       const v = await p.text({
-        message: 'Worker name prefix?',
-        placeholder: 'flowpunk',
-        defaultValue: 'flowpunk',
+        message: "Worker name prefix?",
+        placeholder: "flowpunk",
+        defaultValue: "flowpunk",
         validate: (s) =>
           /^[a-z][a-z0-9-]{0,30}$/.test(s)
             ? undefined
-            : 'Lowercase letters, digits, hyphens. Start with a letter. Max 31 chars.',
+            : "Lowercase letters, digits, hyphens. Start with a letter. Max 31 chars.",
       });
       if (p.isCancel(v)) {
-        p.cancel('Cancelled.');
+        p.cancel("Cancelled.");
         process.exit(0);
       }
       return v as string;
@@ -73,18 +80,24 @@ export async function initCommand(opts: InitOpts): Promise<void> {
     const choice = await p.select({
       message: `A deployment already exists for ${account.name} with prefix "${prefix}". What now?`,
       options: [
-        { value: 'resume', label: 'Resume (re-run init; existing resources will be reused)' },
-        { value: 'cancel', label: 'Cancel and use `flowpunk update` / `flowpunk doctor` instead' },
-        { value: 'prefix', label: 'Use a different prefix' },
+        {
+          value: "resume",
+          label: "Resume (re-run init; existing resources will be reused)",
+        },
+        {
+          value: "cancel",
+          label: "Cancel and use `flowpunk update` / `flowpunk doctor` instead",
+        },
+        { value: "prefix", label: "Use a different prefix" },
       ],
     });
-    if (p.isCancel(choice) || choice === 'cancel') {
-      p.cancel('Cancelled.');
+    if (p.isCancel(choice) || choice === "cancel") {
+      p.cancel("Cancelled.");
       process.exit(0);
     }
-    if (choice === 'prefix') {
+    if (choice === "prefix") {
       throw new CliError(
-        'Pick a different prefix and re-run with --prefix <name>',
+        "Pick a different prefix and re-run with --prefix <name>",
       );
     }
     // resume — fall through.
@@ -110,26 +123,29 @@ export async function initCommand(opts: InitOpts): Promise<void> {
           `(id ${cfD1.uuid.slice(0, 8)}…).`,
           ``,
           `Reusing keeps your CRM data (contacts, deals, pipelines, etc.)`,
-          `but ${theme.warn('revokes all credentials')} — API keys, OAuth registrations,`,
+          `but ${theme.warn("revokes all credentials")} — API keys, OAuth registrations,`,
           `browser sessions, and login tokens. A fresh API key is minted at the`,
           `end of init.`,
           ``,
           `If you want a clean slate (delete the D1 entirely), cancel and run:`,
           `  ${theme.accent(`flowpunk teardown --prefix ${prefix}`)}`,
           `then re-run \`flowpunk init\`.`,
-        ].join('\n'),
-        'Existing D1 detected',
+        ].join("\n"),
+        "Existing D1 detected",
       );
 
       const choice = await p.select({
-        message: 'What now?',
+        message: "What now?",
         options: [
-          { value: 'reuse', label: 'Reuse — keep CRM data, revoke all credentials' },
-          { value: 'cancel', label: 'Cancel' },
+          {
+            value: "reuse",
+            label: "Reuse — keep CRM data, revoke all credentials",
+          },
+          { value: "cancel", label: "Cancel" },
         ],
       });
-      if (p.isCancel(choice) || choice === 'cancel') {
-        p.cancel('Cancelled.');
+      if (p.isCancel(choice) || choice === "cancel") {
+        p.cancel("Cancelled.");
         process.exit(0);
       }
 
@@ -140,20 +156,20 @@ export async function initCommand(opts: InitOpts): Promise<void> {
       // inside provisionFresh then bring the schema current and seedAdmin
       // inserts the first owner row.
       const ownerInfo = await readOwnerSummary(client, cfD1.uuid);
-      if (ownerInfo.kind === 'multi') {
+      if (ownerInfo.kind === "multi") {
         throw new CliError(
           `Existing D1 has ${ownerInfo.count} active owner rows (expected 1).`,
           `Resolve via \`flowpunk admin reset --prefix ${prefix}\` or manual D1 inspection, then re-run \`flowpunk init\`.`,
         );
       }
-      if (ownerInfo.kind === 'one') {
+      if (ownerInfo.kind === "one") {
         inheritedOwner = {
           email: ownerInfo.email,
           displayName: ownerInfo.displayName,
         };
         p.note(
           `Reusing existing admin: ${theme.accent(ownerInfo.email)}`,
-          'Inherited',
+          "Inherited",
         );
       }
       // 'none' → fall through silently.
@@ -166,12 +182,14 @@ export async function initCommand(opts: InitOpts): Promise<void> {
     inheritedOwner?.email ??
     (await (async () => {
       const v = await p.text({
-        message: 'Admin email?',
+        message: "Admin email?",
         validate: (s) =>
-          /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) ? undefined : 'Enter a valid email.',
+          /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)
+            ? undefined
+            : "Enter a valid email.",
       });
       if (p.isCancel(v)) {
-        p.cancel('Cancelled.');
+        p.cancel("Cancelled.");
         process.exit(0);
       }
       return v as string;
@@ -180,12 +198,12 @@ export async function initCommand(opts: InitOpts): Promise<void> {
     inheritedOwner?.displayName ??
     (await (async () => {
       const v = await p.text({
-        message: 'Admin display name?',
-        placeholder: 'Operator',
-        defaultValue: 'Operator',
+        message: "Admin display name?",
+        placeholder: "Operator",
+        defaultValue: "Operator",
       });
       if (p.isCancel(v)) {
-        p.cancel('Cancelled.');
+        p.cancel("Cancelled.");
         process.exit(0);
       }
       return v as string;
@@ -210,12 +228,12 @@ export async function initCommand(opts: InitOpts): Promise<void> {
       `  • 6 KV namespaces`,
       `  • 5 Workers (1 public gateway + 4 internal)`,
       `  • 1 Durable Object class`,
-    ].join('\n'),
-    'Plan summary',
+    ].join("\n"),
+    "Plan summary",
   );
-  const confirm = await p.confirm({ message: 'Proceed?' });
+  const confirm = await p.confirm({ message: "Proceed?" });
   if (p.isCancel(confirm) || !confirm) {
-    p.cancel('Cancelled.');
+    p.cancel("Cancelled.");
     process.exit(0);
   }
 
@@ -242,51 +260,57 @@ function printSuccessCard(result: {
   record: { resources: { workers: { gateway: { url?: string } } } };
   apiKey: string;
 }): void {
-  const url = result.record.resources.workers.gateway.url ?? '<gateway-url>';
-  const banner = '═'.repeat(72);
+  const url = result.record.resources.workers.gateway.url ?? "<gateway-url>";
+  const banner = "═".repeat(72);
   const lines = [
-    '',
+    "",
     theme.brand(banner),
-    theme.bold('  flow-punk indie is live — API key below is shown ONCE'),
+    theme.bold("  flow-punk indie is live — API key below is shown ONCE"),
     theme.brand(banner),
-    '',
-    `${theme.bold('Gateway URL:')}  ${theme.accent(url)}`,
-    `${theme.bold('API key:')}      ${theme.accent(result.apiKey)}`,
-    '',
-    theme.bold('First-time browser login:'),
-    `  ${theme.accent('flowpunk connect')}`,
-    `  ${theme.dim('then visit')} ${theme.accent(`${url}/auth/login`)}`,
-    `  ${theme.dim('and paste the printed login token (30-minute one-shot).')}`,
-    '',
-    theme.bold('Try the API:'),
+    "",
+    `${theme.bold("Gateway URL:")}  ${theme.accent(url)}`,
+    `${theme.bold("API key:")}      ${theme.accent(result.apiKey)}`,
+    "",
+    theme.bold("First-time browser login:"),
+    `  ${theme.accent("flowpunk connect")}`,
+    `  ${theme.dim("then visit")} ${theme.accent(`${url}/auth/login`)}`,
+    `  ${theme.dim("and paste the printed login token (30-minute one-shot).")}`,
+    "",
+    theme.bold("Try the API:"),
     `  ${theme.accent(`curl -H "Authorization: Bearer ${result.apiKey}" \\`)}`,
     `  ${theme.accent(`     ${url}/api/v1/contacts`)}`,
-    '',
-    theme.bold('Connect MCP — browser or hosted agents (Claude.ai, ChatGPT)'),
-    `  ${theme.dim('Paste this URL — login is handled via OAuth in the browser:')}`,
+    "",
+    theme.bold("Connect MCP — browser or hosted agents (Claude.ai, ChatGPT)"),
+    `  ${theme.dim("Paste this URL — login is handled via OAuth in the browser:")}`,
     `    ${theme.accent(`${url}/mcp`)}`,
-    `  ${theme.dim('(if this is your first connection, complete the browser-login step above first)')}`,
-    '',
-    theme.bold('Connect MCP — desktop or IDE clients (Claude Desktop, Cursor, …)'),
-    `  ${theme.dim('Paste into your MCP config (uses your API key directly):')}`,
-    theme.accent(JSON.stringify(
-      {
-        mcpServers: {
-          flowpunk: {
-            url: `${url}/mcp`,
-            headers: { Authorization: `Bearer ${result.apiKey}` },
+    `  ${theme.dim("(if this is your first connection, complete the browser-login step above first)")}`,
+    "",
+    theme.bold(
+      "Connect MCP — desktop or IDE clients (Claude Desktop, Cursor, …)",
+    ),
+    `  ${theme.dim("Paste into your MCP config (uses your API key directly):")}`,
+    theme.accent(
+      JSON.stringify(
+        {
+          mcpServers: {
+            flowpunk: {
+              url: `${url}/mcp`,
+              headers: { Authorization: `Bearer ${result.apiKey}` },
+            },
           },
         },
-      },
-      null,
-      2,
-    )),
-    '',
-    theme.dim(`Day-2 upgrades: \`flowpunk update\`. Health check: \`flowpunk doctor\`.`),
+        null,
+        2,
+      ),
+    ),
+    "",
+    theme.dim(
+      `Day-2 upgrades: \`flowpunk update\`. Health check: \`flowpunk doctor\`.`,
+    ),
     theme.brand(banner),
-    '',
+    "",
   ];
-  process.stdout.write(lines.join('\n'));
+  process.stdout.write(lines.join("\n"));
 }
 
 async function readOwnerSummary(
@@ -306,24 +330,30 @@ async function readOwnerSummary(
       if (Array.isArray(r.results)) {
         for (const row of r.results) {
           if (
-            row && typeof row === 'object' &&
-            'email' in row && 'display_name' in row
+            row &&
+            typeof row === "object" &&
+            "email" in row &&
+            "display_name" in row
           ) {
             const email = (row as { email: unknown }).email;
             const displayName = (row as { display_name: unknown }).display_name;
-            if (typeof email === 'string' && typeof displayName === 'string') {
+            if (typeof email === "string" && typeof displayName === "string") {
               collected.push({ email, displayName });
             }
           }
         }
       }
     }
-    if (collected.length === 0) return { kind: 'none' };
+    if (collected.length === 0) return { kind: "none" };
     if (collected.length === 1) {
-      return { kind: 'one', email: collected[0]!.email, displayName: collected[0]!.displayName };
+      return {
+        kind: "one",
+        email: collected[0]!.email,
+        displayName: collected[0]!.displayName,
+      };
     }
-    return { kind: 'multi', count: collected.length };
+    return { kind: "multi", count: collected.length };
   } catch {
-    return { kind: 'none' };
+    return { kind: "none" };
   }
 }

@@ -22,11 +22,11 @@
  * Per ADR-011, indie wrappers pass `enforceSingleOwner: true`; managed
  * wrappers pass `false`. The repo itself is edition-agnostic.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, desc, eq, lt, ne, or, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, desc, eq, lt, ne, or, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
-import { mcpSessions } from '../schema/mcp-sessions.js';
+import { mcpSessions } from "../schema/mcp-sessions.js";
 import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
@@ -36,23 +36,23 @@ import {
   type NewUser,
   type User,
   type UserPatchableField,
-} from '../schema/users.js';
-import { ROLE_VALUES, isRole, type Role } from '../utils/roles.js';
+} from "../schema/users.js";
+import { ROLE_VALUES, isRole, type Role } from "../utils/roles.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class UsersRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
     public readonly detailCode?: string,
   ) {
     super(message);
-    this.name = 'UsersRepoError';
+    this.name = "UsersRepoError";
   }
 }
 
@@ -124,18 +124,18 @@ export async function create(
   const existing = await findByEmail(db, normalized.email);
   if (existing) {
     throw new UsersRepoError(
-      'wrong_state',
+      "wrong_state",
       `email "${normalized.email}" is already in use`,
-      'EMAIL_TAKEN',
+      "EMAIL_TAKEN",
     );
   }
 
-  const id = generateId('usr');
-  const role: Role = normalized.role ?? 'member';
+  const id = generateId("usr");
+  const role: Role = normalized.role ?? "member";
   const firstName = normalized.firstName ?? null;
   const lastName = normalized.lastName ?? null;
   const enforceSingleOwnerCreate =
-    options.enforceSingleOwner === true && role === 'owner';
+    options.enforceSingleOwner === true && role === "owner";
 
   if (enforceSingleOwnerCreate) {
     // Race-safe single-owner enforcement (indie one-active-owner per
@@ -163,28 +163,25 @@ export async function create(
       `);
       if (getChanges(result) === 0) {
         throw new UsersRepoError(
-          'invariant_violation',
+          "invariant_violation",
           `another active owner already exists`,
-          'OWNER_EXISTS',
+          "OWNER_EXISTS",
         );
       }
     } catch (err) {
       if (err instanceof UsersRepoError) throw err;
       if (isUniqueViolation(err)) {
         throw new UsersRepoError(
-          'wrong_state',
+          "wrong_state",
           `email "${normalized.email}" is already in use`,
-          'EMAIL_TAKEN',
+          "EMAIL_TAKEN",
         );
       }
       throw err;
     }
     const inserted = await findById(db, id);
     if (!inserted) {
-      throw new UsersRepoError(
-        'invariant_violation',
-        'insert returned no row',
-      );
+      throw new UsersRepoError("invariant_violation", "insert returned no row");
     }
     return inserted;
   }
@@ -197,7 +194,7 @@ export async function create(
     firstName,
     lastName,
     role,
-    status: 'active',
+    status: "active",
     lastLoginAt: null,
     deletedAt: null,
     deletedBy: null,
@@ -211,18 +208,15 @@ export async function create(
     const inserted = await db.insert(users).values(row).returning();
     const user = inserted[0];
     if (!user) {
-      throw new UsersRepoError(
-        'invariant_violation',
-        'insert returned no row',
-      );
+      throw new UsersRepoError("invariant_violation", "insert returned no row");
     }
     return user;
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw new UsersRepoError(
-        'wrong_state',
+        "wrong_state",
         `email "${normalized.email}" is already in use`,
-        'EMAIL_TAKEN',
+        "EMAIL_TAKEN",
       );
     }
     throw err;
@@ -236,14 +230,10 @@ export async function findById(
   id: string,
   options: { includeDeleted?: boolean } = {},
 ): Promise<User | null> {
-  const rows = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1);
+  const rows = await db.select().from(users).where(eq(users.id, id)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!options.includeDeleted && row.status !== 'active') return null;
+  if (!options.includeDeleted && row.status !== "active") return null;
   return row;
 }
 
@@ -265,9 +255,9 @@ export async function findByEmail(
     .limit(2);
   if (rows.length === 0) return null;
   if (options.includeDeleted) {
-    return rows.find((r) => r.status === 'active') ?? rows[0]!;
+    return rows.find((r) => r.status === "active") ?? rows[0]!;
   }
-  return rows.find((r) => r.status === 'active') ?? null;
+  return rows.find((r) => r.status === "active") ?? null;
 }
 
 export async function list(
@@ -278,7 +268,7 @@ export async function list(
   const cursor = options.cursor ? decodeCursor(options.cursor) : null;
 
   const filters = [];
-  if (!options.includeDeleted) filters.push(eq(users.status, 'active'));
+  if (!options.includeDeleted) filters.push(eq(users.status, "active"));
   if (options.role !== undefined) filters.push(eq(users.role, options.role));
   if (cursor) {
     filters.push(
@@ -328,14 +318,11 @@ export async function update(
 ): Promise<UpdateResult> {
   for (const key of Object.keys(patch)) {
     if (isImmutablePatchField(key)) {
-      throw new UsersRepoError(
-        'invalid_input',
-        `field "${key}" is immutable`,
-      );
+      throw new UsersRepoError("invalid_input", `field "${key}" is immutable`);
     }
     if (!isAllowedPatchField(key)) {
       throw new UsersRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is not patchable`,
       );
     }
@@ -350,7 +337,7 @@ export async function update(
     if (value === null) {
       if (!NULLABLE_PATCH_FIELDS.has(field)) {
         throw new UsersRepoError(
-          'invalid_input',
+          "invalid_input",
           `field "${field}" cannot be null`,
         );
       }
@@ -367,7 +354,7 @@ export async function update(
   if (fieldsChanged.length === 0) {
     const current = await findById(db, id);
     if (!current) {
-      throw new UsersRepoError('not_found', `user "${id}" not found`);
+      throw new UsersRepoError("not_found", `user "${id}" not found`);
     }
     return { user: current, fieldsChanged: [] };
   }
@@ -375,7 +362,7 @@ export async function update(
   // Role transitions go through `setRole` so the last-owner and
   // single-owner invariants are race-safe. Other field changes go through
   // the standard UPDATE below.
-  if ('role' in changes) {
+  if ("role" in changes) {
     const target = changes.role as Role;
     await setRole(db, id, target, actorId, now, {
       enforceSingleOwner: options.enforceSingleOwner === true,
@@ -384,23 +371,23 @@ export async function update(
   }
 
   // Email uniqueness pre-check (UX); unique-violation is authoritative.
-  if (typeof changes.email === 'string') {
+  if (typeof changes.email === "string") {
     const collision = await db
       .select({ id: users.id })
       .from(users)
       .where(
         and(
           eq(users.email, changes.email as string),
-          eq(users.status, 'active'),
+          eq(users.status, "active"),
           ne(users.id, id),
         ),
       )
       .limit(1);
     if (collision[0]) {
       throw new UsersRepoError(
-        'wrong_state',
+        "wrong_state",
         `email "${changes.email}" is already in use`,
-        'EMAIL_TAKEN',
+        "EMAIL_TAKEN",
       );
     }
   }
@@ -410,7 +397,7 @@ export async function update(
       const updated = await db
         .update(users)
         .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-        .where(and(eq(users.id, id), eq(users.status, 'active')))
+        .where(and(eq(users.id, id), eq(users.status, "active")))
         .returning();
 
       const row = updated[0];
@@ -421,19 +408,16 @@ export async function update(
           .where(eq(users.id, id))
           .limit(1);
         if (existing[0]) {
-          throw new UsersRepoError(
-            'wrong_state',
-            `user "${id}" is not active`,
-          );
+          throw new UsersRepoError("wrong_state", `user "${id}" is not active`);
         }
-        throw new UsersRepoError('not_found', `user "${id}" not found`);
+        throw new UsersRepoError("not_found", `user "${id}" not found`);
       }
     } catch (err) {
       if (isUniqueViolation(err)) {
         throw new UsersRepoError(
-          'wrong_state',
+          "wrong_state",
           `email "${changes.email}" is already in use`,
-          'EMAIL_TAKEN',
+          "EMAIL_TAKEN",
         );
       }
       throw err;
@@ -444,7 +428,7 @@ export async function update(
   // transition and the field updates.
   const after = await findById(db, id, { includeDeleted: true });
   if (!after) {
-    throw new UsersRepoError('not_found', `user "${id}" not found`);
+    throw new UsersRepoError("not_found", `user "${id}" not found`);
   }
   return { user: after, fieldsChanged };
 }
@@ -466,17 +450,17 @@ export async function setRole(
 ): Promise<void> {
   const before = await findById(db, id, { includeDeleted: true });
   if (!before) {
-    throw new UsersRepoError('not_found', `user "${id}" not found`);
+    throw new UsersRepoError("not_found", `user "${id}" not found`);
   }
-  if (before.status !== 'active') {
-    throw new UsersRepoError('wrong_state', `user "${id}" is not active`);
+  if (before.status !== "active") {
+    throw new UsersRepoError("wrong_state", `user "${id}" is not active`);
   }
   if (before.role === target) {
     return; // no-op
   }
 
   // Promotion to owner.
-  if (target === 'owner') {
+  if (target === "owner") {
     if (options.enforceSingleOwner) {
       const result = await db.run(sql`
         UPDATE users
@@ -493,21 +477,21 @@ export async function setRole(
       `);
       if (getChanges(result) > 0) return;
       throw new UsersRepoError(
-        'invariant_violation',
+        "invariant_violation",
         `another active owner already exists`,
-        'OWNER_EXISTS',
+        "OWNER_EXISTS",
       );
     }
     // Multi-owner allowed (managed): plain promotion.
     await db
       .update(users)
-      .set({ role: 'owner', updatedAt: now, updatedBy: actorId })
-      .where(and(eq(users.id, id), eq(users.status, 'active')));
+      .set({ role: "owner", updatedAt: now, updatedBy: actorId })
+      .where(and(eq(users.id, id), eq(users.status, "active")));
     return;
   }
 
   // Demotion away from owner: must keep at least one active owner.
-  if (before.role === 'owner') {
+  if (before.role === "owner") {
     const result = await db.run(sql`
       UPDATE users
       SET role = ${target}, updated_at = ${now}, updated_by = ${actorId}
@@ -523,9 +507,9 @@ export async function setRole(
     `);
     if (getChanges(result) > 0) return;
     throw new UsersRepoError(
-      'invariant_violation',
+      "invariant_violation",
       `cannot demote the last active owner`,
-      'LAST_OWNER',
+      "LAST_OWNER",
     );
   }
 
@@ -533,7 +517,7 @@ export async function setRole(
   await db
     .update(users)
     .set({ role: target, updatedAt: now, updatedBy: actorId })
-    .where(and(eq(users.id, id), eq(users.status, 'active')));
+    .where(and(eq(users.id, id), eq(users.status, "active")));
 }
 
 // ---------- soft delete ----------
@@ -575,7 +559,7 @@ export async function softDelete(
     const after = await findById(db, id, { includeDeleted: true });
     if (!after) {
       throw new UsersRepoError(
-        'invariant_violation',
+        "invariant_violation",
         `user "${id}" missing after soft-delete`,
       );
     }
@@ -585,20 +569,17 @@ export async function softDelete(
   // 0 rows: figure out why.
   const current = await findById(db, id, { includeDeleted: true });
   if (!current) {
-    throw new UsersRepoError('not_found', `user "${id}" not found`);
+    throw new UsersRepoError("not_found", `user "${id}" not found`);
   }
-  if (current.status !== 'active') {
-    throw new UsersRepoError(
-      'wrong_state',
-      `user "${id}" is already deleted`,
-    );
+  if (current.status !== "active") {
+    throw new UsersRepoError("wrong_state", `user "${id}" is already deleted`);
   }
   // Active owner, blocked by invariant: at least one other active user
   // exists but no other owner.
   throw new UsersRepoError(
-    'invariant_violation',
+    "invariant_violation",
     `cannot soft-delete the last active owner while other active users exist`,
-    'LAST_OWNER_BLOCKS_DELETE',
+    "LAST_OWNER_BLOCKS_DELETE",
   );
 }
 
@@ -617,7 +598,7 @@ export async function touchLastLogin(
   await db
     .update(users)
     .set({ lastLoginAt: now })
-    .where(and(eq(users.id, id), eq(users.status, 'active')));
+    .where(and(eq(users.id, id), eq(users.status, "active")));
 }
 
 // ---------- cascade helpers (auth state revocation) ----------
@@ -666,11 +647,11 @@ interface NormalizedCreate {
 }
 
 function validateCreate(input: CreateUserInput): NormalizedCreate {
-  if (typeof input.email !== 'string') {
-    throw new UsersRepoError('invalid_input', 'email is required');
+  if (typeof input.email !== "string") {
+    throw new UsersRepoError("invalid_input", "email is required");
   }
-  if (typeof input.displayName !== 'string') {
-    throw new UsersRepoError('invalid_input', 'displayName is required');
+  if (typeof input.displayName !== "string") {
+    throw new UsersRepoError("invalid_input", "displayName is required");
   }
   const email = normalizeEmail(input.email);
   validateEmail(email);
@@ -683,8 +664,8 @@ function validateCreate(input: CreateUserInput): NormalizedCreate {
   if (input.role !== undefined) {
     if (!isRole(input.role)) {
       throw new UsersRepoError(
-        'invalid_input',
-        `role must be one of ${ROLE_VALUES.join(', ')}`,
+        "invalid_input",
+        `role must be one of ${ROLE_VALUES.join(", ")}`,
       );
     }
     out.role = input.role;
@@ -694,7 +675,7 @@ function validateCreate(input: CreateUserInput): NormalizedCreate {
     if (input.firstName === null) {
       out.firstName = null;
     } else {
-      validateString('firstName', input.firstName, NAME_MIN, NAME_MAX);
+      validateString("firstName", input.firstName, NAME_MIN, NAME_MAX);
       out.firstName = (input.firstName as string).trim();
     }
   }
@@ -702,7 +683,7 @@ function validateCreate(input: CreateUserInput): NormalizedCreate {
     if (input.lastName === null) {
       out.lastName = null;
     } else {
-      validateString('lastName', input.lastName, NAME_MIN, NAME_MAX);
+      validateString("lastName", input.lastName, NAME_MIN, NAME_MAX);
       out.lastName = (input.lastName as string).trim();
     }
   }
@@ -711,37 +692,37 @@ function validateCreate(input: CreateUserInput): NormalizedCreate {
 
 function validateField(field: UserPatchableField, value: unknown): void {
   switch (field) {
-    case 'email':
-      if (typeof value !== 'string') {
-        throw new UsersRepoError('invalid_input', 'email must be a string');
+    case "email":
+      if (typeof value !== "string") {
+        throw new UsersRepoError("invalid_input", "email must be a string");
       }
       validateEmail(normalizeEmail(value));
       return;
-    case 'displayName':
-      if (typeof value !== 'string') {
+    case "displayName":
+      if (typeof value !== "string") {
         throw new UsersRepoError(
-          'invalid_input',
-          'displayName must be a string',
+          "invalid_input",
+          "displayName must be a string",
         );
       }
       validateDisplayName(value.trim());
       return;
-    case 'firstName':
-    case 'lastName':
+    case "firstName":
+    case "lastName":
       validateString(field, value, NAME_MIN, NAME_MAX);
       return;
-    case 'role':
+    case "role":
       if (!isRole(value)) {
         throw new UsersRepoError(
-          'invalid_input',
-          `role must be one of ${ROLE_VALUES.join(', ')}`,
+          "invalid_input",
+          `role must be one of ${ROLE_VALUES.join(", ")}`,
         );
       }
       return;
     default: {
       const exhaustive: never = field;
       throw new UsersRepoError(
-        'invalid_input',
+        "invalid_input",
         `unknown field "${exhaustive as string}"`,
       );
     }
@@ -750,13 +731,13 @@ function validateField(field: UserPatchableField, value: unknown): void {
 
 function normalizeField(field: UserPatchableField, value: unknown): unknown {
   switch (field) {
-    case 'email':
+    case "email":
       return normalizeEmail(value as string);
-    case 'displayName':
-    case 'firstName':
-    case 'lastName':
+    case "displayName":
+    case "firstName":
+    case "lastName":
       return (value as string).trim();
-    case 'role':
+    case "role":
       return value as Role;
   }
 }
@@ -767,13 +748,13 @@ function validateString(
   min: number,
   max: number,
 ): void {
-  if (typeof value !== 'string') {
-    throw new UsersRepoError('invalid_input', `${field} must be a string`);
+  if (typeof value !== "string") {
+    throw new UsersRepoError("invalid_input", `${field} must be a string`);
   }
   const trimmed = value.trim();
   if (trimmed.length < min || trimmed.length > max) {
     throw new UsersRepoError(
-      'invalid_input',
+      "invalid_input",
       `${field} must be ${min}-${max} characters`,
     );
   }
@@ -782,7 +763,7 @@ function validateString(
 function validateDisplayName(value: string): void {
   if (value.length < DISPLAY_NAME_MIN || value.length > DISPLAY_NAME_MAX) {
     throw new UsersRepoError(
-      'invalid_input',
+      "invalid_input",
       `displayName must be ${DISPLAY_NAME_MIN}-${DISPLAY_NAME_MAX} characters`,
     );
   }
@@ -791,13 +772,13 @@ function validateDisplayName(value: string): void {
 function validateEmail(email: string): void {
   if (email.length === 0 || email.length > EMAIL_MAX) {
     throw new UsersRepoError(
-      'invalid_input',
+      "invalid_input",
       `email must be 1-${EMAIL_MAX} characters`,
     );
   }
   if (!EMAIL_REGEX.test(email)) {
     throw new UsersRepoError(
-      'invalid_input',
+      "invalid_input",
       'email must look like "name@host.tld"',
     );
   }
@@ -808,11 +789,12 @@ export function normalizeEmail(value: string): string {
 }
 
 function isUniqueViolation(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
+  if (!err || typeof err !== "object") return false;
   const message =
-    'message' in err && typeof (err as { message: unknown }).message === 'string'
-      ? ((err as { message: string }).message)
-      : '';
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+      ? (err as { message: string }).message
+      : "";
   return /UNIQUE constraint failed/i.test(message);
 }
 
@@ -822,20 +804,21 @@ interface RunResult {
 }
 
 function getChanges(result: unknown): number {
-  if (!result || typeof result !== 'object') return 0;
+  if (!result || typeof result !== "object") return 0;
   const r = result as RunResult;
-  if (typeof r.changes === 'number') return r.changes;
-  if (r.meta && typeof r.meta.changes === 'number') return r.meta.changes;
-  if (r.meta && typeof r.meta.rows_written === 'number') return r.meta.rows_written;
+  if (typeof r.changes === "number") return r.changes;
+  if (r.meta && typeof r.meta.changes === "number") return r.meta.changes;
+  if (r.meta && typeof r.meta.rows_written === "number")
+    return r.meta.rows_written;
   return 0;
 }
 
 function clampLimit(raw: unknown): number {
   if (raw === undefined || raw === null) return DEFAULT_LIMIT;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new UsersRepoError(
-      'invalid_input',
-      'limit must be a positive integer',
+      "invalid_input",
+      "limit must be a positive integer",
     );
   }
   return Math.min(raw, MAX_LIMIT);
@@ -858,57 +841,53 @@ export function decodeCursor(raw: string): CursorPayload {
   try {
     json = base64UrlDecode(raw);
   } catch {
-    throw new UsersRepoError('invalid_input', 'malformed cursor');
+    throw new UsersRepoError("invalid_input", "malformed cursor");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new UsersRepoError('invalid_input', 'malformed cursor');
+    throw new UsersRepoError("invalid_input", "malformed cursor");
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    throw new UsersRepoError('invalid_input', 'malformed cursor');
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new UsersRepoError("invalid_input", "malformed cursor");
   }
   const obj = parsed as Record<string, unknown>;
   const keys = Object.keys(obj);
   if (
     keys.length !== 2 ||
-    !keys.includes('createdAt') ||
-    !keys.includes('id') ||
-    typeof obj.createdAt !== 'string' ||
-    typeof obj.id !== 'string'
+    !keys.includes("createdAt") ||
+    !keys.includes("id") ||
+    typeof obj.createdAt !== "string" ||
+    typeof obj.id !== "string"
   ) {
-    throw new UsersRepoError('invalid_input', 'malformed cursor');
+    throw new UsersRepoError("invalid_input", "malformed cursor");
   }
   return { createdAt: obj.createdAt, id: obj.id };
 }
 
 function base64UrlEncode(input: string): string {
   const utf8 = new TextEncoder().encode(input);
-  let bin = '';
+  let bin = "";
   for (const byte of utf8) bin += String.fromCharCode(byte);
-  const b64 = typeof btoa === 'function' ? btoa(bin) : nodeBtoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = typeof btoa === "function" ? btoa(bin) : nodeBtoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): string {
   const padded =
-    input.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (input.length % 4)) % 4);
-  const bin = typeof atob === 'function' ? atob(padded) : nodeAtob(padded);
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (input.length % 4)) % 4);
+  const bin = typeof atob === "function" ? atob(padded) : nodeAtob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
 
 function nodeBtoa(s: string): string {
-  return Buffer.from(s, 'binary').toString('base64');
+  return Buffer.from(s, "binary").toString("base64");
 }
 
 function nodeAtob(s: string): string {
-  return Buffer.from(s, 'base64').toString('binary');
+  return Buffer.from(s, "base64").toString("binary");
 }

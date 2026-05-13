@@ -1,4 +1,4 @@
-import { htmlEscape } from './_lib/html.js';
+import { htmlEscape } from "./_lib/html.js";
 
 export interface ConsentPageOptions {
   clientName: string;
@@ -40,7 +40,7 @@ export function consentPage(options: ConsentPageOptions): Response {
   return new Response(body, {
     status: 200,
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
+      "Content-Type": "text/html; charset=utf-8",
       // `same-origin` preserves the `Origin` header on the same-origin
       // form POST to /oauth/approve, while still stripping referrer for
       // any cross-origin navigation. The previous `no-referrer` value
@@ -49,10 +49,10 @@ export function consentPage(options: ConsentPageOptions): Response {
       // here contains authorize-request fields, but the form action is
       // same-origin, so leaking the full URL as Referer to ourselves is
       // not a concern.
-      'Referrer-Policy': 'same-origin',
-      'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "frame-ancestors 'none'",
-      'X-Request-ID': options.responseRequestId,
+      "Referrer-Policy": "same-origin",
+      "X-Frame-Options": "DENY",
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "X-Request-ID": options.responseRequestId,
     },
   });
 }

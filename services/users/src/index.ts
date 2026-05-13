@@ -1,11 +1,11 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { createLogger } from '@flowpunk/service-utils';
+import { drizzle } from "drizzle-orm/d1";
+import { createLogger } from "@flowpunk/service-utils";
 import {
   route,
   type UsersCoreOptions,
   type UsersEnv,
-} from '@flowpunk-indie/users-core';
-import { oauthTokensRepo } from '@flowpunk-indie/db';
+} from "@flowpunk-indie/users-core";
+import { oauthTokensRepo } from "@flowpunk-indie/db";
 
 /**
  * Indie users worker.
@@ -30,9 +30,9 @@ const INDIE_OPTIONS: UsersCoreOptions = {
 };
 
 const USER_INVALIDATION_TTL_SECONDS = 60;
-const INDIE_SCOPE = '_system';
+const INDIE_SCOPE = "_system";
 
-type IndieUsersEnv = Omit<UsersEnv, 'USERS_OPTIONS'> & {
+type IndieUsersEnv = Omit<UsersEnv, "USERS_OPTIONS"> & {
   /**
    * OAuth identity + revocation cache. The wrapper writes a
    * `user_invalidated:_system:<userId>` tombstone on successful
@@ -44,9 +44,9 @@ type IndieUsersEnv = Omit<UsersEnv, 'USERS_OPTIONS'> & {
 export default {
   async fetch(request: Request, env: IndieUsersEnv): Promise<Response> {
     const requestId =
-      request.headers.get('X-Request-ID') ?? crypto.randomUUID();
-    const tenantId = request.headers.get('X-Tenant-Id') ?? undefined;
-    const logger = createLogger({ service: 'users' })
+      request.headers.get("X-Request-ID") ?? crypto.randomUUID();
+    const tenantId = request.headers.get("X-Tenant-Id") ?? undefined;
+    const logger = createLogger({ service: "users" })
       .withRequestId(requestId)
       .withTenantId(tenantId);
 
@@ -59,7 +59,7 @@ export default {
       );
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('unhandled error in users worker', {
+      logger.error("unhandled error in users worker", {
         error: err,
         method: request.method,
         path: new URL(request.url).pathname,
@@ -67,11 +67,11 @@ export default {
       return new Response(
         JSON.stringify({
           success: false,
-          error: { code: 'INTERNAL_ERROR' },
+          error: { code: "INTERNAL_ERROR" },
         }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { "Content-Type": "application/json" },
         },
       );
     }
@@ -81,13 +81,13 @@ export default {
     // the cascade — original-request semantics.
     const url = new URL(request.url);
     if (
-      request.method === 'DELETE' &&
+      request.method === "DELETE" &&
       response.status >= 200 &&
       response.status < 300 &&
-      url.pathname.startsWith('/api/v1/users/')
+      url.pathname.startsWith("/api/v1/users/")
     ) {
-      const targetUserId = url.pathname.slice('/api/v1/users/'.length);
-      if (targetUserId && !targetUserId.includes('/')) {
+      const targetUserId = url.pathname.slice("/api/v1/users/".length);
+      if (targetUserId && !targetUserId.includes("/")) {
         await cascadeRevokeOauth(env, targetUserId, logger);
       }
     }
@@ -106,10 +106,10 @@ async function cascadeRevokeOauth(
   try {
     const db = drizzle(env.DB);
     const revokedCount = await oauthTokensRepo.revokeForUser(db, userId, now);
-    logger.info('oauth.revokedForUser', { userId, revokedCount });
+    logger.info("oauth.revokedForUser", { userId, revokedCount });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.error('oauth cascade revoke failed', { error: err, userId });
+    logger.error("oauth cascade revoke failed", { error: err, userId });
   }
 
   // User-invalidation tombstone — independent of the DB revoke. Both
@@ -121,14 +121,14 @@ async function cascadeRevokeOauth(
       now,
       { expirationTtl: USER_INVALIDATION_TTL_SECONDS },
     );
-    logger.info('oauth.userInvalidationTombstoneWritten', { userId });
+    logger.info("oauth.userInvalidationTombstoneWritten", { userId });
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.warn('oauth user-invalidation tombstone write failed', {
+    logger.warn("oauth user-invalidation tombstone write failed", {
       error: err,
       userId,
     });
   }
 }
 
-export type { UsersEnv } from '@flowpunk-indie/users-core';
+export type { UsersEnv } from "@flowpunk-indie/users-core";

@@ -1,7 +1,7 @@
-import { accountsRepo } from '@flowpunk-indie/db';
+import { accountsRepo } from "@flowpunk-indie/db";
 
-import type { Actor, ContactsEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, notFound } from '../_shared.js';
+import type { Actor, ContactsEnv } from "../../types.js";
+import { getDb, jsonResponse, mapRepoError, notFound } from "../_shared.js";
 
 export async function handleGetAccount(
   _request: Request,

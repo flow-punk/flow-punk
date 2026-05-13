@@ -3,7 +3,7 @@
  * `localhost` is intentionally excluded — IETF guidance and our threat model both prefer
  * literal addresses, which cannot be intercepted by hosts file or DNS rebinding.
  */
-const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(['127.0.0.1', '[::1]']);
+const LOOPBACK_HOSTS: ReadonlySet<string> = new Set(["127.0.0.1", "[::1]"]);
 
 export interface RedirectUriPolicy {
   /** Maximum total length of a registered redirect URI string. */
@@ -24,8 +24,10 @@ export function isLoopbackRedirectUri(raw: string): boolean {
   } catch {
     return false;
   }
-  if (url.protocol !== 'http:') return false;
-  return LOOPBACK_HOSTS.has(url.hostname) || LOOPBACK_HOSTS.has(`[${url.hostname}]`);
+  if (url.protocol !== "http:") return false;
+  return (
+    LOOPBACK_HOSTS.has(url.hostname) || LOOPBACK_HOSTS.has(`[${url.hostname}]`)
+  );
 }
 
 /**
@@ -42,7 +44,7 @@ export function isValidRegistrableRedirectUri(raw: string): boolean {
     return false;
   }
   if (url.hash) return false;
-  if (url.protocol === 'https:') return true;
+  if (url.protocol === "https:") return true;
   return isLoopbackRedirectUri(raw);
 }
 
@@ -87,13 +89,19 @@ export function validateRedirectUriList(
   policy: RedirectUriPolicy = DEFAULT_REDIRECT_URI_POLICY,
 ):
   | { ok: true }
-  | { ok: false; error: 'too_many' | 'too_long' | 'invalid_redirect_uri'; offending?: string } {
-  if (uris.length === 0) return { ok: false, error: 'invalid_redirect_uri' };
-  if (uris.length > policy.maxPerClient) return { ok: false, error: 'too_many' };
+  | {
+      ok: false;
+      error: "too_many" | "too_long" | "invalid_redirect_uri";
+      offending?: string;
+    } {
+  if (uris.length === 0) return { ok: false, error: "invalid_redirect_uri" };
+  if (uris.length > policy.maxPerClient)
+    return { ok: false, error: "too_many" };
   for (const uri of uris) {
-    if (uri.length > policy.maxLength) return { ok: false, error: 'too_long', offending: uri };
+    if (uri.length > policy.maxLength)
+      return { ok: false, error: "too_long", offending: uri };
     if (!isValidRegistrableRedirectUri(uri)) {
-      return { ok: false, error: 'invalid_redirect_uri', offending: uri };
+      return { ok: false, error: "invalid_redirect_uri", offending: uri };
     }
   }
   return { ok: true };

@@ -1,17 +1,17 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { drizzle } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
 import {
   mcpOauthTokens,
   oauthClientsRepo,
   oauthTokensRepo,
-} from '@flowpunk-indie/db';
-import { isoNow, sha256Hex } from '@flowpunk-indie/oauth-protocol';
+} from "@flowpunk-indie/db";
+import { isoNow, sha256Hex } from "@flowpunk-indie/oauth-protocol";
 
-import type { OAuthEnv } from '../env.js';
-import { isIndieToken } from '../codec.js';
-import { safeFormUrlEncoded } from '../body.js';
-import { oauthJsonError } from '../responses.js';
-import { protectRevokedOauthTokens } from '../revoke-cache.js';
+import type { OAuthEnv } from "../env.js";
+import { isIndieToken } from "../codec.js";
+import { safeFormUrlEncoded } from "../body.js";
+import { oauthJsonError } from "../responses.js";
+import { protectRevokedOauthTokens } from "../revoke-cache.js";
 
 /**
  * RFC 7009 token revocation. Always-200 semantics for unknown tokens
@@ -24,12 +24,12 @@ export async function handleRevoke(
 ): Promise<Response> {
   const form = await safeFormUrlEncoded(request, env, requestId);
   if (form instanceof Response) return form;
-  if (!form) return oauthJsonError(400, 'invalid_request');
+  if (!form) return oauthJsonError(400, "invalid_request");
 
-  const token = form.get('token');
-  const clientId = form.get('client_id');
-  if (typeof token !== 'string' || typeof clientId !== 'string') {
-    return oauthJsonError(400, 'invalid_request');
+  const token = form.get("token");
+  const clientId = form.get("client_id");
+  if (typeof token !== "string" || typeof clientId !== "string") {
+    return oauthJsonError(400, "invalid_request");
   }
 
   if (!isIndieToken(token)) {
@@ -38,8 +38,8 @@ export async function handleRevoke(
 
   const db = drizzle(env.DB);
   const client = await oauthClientsRepo.findByClientId(db, clientId);
-  if (!client || client.tokenEndpointAuthMethod !== 'none') {
-    return oauthJsonError(401, 'invalid_client');
+  if (!client || client.tokenEndpointAuthMethod !== "none") {
+    return oauthJsonError(401, "invalid_client");
   }
 
   const tokenHash = await sha256Hex(token);
@@ -48,7 +48,7 @@ export async function handleRevoke(
     return new Response(null, { status: 200 });
   }
 
-  if (row.tokenType === 'refresh') {
+  if (row.tokenType === "refresh") {
     // Family-wide revoke for a refresh token.
     const familyTokens = await db
       .select({
@@ -64,6 +64,8 @@ export async function handleRevoke(
 
   // Single-token revoke (access).
   await oauthTokensRepo.revokeByHash(db, tokenHash, isoNow());
-  await protectRevokedOauthTokens(env, [{ tokenHash, tokenType: row.tokenType }]);
+  await protectRevokedOauthTokens(env, [
+    { tokenHash, tokenType: row.tokenType },
+  ]);
   return new Response(null, { status: 200 });
 }

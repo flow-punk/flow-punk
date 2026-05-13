@@ -1,7 +1,7 @@
-import { dealsRepo } from '@flowpunk-indie/db';
+import { dealsRepo } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, notFound } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import { getDb, jsonResponse, mapRepoError, notFound } from "../_shared.js";
 
 export async function handleGetDeal(
   _request: Request,

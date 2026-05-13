@@ -5,17 +5,18 @@ import {
   setWorkersDevSubdomain,
   workerScriptExists,
   type CfClient,
-} from '@flowpunk/cf-admin';
+} from "@flowpunk/cf-admin";
 
-import { SERVICE_UPLOAD_ORDER, type DeploymentRecord, type ServiceName } from '../types.js';
 import {
-  buildScriptMetadata,
-  isPubliclyExposed,
-} from './script-metadata.js';
-import { hashBundle, loadMigrations, loadWorkerBundle } from './bundles.js';
-import { runChecklist, type ChecklistItem } from '../ui/checklist.js';
-import { withRetry } from '../util/retry.js';
-import { CliError } from '../util/errors.js';
+  SERVICE_UPLOAD_ORDER,
+  type DeploymentRecord,
+  type ServiceName,
+} from "../types.js";
+import { buildScriptMetadata, isPubliclyExposed } from "./script-metadata.js";
+import { hashBundle, loadMigrations, loadWorkerBundle } from "./bundles.js";
+import { runChecklist, type ChecklistItem } from "../ui/checklist.js";
+import { withRetry } from "../util/retry.js";
+import { CliError } from "../util/errors.js";
 
 export interface UpdateOptions {
   /** Apply migrations only; skip worker redeploys. */
@@ -45,7 +46,7 @@ export async function updateDeployment(
   options: UpdateOptions = {},
 ): Promise<UpdateOutcome> {
   if (options.schemaOnly && options.codeOnly) {
-    throw new CliError('--schema-only and --code-only are mutually exclusive');
+    throw new CliError("--schema-only and --code-only are mutually exclusive");
   }
 
   const items: ChecklistItem[] = [];
@@ -60,13 +61,13 @@ export async function updateDeployment(
   // 0. Resolve subdomain (needed for ALLOWED_ORIGINS on any gateway redeploy).
   if (!options.schemaOnly) {
     items.push({
-      key: 'account.subdomain',
-      label: 'Resolve account workers.dev subdomain',
+      key: "account.subdomain",
+      label: "Resolve account workers.dev subdomain",
       run: async () => {
         accountSubdomain = await withRetry(() => getAccountSubdomain(client));
         if (!accountSubdomain) {
           throw new Error(
-            'No workers.dev subdomain registered. Visit dash.cloudflare.com and pick one.',
+            "No workers.dev subdomain registered. Visit dash.cloudflare.com and pick one.",
           );
         }
         return accountSubdomain;
@@ -77,8 +78,8 @@ export async function updateDeployment(
   // 1. Migrations.
   if (!options.codeOnly) {
     items.push({
-      key: 'd1.migrate',
-      label: 'Apply pending D1 migrations',
+      key: "d1.migrate",
+      label: "Apply pending D1 migrations",
       run: async () => {
         const migrations = await loadMigrations();
         const result = await migrateD1(client, {
@@ -109,8 +110,8 @@ export async function updateDeployment(
     // because the per-service step needs the result.
     const localHashes: Partial<Record<ServiceName, string>> = {};
     items.push({
-      key: 'worker.diff',
-      label: 'Diff worker bundles',
+      key: "worker.diff",
+      label: "Diff worker bundles",
       run: async () => {
         for (const svc of ordered) {
           const body = await loadWorkerBundle(svc);
@@ -120,8 +121,8 @@ export async function updateDeployment(
           (svc) => localHashes[svc] !== record.lastDeployedBundleHashes?.[svc],
         );
         return changed.length === 0
-          ? 'no changes'
-          : `${changed.length} changed: ${changed.join(', ')}`;
+          ? "no changes"
+          : `${changed.length} changed: ${changed.join(", ")}`;
       },
     });
 
@@ -132,7 +133,7 @@ export async function updateDeployment(
         label: `Worker: ${name}`,
         run: async () => {
           const local = localHashes[service];
-          if (!local) throw new Error('hash not computed');
+          if (!local) throw new Error("hash not computed");
           const last = record.lastDeployedBundleHashes?.[service];
 
           // ALWAYS reassert workers_dev posture, even when the bundle is
@@ -150,10 +151,10 @@ export async function updateDeployment(
 
           if (local === last) {
             workersUnchanged.push(service);
-            return 'unchanged';
+            return "unchanged";
           }
           if (!accountSubdomain) {
-            throw new Error('account subdomain not resolved');
+            throw new Error("account subdomain not resolved");
           }
           const isFreshDeploy = await isWorkerAbsent(client, name);
           const body = await loadWorkerBundle(service);
@@ -163,17 +164,17 @@ export async function updateDeployment(
             inventory: record.resources,
             gatewayUrl,
             isFreshDeploy,
-            mainModuleFilename: 'index.js',
+            mainModuleFilename: "index.js",
           });
           await withRetry(() =>
             putWorkerScript(client, {
               scriptName: name,
-              deployment: { metadata, body, mainModuleFilename: 'index.js' },
+              deployment: { metadata, body, mainModuleFilename: "index.js" },
             }),
           );
           newBundleHashes[service] = local;
           workersRedeployed.push(service);
-          return 'redeployed';
+          return "redeployed";
         },
       });
     }
@@ -196,7 +197,10 @@ export async function updateDeployment(
   };
 }
 
-async function isWorkerAbsent(client: CfClient, name: string): Promise<boolean> {
+async function isWorkerAbsent(
+  client: CfClient,
+  name: string,
+): Promise<boolean> {
   const exists = await workerScriptExists(client, { scriptName: name });
   return !exists;
 }

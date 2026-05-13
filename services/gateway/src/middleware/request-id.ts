@@ -1,6 +1,6 @@
-import type { Middleware } from '../types.js';
+import type { Middleware } from "../types.js";
 
-const REQUEST_ID_HEADER = 'X-Request-ID';
+const REQUEST_ID_HEADER = "X-Request-ID";
 
 /**
  * Request-ID middleware.

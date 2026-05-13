@@ -1,6 +1,6 @@
-import { fetchWithServiceTimeout } from '../fetch-with-timeout.js';
-import { API_KEY_PREFIX, parseScopedCredential } from './extract-material.js';
-import { isValidApiKeyScope } from './scope.js';
+import { fetchWithServiceTimeout } from "../fetch-with-timeout.js";
+import { API_KEY_PREFIX, parseScopedCredential } from "./extract-material.js";
+import { isValidApiKeyScope } from "./scope.js";
 
 export interface ValidatedIdentity {
   tenantId: string;
@@ -37,13 +37,13 @@ export async function validateApiKey(
   try {
     const res = await fetchWithServiceTimeout(
       authService,
-      'http://internal/auth/validate',
+      "http://internal/auth/validate",
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           credential: rawCredential,
-          credentialType: 'apikey',
+          credentialType: "apikey",
           tenantId: scoped.scope,
         }),
       },
@@ -65,7 +65,7 @@ export async function validateApiKey(
       !body.tenantId ||
       body.tenantId !== scoped.scope ||
       !body.userId ||
-      typeof scope !== 'string' ||
+      typeof scope !== "string" ||
       !isValidApiKeyScope(scope)
     ) {
       return null;
@@ -76,11 +76,11 @@ export async function validateApiKey(
       userId: body.userId,
       scope,
       credentialId:
-        typeof body.credentialId === 'string' ? body.credentialId : undefined,
+        typeof body.credentialId === "string" ? body.credentialId : undefined,
       keyLabel:
         body.keyLabel === null
           ? null
-          : typeof body.keyLabel === 'string'
+          : typeof body.keyLabel === "string"
             ? body.keyLabel
             : undefined,
     };

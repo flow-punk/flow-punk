@@ -1,31 +1,31 @@
-import type { Logger } from '@flowpunk/service-utils';
-import { withIdempotency } from '@flowpunk/service-utils';
+import type { Logger } from "@flowpunk/service-utils";
+import { withIdempotency } from "@flowpunk/service-utils";
 import {
   CUSTOM_FIELDS_PATHS,
   routeCustomFields,
-} from '@flowpunk-indie/custom-fields-core';
+} from "@flowpunk-indie/custom-fields-core";
 
-import { handleCreateAccount } from './handlers/accounts/create.js';
-import { handleGetAccount } from './handlers/accounts/get.js';
-import { handleListAccounts } from './handlers/accounts/list.js';
-import { handleSoftDeleteAccount } from './handlers/accounts/softDelete.js';
-import { handleUpdateAccount } from './handlers/accounts/update.js';
-import { handleCreatePerson } from './handlers/persons/create.js';
-import { handleGetPerson } from './handlers/persons/get.js';
-import { handleListPersons } from './handlers/persons/list.js';
-import { handleSoftDeletePerson } from './handlers/persons/softDelete.js';
-import { handleUpdatePerson } from './handlers/persons/update.js';
-import { handleMcpExecute } from './mcp/execute.js';
-import { handleMcpTools } from './mcp/tools.js';
-import { parseIdentity } from './middleware/identity.js';
-import type { Actor, ContactsEnv } from './types.js';
+import { handleCreateAccount } from "./handlers/accounts/create.js";
+import { handleGetAccount } from "./handlers/accounts/get.js";
+import { handleListAccounts } from "./handlers/accounts/list.js";
+import { handleSoftDeleteAccount } from "./handlers/accounts/softDelete.js";
+import { handleUpdateAccount } from "./handlers/accounts/update.js";
+import { handleCreatePerson } from "./handlers/persons/create.js";
+import { handleGetPerson } from "./handlers/persons/get.js";
+import { handleListPersons } from "./handlers/persons/list.js";
+import { handleSoftDeletePerson } from "./handlers/persons/softDelete.js";
+import { handleUpdatePerson } from "./handlers/persons/update.js";
+import { handleMcpExecute } from "./mcp/execute.js";
+import { handleMcpTools } from "./mcp/tools.js";
+import { parseIdentity } from "./middleware/identity.js";
+import type { Actor, ContactsEnv } from "./types.js";
 
-const ACCOUNTS_COLLECTION_PATH = '/api/v1/accounts';
-const ACCOUNTS_ITEM_PREFIX = '/api/v1/accounts/';
-const PERSONS_COLLECTION_PATH = '/api/v1/persons';
-const PERSONS_ITEM_PREFIX = '/api/v1/persons/';
-const MCP_TOOLS_PATH = '/mcp/tools';
-const MCP_EXECUTE_PATH = '/mcp/execute';
+const ACCOUNTS_COLLECTION_PATH = "/api/v1/accounts";
+const ACCOUNTS_ITEM_PREFIX = "/api/v1/accounts/";
+const PERSONS_COLLECTION_PATH = "/api/v1/persons";
+const PERSONS_ITEM_PREFIX = "/api/v1/persons/";
+const MCP_TOOLS_PATH = "/mcp/tools";
+const MCP_EXECUTE_PATH = "/mcp/execute";
 
 export async function route(
   request: Request,
@@ -38,11 +38,11 @@ export async function route(
 
   // Liveness probe — runs BEFORE the identity guard so the worker is
   // reachable without forging headers.
-  if (pathname === '/health') {
-    if (method === 'GET' || method === 'HEAD') {
-      return jsonResponse(200, { ok: true, service: 'contacts' });
+  if (pathname === "/health") {
+    if (method === "GET" || method === "HEAD") {
+      return jsonResponse(200, { ok: true, service: "contacts" });
     }
-    return methodNotAllowed(['GET', 'HEAD']);
+    return methodNotAllowed(["GET", "HEAD"]);
   }
 
   const actor = parseIdentity(request);
@@ -52,18 +52,18 @@ export async function route(
   // Trust model: identity headers + X-MCP-Session-Id + X-Idempotency-Key
   // (synthesized by the gateway for mutating tools).
   if (pathname === MCP_TOOLS_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleMcpTools(env);
     }
-    return methodNotAllowed(['GET', 'HEAD']);
+    return methodNotAllowed(["GET", "HEAD"]);
   }
   if (pathname === MCP_EXECUTE_PATH) {
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleMcpExecute(request, env, actor),
       );
     }
-    return methodNotAllowed(['POST']);
+    return methodNotAllowed(["POST"]);
   }
 
   // /api/v1/custom-fields/* — delegated to the shared core (ADR-023 §12).
@@ -74,7 +74,7 @@ export async function route(
     pathname.startsWith(CUSTOM_FIELDS_PATHS.ITEM_PREFIX)
   ) {
     const result = await routeCustomFields(request, env, actor, {
-      allowedBaseModels: ['person', 'account'],
+      allowedBaseModels: ["person", "account"],
     });
     if (result) return result;
     return notFound();
@@ -82,15 +82,15 @@ export async function route(
 
   // /api/v1/accounts collection
   if (pathname === ACCOUNTS_COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListAccounts(request, env, actor);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreateAccount(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
 
   // /api/v1/accounts/:id item
@@ -98,56 +98,56 @@ export async function route(
     const id = pathname.slice(ACCOUNTS_ITEM_PREFIX.length);
     // Reject sub-resource paths until they are explicitly added (e.g.
     // `/accounts/:id/people` would land here unrouted otherwise).
-    if (id.length === 0 || id.includes('/')) return notFound();
+    if (id.length === 0 || id.includes("/")) return notFound();
 
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleGetAccount(request, env, actor, id);
     }
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       return idempotent(request, env, actor, () =>
         handleUpdateAccount(request, env, actor, id),
       );
     }
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       return idempotent(request, env, actor, () =>
         handleSoftDeleteAccount(request, env, actor, id),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
 
   // /api/v1/persons collection
   if (pathname === PERSONS_COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListPersons(request, env, actor);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreatePerson(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
 
   // /api/v1/persons/:id item
   if (pathname.startsWith(PERSONS_ITEM_PREFIX)) {
     const id = pathname.slice(PERSONS_ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
+    if (id.length === 0 || id.includes("/")) return notFound();
 
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleGetPerson(request, env, actor, id);
     }
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       return idempotent(request, env, actor, () =>
         handleUpdatePerson(request, env, actor, id),
       );
     }
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       return idempotent(request, env, actor, () =>
         handleSoftDeletePerson(request, env, actor, id),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
 
   return notFound();
@@ -173,16 +173,16 @@ export function idempotent(
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 function unauthenticated(): Response {
   return new Response(
-    JSON.stringify({ success: false, error: { code: 'UNAUTHENTICATED' } }),
+    JSON.stringify({ success: false, error: { code: "UNAUTHENTICATED" } }),
     {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     },
   );
 }
@@ -191,13 +191,13 @@ function methodNotAllowed(allow: string[]): Response {
   return new Response(
     JSON.stringify({
       success: false,
-      error: { code: 'METHOD_NOT_ALLOWED' },
+      error: { code: "METHOD_NOT_ALLOWED" },
     }),
     {
       status: 405,
       headers: {
-        'Content-Type': 'application/json',
-        Allow: allow.join(', '),
+        "Content-Type": "application/json",
+        Allow: allow.join(", "),
       },
     },
   );
@@ -205,10 +205,10 @@ function methodNotAllowed(allow: string[]): Response {
 
 function notFound(): Response {
   return new Response(
-    JSON.stringify({ success: false, error: { code: 'NOT_FOUND' } }),
+    JSON.stringify({ success: false, error: { code: "NOT_FOUND" } }),
     {
       status: 404,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     },
   );
 }

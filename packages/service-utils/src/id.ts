@@ -1,6 +1,6 @@
-import { customAlphabet } from 'nanoid';
+import { customAlphabet } from "nanoid";
 
-const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
+const ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
 const ID_LENGTH = 21;
 const nano = customAlphabet(ALPHABET, ID_LENGTH);
 
@@ -13,7 +13,7 @@ const nano = customAlphabet(ALPHABET, ID_LENGTH);
  */
 export function generateId(prefix: string): string {
   if (!prefix) {
-    throw new Error('generateId: prefix is required');
+    throw new Error("generateId: prefix is required");
   }
   return `${prefix}_${nano()}`;
 }

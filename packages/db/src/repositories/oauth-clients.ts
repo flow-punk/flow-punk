@@ -6,46 +6,52 @@
  * the OAuth handler reading `count()` before insert; this repo just
  * surfaces the count and never gates writes itself.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq, isNull, lt, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, eq, isNull, lt, sql } from "drizzle-orm";
 
 import {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,
-} from '../schema/mcp-oauth-clients.js';
+} from "../schema/mcp-oauth-clients.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class OauthClientsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
     public readonly detailCode?: string,
   ) {
     super(message);
-    this.name = 'OauthClientsRepoError';
+    this.name = "OauthClientsRepoError";
   }
 }
 
-export async function create(db: Db, input: NewMcpOauthClient): Promise<McpOauthClient> {
+export async function create(
+  db: Db,
+  input: NewMcpOauthClient,
+): Promise<McpOauthClient> {
   try {
     const inserted = await db.insert(mcpOauthClients).values(input).returning();
     const row = inserted[0];
     if (!row) {
-      throw new OauthClientsRepoError('invariant_violation', 'insert returned no row');
+      throw new OauthClientsRepoError(
+        "invariant_violation",
+        "insert returned no row",
+      );
     }
     return row;
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw new OauthClientsRepoError(
-        'wrong_state',
-        'client_id already exists',
-        'CLIENT_ID_TAKEN',
+        "wrong_state",
+        "client_id already exists",
+        "CLIENT_ID_TAKEN",
       );
     }
     throw err;
@@ -94,11 +100,21 @@ export async function listStale(
   return db
     .select()
     .from(mcpOauthClients)
-    .where(and(isNull(mcpOauthClients.lastUsedAt), lt(mcpOauthClients.createdAt, cutoffIso)));
+    .where(
+      and(
+        isNull(mcpOauthClients.lastUsedAt),
+        lt(mcpOauthClients.createdAt, cutoffIso),
+      ),
+    );
 }
 
-export async function deleteByClientId(db: Db, clientId: string): Promise<void> {
-  await db.delete(mcpOauthClients).where(eq(mcpOauthClients.clientId, clientId));
+export async function deleteByClientId(
+  db: Db,
+  clientId: string,
+): Promise<void> {
+  await db
+    .delete(mcpOauthClients)
+    .where(eq(mcpOauthClients.clientId, clientId));
 }
 
 function isUniqueViolation(err: unknown): boolean {

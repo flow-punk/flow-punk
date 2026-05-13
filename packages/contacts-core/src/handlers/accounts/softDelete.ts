@@ -1,12 +1,12 @@
-import { accountsRepo } from '@flowpunk-indie/db';
+import { accountsRepo } from "@flowpunk-indie/db";
 
-import type { Actor, ContactsEnv } from '../../types.js';
+import type { Actor, ContactsEnv } from "../../types.js";
 import {
   emitContactsAudit,
   getDb,
   jsonResponse,
   mapRepoError,
-} from '../_shared.js';
+} from "../_shared.js";
 
 export async function handleSoftDeleteAccount(
   _request: Request,
@@ -20,8 +20,8 @@ export async function handleSoftDeleteAccount(
     const account = await accountsRepo.softDelete(db, id, actor.userId, now);
 
     emitContactsAudit(actor, {
-      action: 'accounts.softDeleted',
-      resourceType: 'account',
+      action: "accounts.softDeleted",
+      resourceType: "account",
       resourceId: account.id,
       detail: {},
     });

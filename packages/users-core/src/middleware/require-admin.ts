@@ -1,10 +1,10 @@
-import { drizzle } from 'drizzle-orm/d1';
-import type { Logger } from '@flowpunk/service-utils';
-import { hasAdminRights, usersRepo, type Role } from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import type { Logger } from "@flowpunk/service-utils";
+import { hasAdminRights, usersRepo, type Role } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
-import { errorResponse } from '../handlers/_shared.js';
-import { parseIdentity } from './identity.js';
+import type { Actor, UsersEnv } from "../types.js";
+import { errorResponse } from "../handlers/_shared.js";
+import { parseIdentity } from "./identity.js";
 
 export type AdminCheckResult =
   | { ok: true; actor: Actor }
@@ -23,23 +23,23 @@ export type AdminCheckResult =
  */
 export function evaluateAdmin(
   actor: Actor | null,
-  user: { role: Role; status: 'active' | 'deleted' } | null,
+  user: { role: Role; status: "active" | "deleted" } | null,
 ): AdminCheckResult {
   if (!actor) {
-    return { ok: false, response: errorResponse(401, 'UNAUTHENTICATED') };
+    return { ok: false, response: errorResponse(401, "UNAUTHENTICATED") };
   }
-  if (actor.credentialType !== 'oauth' && actor.credentialType !== 'session') {
+  if (actor.credentialType !== "oauth" && actor.credentialType !== "session") {
     return {
       ok: false,
       response: errorResponse(
         403,
-        'ADMIN_CREDENTIAL_REQUIRED',
-        'Platform admin operations require session/OAuth authentication.',
+        "ADMIN_CREDENTIAL_REQUIRED",
+        "Platform admin operations require session/OAuth authentication.",
       ),
     };
   }
-  if (!user || user.status !== 'active' || !hasAdminRights(user.role)) {
-    return { ok: false, response: errorResponse(403, 'FORBIDDEN') };
+  if (!user || user.status !== "active" || !hasAdminRights(user.role)) {
+    return { ok: false, response: errorResponse(403, "FORBIDDEN") };
   }
   return { ok: true, actor };
 }
@@ -51,11 +51,11 @@ export async function requireAdmin(
 ): Promise<AdminCheckResult> {
   const actor = parseIdentity(request);
   if (!actor) {
-    logAuthFailure(logger, 'identity_missing', null);
+    logAuthFailure(logger, "identity_missing", null);
     return evaluateAdmin(null, null);
   }
-  if (actor.credentialType !== 'oauth' && actor.credentialType !== 'session') {
-    logAuthFailure(logger, 'non_admin_credential_type', actor);
+  if (actor.credentialType !== "oauth" && actor.credentialType !== "session") {
+    logAuthFailure(logger, "non_admin_credential_type", actor);
     return evaluateAdmin(actor, null);
   }
   const db = drizzle(env.DB);
@@ -66,10 +66,10 @@ export async function requireAdmin(
   });
   const result = evaluateAdmin(actor, user);
   if (!result.ok) {
-    let reason = 'user_not_found';
+    let reason = "user_not_found";
     if (user) {
-      if (user.status !== 'active') reason = 'user_deleted';
-      else if (!hasAdminRights(user.role)) reason = 'role_insufficient';
+      if (user.status !== "active") reason = "user_deleted";
+      else if (!hasAdminRights(user.role)) reason = "role_insufficient";
     }
     logAuthFailure(logger, reason, actor);
   }
@@ -82,7 +82,7 @@ function logAuthFailure(
   actor: Actor | null,
 ): void {
   if (!logger) return;
-  logger.warn('users admin guard rejected request', {
+  logger.warn("users admin guard rejected request", {
     reason,
     ...(actor
       ? {

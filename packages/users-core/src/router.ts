@@ -1,17 +1,17 @@
-import type { Logger } from '@flowpunk/service-utils';
-import { withIdempotency } from '@flowpunk/service-utils';
+import type { Logger } from "@flowpunk/service-utils";
+import { withIdempotency } from "@flowpunk/service-utils";
 
-import { handleCreate } from './handlers/create.js';
-import { handleGet } from './handlers/get.js';
-import { handleList } from './handlers/list.js';
-import { handleSoftDelete } from './handlers/softDelete.js';
-import { handleUpdate } from './handlers/update.js';
-import { requireAdmin } from './middleware/require-admin.js';
-import { requireAuthenticated } from './middleware/require-authenticated.js';
-import type { Actor, UsersEnv } from './types.js';
+import { handleCreate } from "./handlers/create.js";
+import { handleGet } from "./handlers/get.js";
+import { handleList } from "./handlers/list.js";
+import { handleSoftDelete } from "./handlers/softDelete.js";
+import { handleUpdate } from "./handlers/update.js";
+import { requireAdmin } from "./middleware/require-admin.js";
+import { requireAuthenticated } from "./middleware/require-authenticated.js";
+import type { Actor, UsersEnv } from "./types.js";
 
-const COLLECTION_PATH = '/api/v1/users';
-const ITEM_PREFIX = '/api/v1/users/';
+const COLLECTION_PATH = "/api/v1/users";
+const ITEM_PREFIX = "/api/v1/users/";
 
 export async function route(
   request: Request,
@@ -24,33 +24,33 @@ export async function route(
 
   // Liveness probe — runs BEFORE any auth so the worker is reachable
   // without forging headers.
-  if (pathname === '/health') {
-    if (method === 'GET' || method === 'HEAD') {
-      return jsonResponse(200, { ok: true, service: 'users' });
+  if (pathname === "/health") {
+    if (method === "GET" || method === "HEAD") {
+      return jsonResponse(200, { ok: true, service: "users" });
     }
-    return methodNotAllowed(['GET', 'HEAD']);
+    return methodNotAllowed(["GET", "HEAD"]);
   }
 
   // Collection — admin only.
-  if (pathname === COLLECTION_PATH || pathname === COLLECTION_PATH + '/') {
+  if (pathname === COLLECTION_PATH || pathname === COLLECTION_PATH + "/") {
     const guard = await requireAdmin(request, env, logger);
     if (!guard.ok) return guard.response;
     const { actor } = guard;
-    if (method === 'GET') return handleList(request, env);
-    if (method === 'POST') {
+    if (method === "GET") return handleList(request, env);
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreate(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'POST']);
+    return methodNotAllowed(["GET", "POST"]);
   }
 
   // Item — self OR admin for GET/PATCH; admin only for DELETE.
   if (pathname.startsWith(ITEM_PREFIX)) {
     const id = pathname.slice(ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
+    if (id.length === 0 || id.includes("/")) return notFound();
 
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       const guard = await requireAdmin(request, env, logger);
       if (!guard.ok) return guard.response;
       const { actor } = guard;
@@ -59,13 +59,13 @@ export async function route(
       );
     }
 
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       const guard = await requireAuthenticated(request, env);
       if (!guard.ok) return guard.response;
       return handleGet(request, env, guard.actor, guard.isAdmin, id);
     }
 
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       const guard = await requireAuthenticated(request, env);
       if (!guard.ok) return guard.response;
       return idempotent(request, env, guard.actor, () =>
@@ -73,7 +73,7 @@ export async function route(
       );
     }
 
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
 
   return notFound();
@@ -100,7 +100,7 @@ function idempotent(
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -108,13 +108,13 @@ function methodNotAllowed(allow: string[]): Response {
   return new Response(
     JSON.stringify({
       success: false,
-      error: { code: 'METHOD_NOT_ALLOWED' },
+      error: { code: "METHOD_NOT_ALLOWED" },
     }),
     {
       status: 405,
       headers: {
-        'Content-Type': 'application/json',
-        Allow: allow.join(', '),
+        "Content-Type": "application/json",
+        Allow: allow.join(", "),
       },
     },
   );
@@ -122,10 +122,10 @@ function methodNotAllowed(allow: string[]): Response {
 
 function notFound(): Response {
   return new Response(
-    JSON.stringify({ success: false, error: { code: 'NOT_FOUND' } }),
+    JSON.stringify({ success: false, error: { code: "NOT_FOUND" } }),
     {
       status: 404,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     },
   );
 }

@@ -1,7 +1,7 @@
-import { stagesRepo } from '@flowpunk-indie/db';
+import { stagesRepo } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { badRequest, getDb, jsonResponse, mapRepoError } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import { badRequest, getDb, jsonResponse, mapRepoError } from "../_shared.js";
 
 const MAX_LIMIT = 200;
 const PIPELINE_ID_REGEX = /^pipe_[a-z0-9]{21}$/;
@@ -13,34 +13,34 @@ export async function handleListStages(
 ): Promise<Response> {
   const url = new URL(request.url);
 
-  const pipelineIdRaw = url.searchParams.get('pipelineId');
+  const pipelineIdRaw = url.searchParams.get("pipelineId");
   if (pipelineIdRaw === null) {
     return badRequest(
-      'INVALID_INPUT',
-      'pipelineId query parameter is required',
+      "INVALID_INPUT",
+      "pipelineId query parameter is required",
     );
   }
   if (!PIPELINE_ID_REGEX.test(pipelineIdRaw)) {
     return badRequest(
-      'INVALID_INPUT',
+      "INVALID_INPUT",
       'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
 
   let limit: number | undefined;
-  const limitRaw = url.searchParams.get('limit');
+  const limitRaw = url.searchParams.get("limit");
   if (limitRaw !== null) {
     const parsed = Number(limitRaw);
     if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_LIMIT) {
       return badRequest(
-        'INVALID_INPUT',
+        "INVALID_INPUT",
         `limit must be an integer in [1, ${MAX_LIMIT}]`,
       );
     }
     limit = parsed;
   }
 
-  const cursor = url.searchParams.get('cursor');
+  const cursor = url.searchParams.get("cursor");
 
   try {
     const db = getDb(env);

@@ -9,7 +9,7 @@ const textDecoder = new TextDecoder();
 export class BodyTooLargeError extends Error {
   constructor(public readonly maxBytes: number) {
     super(`body exceeds ${maxBytes} bytes`);
-    this.name = 'BodyTooLargeError';
+    this.name = "BodyTooLargeError";
   }
 }
 
@@ -20,21 +20,39 @@ export function parseMaxBodyBytes(rawValue: string): number | null {
 }
 
 export function invalidBodyLimitResponse(requestId: string): Response {
-  return new Response(JSON.stringify({ error: 'invalid_body_limit_configuration' }), {
-    status: 500,
-    headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId },
-  });
+  return new Response(
+    JSON.stringify({ error: "invalid_body_limit_configuration" }),
+    {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      },
+    },
+  );
 }
 
-export function requestTooLargeResponse(maxBytes: number, requestId: string): Response {
-  return new Response(JSON.stringify({ error: 'request_too_large', maxBytes }), {
-    status: 413,
-    headers: { 'Content-Type': 'application/json', 'X-Request-ID': requestId },
-  });
+export function requestTooLargeResponse(
+  maxBytes: number,
+  requestId: string,
+): Response {
+  return new Response(
+    JSON.stringify({ error: "request_too_large", maxBytes }),
+    {
+      status: 413,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      },
+    },
+  );
 }
 
-export function declaredContentLengthTooLarge(headers: Headers, maxBytes: number): boolean {
-  const contentLength = headers.get('Content-Length');
+export function declaredContentLengthTooLarge(
+  headers: Headers,
+  maxBytes: number,
+): boolean {
+  const contentLength = headers.get("Content-Length");
   if (!contentLength) return false;
   const declared = Number(contentLength);
   return Number.isFinite(declared) && declared > maxBytes;
@@ -45,7 +63,7 @@ export async function readRequestTextWithinLimit(
   maxBytes: number,
 ): Promise<string> {
   const stream = request.body;
-  if (!stream) return '';
+  if (!stream) return "";
 
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];

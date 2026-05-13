@@ -9,7 +9,7 @@
 export type BindingMetadata =
   | {
       name: string;
-      type: 'd1';
+      type: "d1";
       /**
        * D1 database UUID. Cloudflare's current Workers Scripts API uses
        * `database_id`; the older `id` field is deprecated but still
@@ -18,22 +18,22 @@ export type BindingMetadata =
        */
       database_id: string;
     }
-  | { name: string; type: 'kv_namespace'; namespace_id: string }
+  | { name: string; type: "kv_namespace"; namespace_id: string }
   | {
       name: string;
-      type: 'service';
+      type: "service";
       service: string;
       environment?: string;
     }
   | {
       name: string;
-      type: 'durable_object_namespace';
+      type: "durable_object_namespace";
       class_name: string;
       script_name?: string;
       environment?: string;
     }
-  | { name: string; type: 'plain_text'; text: string }
-  | { name: string; type: 'secret_text'; text: string };
+  | { name: string; type: "plain_text"; text: string }
+  | { name: string; type: "secret_text"; text: string };
 
 /**
  * Coerce an inbound binding metadata blob (from `getWorkerScript`) to the
@@ -41,52 +41,56 @@ export type BindingMetadata =
  * `database_id`. Unknown / malformed entries are dropped.
  */
 export function normalizeBinding(raw: unknown): BindingMetadata | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
-  if (typeof r.name !== 'string' || typeof r.type !== 'string') return null;
+  if (typeof r.name !== "string" || typeof r.type !== "string") return null;
   switch (r.type) {
-    case 'd1': {
+    case "d1": {
       const databaseId =
-        typeof r.database_id === 'string'
+        typeof r.database_id === "string"
           ? r.database_id
-          : typeof r.id === 'string'
+          : typeof r.id === "string"
             ? r.id
             : null;
       if (!databaseId) return null;
-      return { name: r.name, type: 'd1', database_id: databaseId };
+      return { name: r.name, type: "d1", database_id: databaseId };
     }
-    case 'kv_namespace':
-      if (typeof r.namespace_id !== 'string') return null;
-      return { name: r.name, type: 'kv_namespace', namespace_id: r.namespace_id };
-    case 'service':
-      if (typeof r.service !== 'string') return null;
+    case "kv_namespace":
+      if (typeof r.namespace_id !== "string") return null;
       return {
         name: r.name,
-        type: 'service',
+        type: "kv_namespace",
+        namespace_id: r.namespace_id,
+      };
+    case "service":
+      if (typeof r.service !== "string") return null;
+      return {
+        name: r.name,
+        type: "service",
         service: r.service,
-        ...(typeof r.environment === 'string'
+        ...(typeof r.environment === "string"
           ? { environment: r.environment }
           : {}),
       };
-    case 'durable_object_namespace':
-      if (typeof r.class_name !== 'string') return null;
+    case "durable_object_namespace":
+      if (typeof r.class_name !== "string") return null;
       return {
         name: r.name,
-        type: 'durable_object_namespace',
+        type: "durable_object_namespace",
         class_name: r.class_name,
-        ...(typeof r.script_name === 'string'
+        ...(typeof r.script_name === "string"
           ? { script_name: r.script_name }
           : {}),
-        ...(typeof r.environment === 'string'
+        ...(typeof r.environment === "string"
           ? { environment: r.environment }
           : {}),
       };
-    case 'plain_text':
-      if (typeof r.text !== 'string') return null;
-      return { name: r.name, type: 'plain_text', text: r.text };
-    case 'secret_text':
-      if (typeof r.text !== 'string') return null;
-      return { name: r.name, type: 'secret_text', text: r.text };
+    case "plain_text":
+      if (typeof r.text !== "string") return null;
+      return { name: r.name, type: "plain_text", text: r.text };
+    case "secret_text":
+      if (typeof r.text !== "string") return null;
+      return { name: r.name, type: "secret_text", text: r.text };
     default:
       return null;
   }
@@ -176,16 +180,16 @@ export function mergeBindings(
 export function buildScriptPutFormData(deployment: ScriptDeployment): FormData {
   const fd = new FormData();
   fd.append(
-    'metadata',
+    "metadata",
     new Blob([JSON.stringify(deployment.metadata)], {
-      type: 'application/json',
+      type: "application/json",
     }),
-    'metadata.json',
+    "metadata.json",
   );
   fd.append(
     deployment.mainModuleFilename,
     new Blob([deployment.body as unknown as ArrayBuffer], {
-      type: 'application/javascript+module',
+      type: "application/javascript+module",
     }),
     deployment.mainModuleFilename,
   );

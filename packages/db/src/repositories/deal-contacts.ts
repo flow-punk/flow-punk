@@ -23,24 +23,24 @@
  *   - Deal create/update paths (in repositories/deals.ts) auto-upsert a
  *     row when `primaryPersonId` is set.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, asc, eq, sql } from "drizzle-orm";
 
-import { dealContacts, type DealContact } from '../schema/deal-contacts.js';
-import { deals } from '../schema/deals.js';
+import { dealContacts, type DealContact } from "../schema/deal-contacts.js";
+import { deals } from "../schema/deals.js";
 import {
   type DealHistoryCredentialType,
   type DealHistoryKind,
-} from '../schema/deal-history.js';
-import { persons } from '../schema/persons.js';
+} from "../schema/deal-history.js";
+import { persons } from "../schema/persons.js";
 import {
   DEAL_CONTACT_ROLE_VALUES,
   type DealContactRole,
-} from '../schema/deal-contacts.js';
+} from "../schema/deal-contacts.js";
 import {
   buildHistoryInsertUnconditional,
   generateHistoryId,
-} from './deal-history.js';
+} from "./deal-history.js";
 
 /**
  * Per-mutation context. Same shape as in `repositories/deals.ts`. See
@@ -58,15 +58,15 @@ type Db = DrizzleD1Database<Record<string, never>>;
 export class DealContactsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'already_exists'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "already_exists"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'DealContactsRepoError';
+    this.name = "DealContactsRepoError";
   }
 }
 
@@ -103,21 +103,21 @@ export async function add(
   const { actorId, now } = ctx;
   if (!DEAL_ID_REGEX.test(input.dealId)) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       'dealId must match "deal_<21 lowercase alphanumeric>"',
     );
   }
   if (!PERSON_ID_REGEX.test(input.personId)) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       'personId must match "per_<21 lowercase alphanumeric>"',
     );
   }
   if (input.role !== undefined && input.role !== null) {
-    if (typeof input.role !== 'string' || !ROLE_SET.has(input.role)) {
+    if (typeof input.role !== "string" || !ROLE_SET.has(input.role)) {
       throw new DealContactsRepoError(
-        'invalid_input',
-        `role must be one of: ${DEAL_CONTACT_ROLE_VALUES.join(', ')}`,
+        "invalid_input",
+        `role must be one of: ${DEAL_CONTACT_ROLE_VALUES.join(", ")}`,
       );
     }
   }
@@ -146,7 +146,7 @@ export async function add(
         db.run(
           buildHistoryInsertUnconditional(historyId, {
             dealId: input.dealId,
-            kind: 'contact_added' as DealHistoryKind,
+            kind: "contact_added" as DealHistoryKind,
             changes: payload,
             actorId: ctx.actorId,
             credentialType: ctx.credentialType,
@@ -157,8 +157,8 @@ export async function add(
       const row = (results[0] as DealContact[])[0];
       if (!row) {
         throw new DealContactsRepoError(
-          'invariant_violation',
-          'insert returned no row',
+          "invariant_violation",
+          "insert returned no row",
         );
       }
       return row;
@@ -171,21 +171,21 @@ export async function add(
     const row = inserted[0];
     if (!row) {
       throw new DealContactsRepoError(
-        'invariant_violation',
-        'insert returned no row',
+        "invariant_violation",
+        "insert returned no row",
       );
     }
     return row;
   } catch (err) {
     // SQLite PRIMARY KEY violation surfaces as a UNIQUE-like constraint
     // error. Distinguish via the message; if uncertain, re-query.
-    const message = err instanceof Error ? err.message : '';
+    const message = err instanceof Error ? err.message : "";
     if (
       /UNIQUE constraint|PRIMARY KEY/i.test(message) ||
       /constraint failed/i.test(message)
     ) {
       throw new DealContactsRepoError(
-        'already_exists',
+        "already_exists",
         `person "${input.personId}" is already a contact on deal "${input.dealId}"`,
       );
     }
@@ -210,13 +210,13 @@ export async function remove(
   const { actorId, now } = ctx;
   if (!DEAL_ID_REGEX.test(dealId)) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       'dealId must match "deal_<21 lowercase alphanumeric>"',
     );
   }
   if (!PERSON_ID_REGEX.test(personId)) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       'personId must match "per_<21 lowercase alphanumeric>"',
     );
   }
@@ -267,7 +267,7 @@ export async function remove(
         .where(
           and(
             eq(deals.id, dealId),
-            eq(deals.status, 'active'),
+            eq(deals.status, "active"),
             eq(deals.primaryPersonId, personId),
           ),
         ),
@@ -293,7 +293,7 @@ export async function remove(
         .where(
           and(
             eq(deals.id, dealId),
-            eq(deals.status, 'active'),
+            eq(deals.status, "active"),
             eq(deals.primaryPersonId, personId),
           ),
         ),
@@ -316,7 +316,7 @@ export async function remove(
     | undefined;
   if (!deletedRows || deletedRows.length === 0) {
     throw new DealContactsRepoError(
-      'not_found',
+      "not_found",
       `contact (deal="${dealId}", person="${personId}") not found`,
     );
   }
@@ -329,13 +329,10 @@ export async function remove(
  *
  * Order is `(created_at ASC, person_id ASC)` for stable history.
  */
-export async function listByDeal(
-  db: Db,
-  dealId: string,
-): Promise<ListResult> {
+export async function listByDeal(db: Db, dealId: string): Promise<ListResult> {
   if (!DEAL_ID_REGEX.test(dealId)) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       'dealId must match "deal_<21 lowercase alphanumeric>"',
     );
   }
@@ -387,14 +384,11 @@ async function assertDealActive(db: Db, dealId: string): Promise<void> {
     .limit(1);
   const row = rows[0];
   if (!row) {
-    throw new DealContactsRepoError(
-      'not_found',
-      `deal "${dealId}" not found`,
-    );
+    throw new DealContactsRepoError("not_found", `deal "${dealId}" not found`);
   }
-  if (row.status !== 'active') {
+  if (row.status !== "active") {
     throw new DealContactsRepoError(
-      'wrong_state',
+      "wrong_state",
       `deal "${dealId}" is not active`,
     );
   }
@@ -409,13 +403,13 @@ async function assertPersonActive(db: Db, personId: string): Promise<void> {
   const row = rows[0];
   if (!row) {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       `person "${personId}" not found (person_not_found)`,
     );
   }
-  if (row.status !== 'active') {
+  if (row.status !== "active") {
     throw new DealContactsRepoError(
-      'invalid_input',
+      "invalid_input",
       `person "${personId}" is not active (person_not_active)`,
     );
   }

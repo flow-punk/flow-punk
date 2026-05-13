@@ -5,9 +5,9 @@ import {
   usersRepo,
   type UpdateUserPatch,
   type UserPatchableField,
-} from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
+import type { Actor, UsersEnv } from "../types.js";
 import {
   emitUsersAudit,
   forbidden,
@@ -15,7 +15,7 @@ import {
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from './_shared.js';
+} from "./_shared.js";
 
 /**
  * PATCH /api/v1/users/:id — self OR admin.
@@ -38,7 +38,7 @@ export async function handleUpdate(
   id: string,
 ): Promise<Response> {
   const body = await requireJsonBody<Record<string, unknown>>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
   const patch = body.value;
 
   const isSelf = actor.userId === id;
@@ -52,7 +52,7 @@ export async function handleUpdate(
   for (const key of Object.keys(patch)) {
     if (!isAllowedPatchField(key)) continue; // repo validates immutable + unknown
     if (!isAdmin && !SELF_ALLOWED_PATCH_FIELDS.has(key as UserPatchableField)) {
-      return forbidden('FORBIDDEN_FIELD', `field "${key}" is admin-only`);
+      return forbidden("FORBIDDEN_FIELD", `field "${key}" is admin-only`);
     }
   }
 
@@ -68,8 +68,8 @@ export async function handleUpdate(
     );
     if (result.fieldsChanged.length > 0) {
       emitUsersAudit(actor, {
-        action: 'users.updated',
-        resourceType: 'user',
+        action: "users.updated",
+        resourceType: "user",
         resourceId: id,
         detail: {
           fieldsChanged: result.fieldsChanged.filter((f) =>

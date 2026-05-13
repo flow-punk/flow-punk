@@ -1,5 +1,5 @@
-import { route as oauthRoute } from '@flowpunk-indie/oauth';
-import type { AppContext, Middleware } from '../types.js';
+import { route as oauthRoute } from "@flowpunk-indie/oauth";
+import type { AppContext, Middleware } from "../types.js";
 
 /**
  * Indie-only bootstrap dispatcher for `/auth/login`. Per ADR-019 amendment
@@ -19,7 +19,7 @@ export const indieAuthBootstrapMiddleware: Middleware = async (
   next: () => Promise<Response>,
 ): Promise<Response> => {
   const { pathname } = new URL(ctx.request.url);
-  if (pathname !== '/auth/login') return next();
+  if (pathname !== "/auth/login") return next();
 
   // No session resolution — the entire point of /auth/login is to MINT
   // a session. Pass `null` so the OAuth route's session-aware handlers

@@ -1,23 +1,23 @@
-import { sql } from 'drizzle-orm';
-import { check, index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from "drizzle-orm";
+import { check, index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { pii } from '../utils/pii.js';
+import { pii } from "../utils/pii.js";
 
 const DEAL_HISTORY_KINDS = [
-  'created',
-  'updated',
-  'stage_moved',
-  'soft_deleted',
-  'contact_added',
-  'contact_removed',
+  "created",
+  "updated",
+  "stage_moved",
+  "soft_deleted",
+  "contact_added",
+  "contact_removed",
 ] as const;
 export type DealHistoryKind = (typeof DEAL_HISTORY_KINDS)[number];
 
-const CREDENTIAL_TYPES = ['apikey', 'oauth', 'session', 'system'] as const;
+const CREDENTIAL_TYPES = ["apikey", "oauth", "session", "system"] as const;
 export type DealHistoryCredentialType = (typeof CREDENTIAL_TYPES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Append-only per-tenant timeline of deal + deal_contact mutations.
@@ -46,30 +46,30 @@ const inList = (values: readonly string[]): string =>
  * erasure path. See ADR-022 §10.
  */
 export const dealHistory = sqliteTable(
-  'deal_history',
+  "deal_history",
   {
-    id: text('id').primaryKey(),
-    dealId: text('deal_id').notNull(),
-    kind: text('kind').notNull().$type<DealHistoryKind>(),
-    changes: pii(text('changes')),
-    actorId: text('actor_id').notNull(),
-    credentialType: text('credential_type')
+    id: text("id").primaryKey(),
+    dealId: text("deal_id").notNull(),
+    kind: text("kind").notNull().$type<DealHistoryKind>(),
+    changes: pii(text("changes")),
+    actorId: text("actor_id").notNull(),
+    credentialType: text("credential_type")
       .notNull()
       .$type<DealHistoryCredentialType>(),
-    createdAt: text('created_at').notNull(),
+    createdAt: text("created_at").notNull(),
   },
   (t) => ({
-    dealIdCreatedIdx: index('idx_deal_history_deal_id_created_id').on(
+    dealIdCreatedIdx: index("idx_deal_history_deal_id_created_id").on(
       t.dealId,
       t.createdAt,
       t.id,
     ),
     kindCheck: check(
-      'deal_history_kind_check',
+      "deal_history_kind_check",
       sql.raw(`kind IN (${inList(DEAL_HISTORY_KINDS)})`),
     ),
     credentialTypeCheck: check(
-      'deal_history_credential_type_check',
+      "deal_history_credential_type_check",
       sql.raw(`credential_type IN (${inList(CREDENTIAL_TYPES)})`),
     ),
   }),
@@ -78,4 +78,7 @@ export const dealHistory = sqliteTable(
 export type DealHistoryRow = typeof dealHistory.$inferSelect;
 export type NewDealHistoryRow = typeof dealHistory.$inferInsert;
 
-export { DEAL_HISTORY_KINDS, CREDENTIAL_TYPES as DEAL_HISTORY_CREDENTIAL_TYPES };
+export {
+  DEAL_HISTORY_KINDS,
+  CREDENTIAL_TYPES as DEAL_HISTORY_CREDENTIAL_TYPES,
+};

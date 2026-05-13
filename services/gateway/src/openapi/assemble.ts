@@ -20,7 +20,7 @@ import type {
   TagObject,
   ServerObject,
   SecurityRequirementObject,
-} from './types.js';
+} from "./types.js";
 
 export interface AssembleInput {
   info: InfoObject;
@@ -29,7 +29,15 @@ export interface AssembleInput {
   security?: SecurityRequirementObject[];
 }
 
-const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'patch', 'head', 'options'] as const;
+const HTTP_METHODS = [
+  "get",
+  "put",
+  "post",
+  "delete",
+  "patch",
+  "head",
+  "options",
+] as const;
 
 export function assembleSpec(input: AssembleInput): OpenAPIObject {
   const paths: Record<string, PathItemObject> = {};
@@ -39,25 +47,33 @@ export function assembleSpec(input: AssembleInput): OpenAPIObject {
 
   for (const fragment of input.fragments) {
     mergePaths(paths, fragment.paths);
-    mergeNamed(schemas, fragment.components?.schemas, 'components.schemas');
-    mergeNamed(securitySchemes, fragment.components?.securitySchemes, 'components.securitySchemes');
+    mergeNamed(schemas, fragment.components?.schemas, "components.schemas");
+    mergeNamed(
+      securitySchemes,
+      fragment.components?.securitySchemes,
+      "components.securitySchemes",
+    );
     mergeTags(tagsByName, fragment.tags);
   }
 
   const components: ComponentsObject = {};
   if (Object.keys(schemas).length > 0) components.schemas = schemas;
-  if (Object.keys(securitySchemes).length > 0) components.securitySchemes = securitySchemes;
+  if (Object.keys(securitySchemes).length > 0)
+    components.securitySchemes = securitySchemes;
 
   const result: OpenAPIObject = {
-    openapi: '3.1.0',
+    openapi: "3.1.0",
     info: input.info,
     paths,
     components,
   };
   if (input.servers && input.servers.length > 0) result.servers = input.servers;
-  if (input.security && input.security.length > 0) result.security = input.security;
+  if (input.security && input.security.length > 0)
+    result.security = input.security;
   if (tagsByName.size > 0) {
-    result.tags = Array.from(tagsByName.values()).sort((a, b) => a.name.localeCompare(b.name));
+    result.tags = Array.from(tagsByName.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }
   return result;
 }
@@ -87,8 +103,13 @@ function mergePaths(
       merged[method] = incoming;
     }
     if (Array.isArray(incomingItem.parameters)) {
-      const existingParams = Array.isArray(existing.parameters) ? existing.parameters : [];
-      merged.parameters = [...existingParams, ...(incomingItem.parameters as unknown[])];
+      const existingParams = Array.isArray(existing.parameters)
+        ? existing.parameters
+        : [];
+      merged.parameters = [
+        ...existingParams,
+        ...(incomingItem.parameters as unknown[]),
+      ];
     }
     acc[path] = merged as PathItemObject;
   }

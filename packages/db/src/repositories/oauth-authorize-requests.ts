@@ -7,28 +7,28 @@
  * the form-embedded single-use CSRF nonce. Atomic consume-by-id verifies
  * BOTH and deletes the row in a single statement.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { eq, sql } from "drizzle-orm";
 
 import {
   mcpOauthAuthorizeRequests,
   type McpOauthAuthorizeRequest,
   type NewMcpOauthAuthorizeRequest,
-} from '../schema/mcp-oauth-authorize-requests.js';
+} from "../schema/mcp-oauth-authorize-requests.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class OauthAuthorizeRequestsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'OauthAuthorizeRequestsRepoError';
+    this.name = "OauthAuthorizeRequestsRepoError";
   }
 }
 
@@ -36,12 +36,15 @@ export async function create(
   db: Db,
   input: NewMcpOauthAuthorizeRequest,
 ): Promise<McpOauthAuthorizeRequest> {
-  const inserted = await db.insert(mcpOauthAuthorizeRequests).values(input).returning();
+  const inserted = await db
+    .insert(mcpOauthAuthorizeRequests)
+    .values(input)
+    .returning();
   const row = inserted[0];
   if (!row) {
     throw new OauthAuthorizeRequestsRepoError(
-      'invariant_violation',
-      'insert returned no row',
+      "invariant_violation",
+      "insert returned no row",
     );
   }
   return row;
@@ -98,9 +101,9 @@ interface RunResult {
 }
 
 function getChanges(result: unknown): number {
-  if (!result || typeof result !== 'object') return 0;
+  if (!result || typeof result !== "object") return 0;
   const r = result as RunResult;
-  if (typeof r.changes === 'number') return r.changes;
-  if (r.meta && typeof r.meta.changes === 'number') return r.meta.changes;
+  if (typeof r.changes === "number") return r.changes;
+  if (r.meta && typeof r.meta.changes === "number") return r.meta.changes;
   return 0;
 }

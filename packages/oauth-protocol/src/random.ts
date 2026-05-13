@@ -1,4 +1,4 @@
-import { base64UrlEncode } from './hashing.js';
+import { base64UrlEncode } from "./hashing.js";
 
 export function randomBase64Url(byteLength = 32): string {
   const bytes = new Uint8Array(byteLength);

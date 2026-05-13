@@ -17,30 +17,36 @@
  * exclusions per ADR-017 and are reported as "ok: managed-only excluded"
  * rather than as drift.
  */
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
 import {
   buildScriptMetadata,
   isPubliclyExposed,
   scriptName,
-} from '../src/flow/script-metadata.js';
-import type { BindingMetadata } from '@flowpunk/cf-admin';
-import type { ResourceInventory, ServiceName } from '../src/types.js';
+} from "../src/flow/script-metadata.js";
+import type { BindingMetadata } from "@flowpunk/cf-admin";
+import type { ResourceInventory, ServiceName } from "../src/types.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = resolve(SCRIPT_DIR, '..');
-const INDIE_ROOT = resolve(PKG_ROOT, '..', '..');
+const PKG_ROOT = resolve(SCRIPT_DIR, "..");
+const INDIE_ROOT = resolve(PKG_ROOT, "..", "..");
 
-const SERVICES: ServiceName[] = ['gateway', 'auth', 'contacts', 'pipeline', 'users'];
+const SERVICES: ServiceName[] = [
+  "gateway",
+  "auth",
+  "contacts",
+  "pipeline",
+  "users",
+];
 
 // Service bindings that exist in indie's gateway wrangler.toml but target
 // managed-only services and are EXPECTED to be excluded from CLI metadata.
 const EXPECTED_MANAGED_ONLY_SERVICE_BINDINGS = new Set([
-  'AUTOMATIONS_SERVICE',
-  'FORMINPUTS_SERVICE',
-  'CMS_SERVICE',
+  "AUTOMATIONS_SERVICE",
+  "FORMINPUTS_SERVICE",
+  "CMS_SERVICE",
 ]);
 
 interface TomlConfig {
@@ -68,27 +74,28 @@ function parseToml(text: string): TomlConfig {
     doMigrationTags: [],
   };
 
-  const lines = text.split('\n');
+  const lines = text.split("\n");
   let section: string | null = null;
-  let arrayContext: { type: string; current: Record<string, string> } | null = null;
+  let arrayContext: { type: string; current: Record<string, string> } | null =
+    null;
 
   const commitArray = () => {
     if (!arrayContext) return;
     const { type, current } = arrayContext;
     switch (type) {
-      case 'kv_namespaces':
+      case "kv_namespaces":
         if (current.binding) config.kvBindings.add(current.binding);
         break;
-      case 'd1_databases':
+      case "d1_databases":
         if (current.binding) config.d1Bindings.add(current.binding);
         break;
-      case 'services':
+      case "services":
         if (current.binding) config.serviceBindings.add(current.binding);
         break;
-      case 'durable_objects.bindings':
+      case "durable_objects.bindings":
         if (current.name) config.doBindings.add(current.name);
         break;
-      case 'migrations':
+      case "migrations":
         if (current.tag) config.doMigrationTags.push(current.tag);
         break;
     }
@@ -96,17 +103,17 @@ function parseToml(text: string): TomlConfig {
   };
 
   for (const raw of lines) {
-    const line = raw.replace(/#.*$/, '').trim();
+    const line = raw.replace(/#.*$/, "").trim();
     if (!line) continue;
 
-    if (line.startsWith('[[') && line.endsWith(']]')) {
+    if (line.startsWith("[[") && line.endsWith("]]")) {
       commitArray();
       const name = line.slice(2, -2).trim();
       arrayContext = { type: name, current: {} };
       section = null;
       continue;
     }
-    if (line.startsWith('[') && line.endsWith(']')) {
+    if (line.startsWith("[") && line.endsWith("]")) {
       commitArray();
       section = line.slice(1, -1).trim();
       continue;
@@ -123,14 +130,14 @@ function parseToml(text: string): TomlConfig {
     }
 
     if (section === null) {
-      if (key === 'compatibility_date') {
+      if (key === "compatibility_date") {
         config.compatibilityDate = stripQuotes(value);
-      } else if (key === 'compatibility_flags') {
+      } else if (key === "compatibility_flags") {
         config.compatibilityFlags = parseStringArray(value);
-      } else if (key === 'workers_dev') {
-        config.workersDev = value === 'true';
+      } else if (key === "workers_dev") {
+        config.workersDev = value === "true";
       }
-    } else if (section === 'vars') {
+    } else if (section === "vars") {
       config.vars[key] = stripQuotes(value);
     }
   }
@@ -140,15 +147,15 @@ function parseToml(text: string): TomlConfig {
 }
 
 function stripQuotes(s: string): string {
-  return s.replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+  return s.replace(/^"|"$/g, "").replace(/^'|'$/g, "");
 }
 
 function parseStringArray(s: string): string[] {
   // Match anything between the outermost brackets.
   const m = s.match(/^\[\s*(.*)\s*\]$/);
   if (!m) return [];
-  return (m[1] ?? '')
-    .split(',')
+  return (m[1] ?? "")
+    .split(",")
     .map((p) => stripQuotes(p.trim()))
     .filter(Boolean);
 }
@@ -165,29 +172,29 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
 
   // Build CLI metadata using a fixture inventory.
   const inventory: ResourceInventory = {
-    d1: { id: 'fixture-d1', name: 'fixture' },
+    d1: { id: "fixture-d1", name: "fixture" },
     kv: {
-      MCP_TOOLS_KV: 'kv-1',
-      MCP_SESSIONS_KV: 'kv-2',
-      LAST_USED_KV: 'kv-3',
-      IDEMPOTENCY_KV: 'kv-4',
-      OAUTH_TOKEN_CACHE: 'kv-5',
+      MCP_TOOLS_KV: "kv-1",
+      MCP_SESSIONS_KV: "kv-2",
+      LAST_USED_KV: "kv-3",
+      IDEMPOTENCY_KV: "kv-4",
+      OAUTH_TOKEN_CACHE: "kv-5",
     },
     workers: {
-      gateway: { name: scriptName('flowpunk', 'gateway') },
-      auth: { name: scriptName('flowpunk', 'auth') },
-      contacts: { name: scriptName('flowpunk', 'contacts') },
-      pipeline: { name: scriptName('flowpunk', 'pipeline') },
-      users: { name: scriptName('flowpunk', 'users') },
+      gateway: { name: scriptName("flowpunk", "gateway") },
+      auth: { name: scriptName("flowpunk", "auth") },
+      contacts: { name: scriptName("flowpunk", "contacts") },
+      pipeline: { name: scriptName("flowpunk", "pipeline") },
+      users: { name: scriptName("flowpunk", "users") },
     },
-    doMigrationTag: 'mcp-session-do-v1',
+    doMigrationTag: "mcp-session-do-v1",
   };
   const cli = buildScriptMetadata({
     service,
     inventory,
-    gatewayUrl: 'https://flowpunk-gateway.example.workers.dev',
+    gatewayUrl: "https://flowpunk-gateway.example.workers.dev",
     isFreshDeploy: true,
-    mainModuleFilename: 'index.js',
+    mainModuleFilename: "index.js",
   });
 
   // 1. compatibility_date.
@@ -218,33 +225,37 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
   // 4. Bindings — collect what the CLI emits.
   const cliBindings: BindingMetadata[] = cli.bindings ?? [];
   const cliKv = new Set(
-    cliBindings.filter((b) => b.type === 'kv_namespace').map((b) => b.name),
+    cliBindings.filter((b) => b.type === "kv_namespace").map((b) => b.name),
   );
   const cliD1 = new Set(
-    cliBindings.filter((b) => b.type === 'd1').map((b) => b.name),
+    cliBindings.filter((b) => b.type === "d1").map((b) => b.name),
   );
   const cliService = new Set(
-    cliBindings.filter((b) => b.type === 'service').map((b) => b.name),
+    cliBindings.filter((b) => b.type === "service").map((b) => b.name),
   );
   const cliDo = new Set(
     cliBindings
-      .filter((b) => b.type === 'durable_object_namespace')
+      .filter((b) => b.type === "durable_object_namespace")
       .map((b) => b.name),
   );
   const cliVars = new Set(
     cliBindings
-      .filter((b) => b.type === 'plain_text' || b.type === 'secret_text')
+      .filter((b) => b.type === "plain_text" || b.type === "secret_text")
       .map((b) => b.name),
   );
 
   // 5. KV bindings — must match exactly.
   if (!setsEqual(cliKv, toml.kvBindings)) {
-    errors.push(`KV bindings drift: CLI=${[...cliKv].sort().join(',')} vs toml=${[...toml.kvBindings].sort().join(',')}`);
+    errors.push(
+      `KV bindings drift: CLI=${[...cliKv].sort().join(",")} vs toml=${[...toml.kvBindings].sort().join(",")}`,
+    );
   }
 
   // 6. D1 bindings — must match exactly.
   if (!setsEqual(cliD1, toml.d1Bindings)) {
-    errors.push(`D1 bindings drift: CLI=${[...cliD1].sort().join(',')} vs toml=${[...toml.d1Bindings].sort().join(',')}`);
+    errors.push(
+      `D1 bindings drift: CLI=${[...cliD1].sort().join(",")} vs toml=${[...toml.d1Bindings].sort().join(",")}`,
+    );
   }
 
   // 7. Service bindings — TOML may legitimately have managed-only ones.
@@ -255,39 +266,44 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
   );
   if (unexpectedExtras.length > 0) {
     errors.push(
-      `Service bindings in toml not in CLI (and not in managed-only allowlist): ${unexpectedExtras.join(',')}`,
+      `Service bindings in toml not in CLI (and not in managed-only allowlist): ${unexpectedExtras.join(",")}`,
     );
   }
   const cliExtras = [...cliService].filter((n) => !tomlServiceBindings.has(n));
   if (cliExtras.length > 0) {
-    errors.push(
-      `Service bindings in CLI not in toml: ${cliExtras.join(',')}`,
-    );
+    errors.push(`Service bindings in CLI not in toml: ${cliExtras.join(",")}`);
   }
   if (tomlExtras.length > 0 && unexpectedExtras.length === 0) {
     warnings.push(
-      `Managed-only service bindings excluded from CLI: ${tomlExtras.join(', ')}`,
+      `Managed-only service bindings excluded from CLI: ${tomlExtras.join(", ")}`,
     );
   }
 
   // 8. DO bindings — must match.
   if (!setsEqual(cliDo, toml.doBindings)) {
-    errors.push(`DO bindings drift: CLI=${[...cliDo].sort().join(',')} vs toml=${[...toml.doBindings].sort().join(',')}`);
+    errors.push(
+      `DO bindings drift: CLI=${[...cliDo].sort().join(",")} vs toml=${[...toml.doBindings].sort().join(",")}`,
+    );
   }
 
   // 9. Vars — wrangler.toml [vars] keys must equal CLI plain_text/secret_text bindings.
   const tomlVars = new Set(Object.keys(toml.vars));
   if (!setsEqual(cliVars, tomlVars)) {
     errors.push(
-      `Vars drift: CLI=${[...cliVars].sort().join(',')} vs toml=${[...tomlVars].sort().join(',')}`,
+      `Vars drift: CLI=${[...cliVars].sort().join(",")} vs toml=${[...tomlVars].sort().join(",")}`,
     );
   } else {
     // Same keys — check values too.
     for (const key of cliVars) {
       const cliBinding = cliBindings.find(
-        (b) => b.name === key && (b.type === 'plain_text' || b.type === 'secret_text'),
+        (b) =>
+          b.name === key &&
+          (b.type === "plain_text" || b.type === "secret_text"),
       );
-      if (!cliBinding || (cliBinding.type !== 'plain_text' && cliBinding.type !== 'secret_text')) {
+      if (
+        !cliBinding ||
+        (cliBinding.type !== "plain_text" && cliBinding.type !== "secret_text")
+      ) {
         continue;
       }
       const cliValue = cliBinding.text;
@@ -296,8 +312,8 @@ function diffService(service: ServiceName, toml: TomlConfig): CheckResult {
       // (gateway URL) — wrangler.toml ships them as empty placeholders
       // and `flowpunk init` fills them in from the deployed worker URL,
       // so don't byte-compare.
-      if (key === 'ALLOWED_ORIGINS') continue;
-      if (key === 'GATEWAY_PUBLIC_ORIGIN') continue;
+      if (key === "ALLOWED_ORIGINS") continue;
+      if (key === "GATEWAY_PUBLIC_ORIGIN") continue;
       if (cliValue !== tomlValue) {
         errors.push(`Var ${key}: CLI="${cliValue}" vs toml="${tomlValue}"`);
       }
@@ -316,8 +332,8 @@ function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
 async function main(): Promise<void> {
   let totalErrors = 0;
   for (const service of SERVICES) {
-    const tomlPath = resolve(INDIE_ROOT, 'services', service, 'wrangler.toml');
-    const text = await readFile(tomlPath, 'utf8');
+    const tomlPath = resolve(INDIE_ROOT, "services", service, "wrangler.toml");
+    const text = await readFile(tomlPath, "utf8");
     const toml = parseToml(text);
     const result = diffService(service, toml);
     process.stdout.write(`\n=== ${service} ===\n`);
@@ -329,14 +345,16 @@ async function main(): Promise<void> {
     }
     for (const w of result.warnings) process.stdout.write(`  • ${w}\n`);
   }
-  process.stdout.write('\n');
+  process.stdout.write("\n");
   if (totalErrors > 0) {
     process.stderr.write(
       `${totalErrors} drift error(s) found. Update src/flow/script-metadata.ts to match wrangler.toml (or vice versa).\n`,
     );
     process.exit(1);
   }
-  process.stdout.write('All services: script-metadata.ts matches wrangler.toml.\n');
+  process.stdout.write(
+    "All services: script-metadata.ts matches wrangler.toml.\n",
+  );
 }
 
 main().catch((err) => {

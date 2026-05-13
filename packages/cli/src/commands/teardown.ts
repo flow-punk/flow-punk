@@ -1,14 +1,14 @@
-import * as p from '@clack/prompts';
-import { deleteD1 } from '@flowpunk/cf-admin';
-import { resolveAndVerify } from './helpers.js';
-import { teardownDeployment } from '../flow/provision.js';
+import * as p from "@clack/prompts";
+import { deleteD1 } from "@flowpunk/cf-admin";
+import { resolveAndVerify } from "./helpers.js";
+import { teardownDeployment } from "../flow/provision.js";
 import {
   deleteDeployment,
   deploymentKey,
   readConfig,
-} from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
+} from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
 
 export interface TeardownOpts {
   token?: string;
@@ -25,20 +25,19 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
   if (matching.length === 0) {
     p.note(
-      `No deployment recorded for account ${account.name}.\n${theme.dim('Nothing to delete.')}`,
-      'No deployment',
+      `No deployment recorded for account ${account.name}.\n${theme.dim("Nothing to delete.")}`,
+      "No deployment",
     );
     return;
   }
   if (matching.length > 1 && !opts.prefix) {
     throw new CliError(
-      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(', ')}`,
-      'Pass --prefix <name> to target a specific deployment.',
+      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(", ")}`,
+      "Pass --prefix <name> to target a specific deployment.",
     );
   }
   const dep = matching[0]!;
@@ -52,9 +51,9 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
       `  • 5 workers (gateway + 4 backends)`,
       `  • 6 KV namespaces`,
       ``,
-      theme.dim('  D1 deletion is asked separately after — opt in.'),
-    ].join('\n'),
-    'Teardown plan',
+      theme.dim("  D1 deletion is asked separately after — opt in."),
+    ].join("\n"),
+    "Teardown plan",
   );
 
   const ok1 = await p.confirm({
@@ -62,7 +61,7 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
     initialValue: false,
   });
   if (p.isCancel(ok1) || !ok1) {
-    p.cancel('Cancelled.');
+    p.cancel("Cancelled.");
     process.exit(0);
   }
 
@@ -73,7 +72,7 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
     initialValue: false,
   });
   if (p.isCancel(ok2) || !ok2) {
-    p.cancel('Cancelled.');
+    p.cancel("Cancelled.");
     process.exit(0);
   }
 
@@ -83,7 +82,7 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
   const dbName = dep.resources.d1.name;
   const dbId = dep.resources.d1.id;
   const dropDb = await p.confirm({
-    message: `Also delete the D1 database ${theme.bold(dbName)}? ${theme.warn('(irrecoverable — wipes all data)')}`,
+    message: `Also delete the D1 database ${theme.bold(dbName)}? ${theme.warn("(irrecoverable — wipes all data)")}`,
     initialValue: false,
   });
 
@@ -92,7 +91,7 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
     const typedName = await p.text({
       message: `Type the D1 name ${theme.bold(`"${dbName}"`)} to confirm deletion`,
       validate: (s) =>
-        s === dbName ? undefined : 'Must match exactly. Cancel with Ctrl+C.',
+        s === dbName ? undefined : "Must match exactly. Cancel with Ctrl+C.",
     });
     if (!p.isCancel(typedName)) {
       const spinner = p.spinner();
@@ -100,9 +99,11 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
       try {
         await deleteD1(client, { databaseId: dbId });
         dbDeleted = true;
-        spinner.stop(`${theme.ok('✓')} Deleted D1: ${dbName}`);
+        spinner.stop(`${theme.ok("✓")} Deleted D1: ${dbName}`);
       } catch (err) {
-        spinner.stop(`${theme.error('✗')} D1 delete failed: ${(err as Error).message}`);
+        spinner.stop(
+          `${theme.error("✗")} D1 delete failed: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -112,5 +113,5 @@ export async function teardownCommand(opts: TeardownOpts): Promise<void> {
   const dbLine = dbDeleted
     ? `${theme.dim(`D1 deleted: ${dbName}`)}`
     : `${theme.dim(`D1 retained: ${dbName} (${dbId}). Delete from the CF dashboard if you change your mind.`)}`;
-  p.outro(`${theme.ok('✓')} Teardown complete.\n${dbLine}`);
+  p.outro(`${theme.ok("✓")} Teardown complete.\n${dbLine}`);
 }

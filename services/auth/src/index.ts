@@ -1,9 +1,9 @@
-import { createLogger } from '@flowpunk/service-utils';
+import { createLogger } from "@flowpunk/service-utils";
 import {
   route,
   type AuthCoreOptions,
   type AuthEnv,
-} from '@flowpunk-indie/auth-core';
+} from "@flowpunk-indie/auth-core";
 
 /**
  * Indie auth worker.
@@ -17,14 +17,14 @@ const INDIE_OPTIONS: AuthCoreOptions = {
   maxActiveKeys: 1,
 };
 
-type IndieAuthEnv = Omit<AuthEnv, 'AUTH_OPTIONS'>;
+type IndieAuthEnv = Omit<AuthEnv, "AUTH_OPTIONS">;
 
 export default {
   async fetch(request: Request, env: IndieAuthEnv): Promise<Response> {
     const requestId =
-      request.headers.get('X-Request-ID') ?? crypto.randomUUID();
-    const tenantId = request.headers.get('X-Tenant-Id') ?? undefined;
-    const logger = createLogger({ service: 'auth' })
+      request.headers.get("X-Request-ID") ?? crypto.randomUUID();
+    const tenantId = request.headers.get("X-Tenant-Id") ?? undefined;
+    const logger = createLogger({ service: "auth" })
       .withRequestId(requestId)
       .withTenantId(tenantId);
 
@@ -36,14 +36,14 @@ export default {
       );
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('unhandled error in auth worker', {
+      logger.error("unhandled error in auth worker", {
         error: err,
         method: request.method,
         path: new URL(request.url).pathname,
       });
       return jsonResponse(500, {
         success: false,
-        error: { code: 'INTERNAL_ERROR' },
+        error: { code: "INTERNAL_ERROR" },
       });
     }
   },
@@ -52,8 +52,8 @@ export default {
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
-export type { AuthEnv } from '@flowpunk-indie/auth-core';
+export type { AuthEnv } from "@flowpunk-indie/auth-core";

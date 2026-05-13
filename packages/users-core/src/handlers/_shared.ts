@@ -1,9 +1,9 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
-import type { AuditEvent } from '@flowpunk/service-utils';
-import { UsersRepoError } from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import { createLogger, emitAuditEvent } from "@flowpunk/service-utils";
+import type { AuditEvent } from "@flowpunk/service-utils";
+import { UsersRepoError } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
+import type { Actor, UsersEnv } from "../types.js";
 
 export function getDb(env: UsersEnv) {
   return drizzle(env.DB);
@@ -12,7 +12,7 @@ export function getDb(env: UsersEnv) {
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -40,39 +40,39 @@ export function badRequest(
   return errorResponse(400, code, message, details);
 }
 
-export function notFound(code = 'NOT_FOUND'): Response {
+export function notFound(code = "NOT_FOUND"): Response {
   return errorResponse(404, code);
 }
 
-export function forbidden(code = 'FORBIDDEN', message?: string): Response {
+export function forbidden(code = "FORBIDDEN", message?: string): Response {
   return errorResponse(403, code, message);
 }
 
 export type ReadJsonResult<T> =
-  | { kind: 'none' }
-  | { kind: 'malformed' }
-  | { kind: 'parsed'; value: T };
+  | { kind: "none" }
+  | { kind: "malformed" }
+  | { kind: "parsed"; value: T };
 
 export async function tryReadJson<T>(
   request: Request,
 ): Promise<ReadJsonResult<T>> {
-  const contentType = request.headers.get('Content-Type') ?? '';
-  if (!contentType.includes('application/json')) return { kind: 'none' };
+  const contentType = request.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) return { kind: "none" };
   try {
-    return { kind: 'parsed', value: (await request.json()) as T };
+    return { kind: "parsed", value: (await request.json()) as T };
   } catch {
-    return { kind: 'malformed' };
+    return { kind: "malformed" };
   }
 }
 
 export async function requireJsonBody<T>(
   request: Request,
-): Promise<{ kind: 'ok'; value: T } | { kind: 'err'; response: Response }> {
+): Promise<{ kind: "ok"; value: T } | { kind: "err"; response: Response }> {
   const result = await tryReadJson<T>(request);
-  if (result.kind === 'parsed') return { kind: 'ok', value: result.value };
+  if (result.kind === "parsed") return { kind: "ok", value: result.value };
   return {
-    kind: 'err',
-    response: badRequest('INVALID_BODY', 'request body must be JSON'),
+    kind: "err",
+    response: badRequest("INVALID_BODY", "request body must be JSON"),
   };
 }
 
@@ -93,32 +93,28 @@ export async function requireJsonBody<T>(
 export function mapRepoError(err: unknown): Response {
   if (!(err instanceof UsersRepoError)) throw err;
   switch (err.code) {
-    case 'not_found':
-      return errorResponse(404, 'NOT_FOUND', err.message);
-    case 'invalid_input':
-      return errorResponse(400, 'INVALID_INPUT', err.message);
-    case 'wrong_state':
-      return errorResponse(
-        409,
-        err.detailCode ?? 'WRONG_STATE',
-        err.message,
-      );
-    case 'invariant_violation': {
+    case "not_found":
+      return errorResponse(404, "NOT_FOUND", err.message);
+    case "invalid_input":
+      return errorResponse(400, "INVALID_INPUT", err.message);
+    case "wrong_state":
+      return errorResponse(409, err.detailCode ?? "WRONG_STATE", err.message);
+    case "invariant_violation": {
       if (err.detailCode) {
         return errorResponse(409, err.detailCode, err.message);
       }
-      const logger = createLogger({ service: 'users' });
-      logger.error('users repo invariant violation', {
+      const logger = createLogger({ service: "users" });
+      logger.error("users repo invariant violation", {
         error: err,
         repoCode: err.code,
       });
-      return errorResponse(500, 'INTERNAL_ERROR');
+      return errorResponse(500, "INTERNAL_ERROR");
     }
   }
 }
 
 export function isString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
+  return typeof value === "string" && value.length > 0;
 }
 
 /**
@@ -129,7 +125,7 @@ export function emitUsersAudit(
   actor: Actor,
   event: UsersAuditEventInput,
 ): void {
-  const logger = createLogger({ service: 'users' });
+  const logger = createLogger({ service: "users" });
   emitAuditEvent(logger, {
     ...event,
     actorId: actor.userId,
@@ -140,5 +136,5 @@ export function emitUsersAudit(
 
 type UsersAuditEventInput = Omit<
   AuditEvent,
-  'actorId' | 'actorTenantId' | 'actorCredentialType'
+  "actorId" | "actorTenantId" | "actorCredentialType"
 >;

@@ -1,6 +1,6 @@
-import type { Env, AppContext } from './types.js';
-import { createIndieChain } from './middleware/index.js';
-export { McpSessionDurableObject } from './mcp/index.js';
+import type { Env, AppContext } from "./types.js";
+import { createIndieChain } from "./middleware/index.js";
+export { McpSessionDurableObject } from "./mcp/index.js";
 
 const handler = createIndieChain();
 
@@ -9,7 +9,7 @@ export default {
     const ctx: AppContext = {
       request,
       env,
-      requestId: '',
+      requestId: "",
     };
 
     return handler(ctx);

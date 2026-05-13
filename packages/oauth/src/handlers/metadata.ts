@@ -1,15 +1,15 @@
 import {
   buildAuthorizationServerMetadata,
   buildProtectedResourceMetadata,
-} from '@flowpunk-indie/oauth-protocol';
+} from "@flowpunk-indie/oauth-protocol";
 
-import type { OAuthEnv } from '../env.js';
-import { AS_SCOPES_SUPPORTED, PRM_SCOPES_SUPPORTED } from '../policy.js';
+import type { OAuthEnv } from "../env.js";
+import { AS_SCOPES_SUPPORTED, PRM_SCOPES_SUPPORTED } from "../policy.js";
 import {
   getAllowedResources,
   getIssuerOrigin,
   getProtectedResource,
-} from '../origin.js';
+} from "../origin.js";
 
 export function handleProtectedResourceMetadata(
   request: Request,

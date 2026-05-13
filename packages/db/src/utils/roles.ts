@@ -6,12 +6,12 @@
  * Both editions accept multiple `admin`/`member`/`readonly` rows.
  */
 
-export const ROLE_VALUES = ['owner', 'admin', 'member', 'readonly'] as const;
+export const ROLE_VALUES = ["owner", "admin", "member", "readonly"] as const;
 export type Role = (typeof ROLE_VALUES)[number];
 
 const ROLE_VALUE_SET = new Set<string>(ROLE_VALUES);
 export function isRole(value: unknown): value is Role {
-  return typeof value === 'string' && ROLE_VALUE_SET.has(value);
+  return typeof value === "string" && ROLE_VALUE_SET.has(value);
 }
 
 export interface RolePrivileges {
@@ -60,7 +60,7 @@ export const ROLE_PRIVILEGES: Record<Role, RolePrivileges> = {
 
 /** Admin-equivalent rights: any path that today reads `users.is_admin === true`. */
 export function hasAdminRights(role: Role): boolean {
-  return role === 'owner' || role === 'admin';
+  return role === "owner" || role === "admin";
 }
 
 export function canManageUsers(role: Role): boolean {

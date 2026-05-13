@@ -1,7 +1,12 @@
-import { dealsRepo } from '@flowpunk-indie/db';
+import { dealsRepo } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { buildMutationCtx, getDb, jsonResponse, mapRepoError } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import {
+  buildMutationCtx,
+  getDb,
+  jsonResponse,
+  mapRepoError,
+} from "../_shared.js";
 
 export async function handleSoftDeleteDeal(
   _request: Request,

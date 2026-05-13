@@ -1,7 +1,12 @@
-import { stagesRepo, type CreateStageInput } from '@flowpunk-indie/db';
+import { stagesRepo, type CreateStageInput } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, requireJsonBody } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import {
+  getDb,
+  jsonResponse,
+  mapRepoError,
+  requireJsonBody,
+} from "../_shared.js";
 
 export async function handleCreateStage(
   request: Request,
@@ -9,7 +14,7 @@ export async function handleCreateStage(
   actor: Actor,
 ): Promise<Response> {
   const body = await requireJsonBody<CreateStageInput>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);

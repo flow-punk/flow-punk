@@ -5,9 +5,9 @@ import {
   parseMaxBodyBytes,
   readRequestTextWithinLimit,
   requestTooLargeResponse,
-} from './_lib/body-size.js';
+} from "./_lib/body-size.js";
 
-import { isFormUrlEncodedRequest } from './responses.js';
+import { isFormUrlEncodedRequest } from "./responses.js";
 
 /**
  * Reads a request body bounded by `MAX_REQUEST_BODY_BYTES`. Returns the
@@ -18,7 +18,7 @@ export async function readBody(
   env: { MAX_REQUEST_BODY_BYTES?: string },
   requestId: string,
 ): Promise<string | Response> {
-  const maxBytes = parseMaxBodyBytes(env.MAX_REQUEST_BODY_BYTES ?? '');
+  const maxBytes = parseMaxBodyBytes(env.MAX_REQUEST_BODY_BYTES ?? "");
   if (maxBytes === null) return invalidBodyLimitResponse(requestId);
   if (declaredContentLengthTooLarge(request.headers, maxBytes)) {
     return requestTooLargeResponse(maxBytes, requestId);

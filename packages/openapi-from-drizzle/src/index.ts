@@ -15,7 +15,7 @@
  * column metadata.
  */
 
-import { getTableColumns, type Table } from 'drizzle-orm';
+import { getTableColumns, type Table } from "drizzle-orm";
 
 /**
  * Audit/system columns excluded from POST bodies by default. The tables
@@ -23,14 +23,14 @@ import { getTableColumns, type Table } from 'drizzle-orm';
  * via `options.audit`.
  */
 export const DEFAULT_AUDIT_FIELDS = [
-  'id',
-  'createdAt',
-  'createdBy',
-  'updatedAt',
-  'updatedBy',
-  'deletedAt',
-  'deletedBy',
-  'status',
+  "id",
+  "createdAt",
+  "createdBy",
+  "updatedAt",
+  "updatedBy",
+  "deletedAt",
+  "deletedBy",
+  "status",
 ] as const;
 
 export interface TableToSchemasOptions {
@@ -111,7 +111,7 @@ function buildEntity(
       properties[name] = schema;
     }
   }
-  return { type: 'object', required, properties };
+  return { type: "object", required, properties };
 }
 
 /**
@@ -133,7 +133,7 @@ function buildCreate(
     }
   }
   const result: OpenAPISchema = {
-    type: 'object',
+    type: "object",
     properties,
     additionalProperties: false,
   };
@@ -164,7 +164,7 @@ function buildPatch(
     properties[name] = patchColumnSchema(col, enums[name], nullable.has(name));
   }
   return {
-    type: 'object',
+    type: "object",
     properties,
     additionalProperties: false,
   };
@@ -178,14 +178,14 @@ function patchColumnSchema(
   const baseType = mapColumnType(col);
   if (enumValues) {
     return isNullable
-      ? { type: ['string', 'null'], enum: [...enumValues, null] }
-      : { type: 'string', enum: [...enumValues] };
+      ? { type: ["string", "null"], enum: [...enumValues, null] }
+      : { type: "string", enum: [...enumValues] };
   }
   const schema: Record<string, unknown> = isNullable
-    ? { type: [baseType, 'null'] }
+    ? { type: [baseType, "null"] }
     : { type: baseType };
-  if (baseType === 'object') {
-    schema.additionalProperties = { type: 'string' };
+  if (baseType === "object") {
+    schema.additionalProperties = { type: "string" };
   }
   return schema;
 }
@@ -200,17 +200,17 @@ function columnSchema(
   const isNullable = !col.notNull && !col.hasDefault;
   const schema: Record<string, unknown> = enumValues
     ? isNullable
-      ? { type: ['string', 'null'], enum: [...enumValues, null] }
-      : { type: 'string', enum: [...enumValues] }
+      ? { type: ["string", "null"], enum: [...enumValues, null] }
+      : { type: "string", enum: [...enumValues] }
     : isNullable
-      ? { type: [baseType, 'null'] }
+      ? { type: [baseType, "null"] }
       : { type: baseType };
   // For `mode: 'json'` columns (text-only values per ADR-023 §5 in the
   // custom-fields case), document the map shape as
   // `additionalProperties: { type: 'string' }`. A v2 with typed fields
   // would change this to a richer schema.
-  if (baseType === 'object') {
-    schema.additionalProperties = { type: 'string' };
+  if (baseType === "object") {
+    schema.additionalProperties = { type: "string" };
   }
   if (col.hasDefault) {
     const defaultValue = literalDefault(col);
@@ -223,21 +223,21 @@ function columnSchema(
 
 function mapColumnType(
   col: DrizzleColumn,
-): 'string' | 'integer' | 'number' | 'object' {
+): "string" | "integer" | "number" | "object" {
   // SQLite-specific column types. We only support the dialect this codebase uses.
   const columnType = (col as unknown as { columnType: string }).columnType;
-  if (columnType === 'SQLiteText') return 'string';
-  if (columnType === 'SQLiteInteger') return 'integer';
-  if (columnType === 'SQLiteReal') return 'number';
+  if (columnType === "SQLiteText") return "string";
+  if (columnType === "SQLiteInteger") return "integer";
+  if (columnType === "SQLiteReal") return "number";
   // `text('foo', { mode: 'json' })` — value is a free-form JSON object on
   // the entity row (see ADR-023 for the custom-fields use case). OpenAPI
   // surface is `type: 'object'`. Callers that need a tighter shape can
   // override via `extraResponseProps`.
-  if (columnType === 'SQLiteTextJson') return 'object';
+  if (columnType === "SQLiteTextJson") return "object";
   // Fall back to dataType for any unrecognized SQLite column type.
-  if (col.dataType === 'string') return 'string';
-  if (col.dataType === 'number') return 'number';
-  if (col.dataType === 'json') return 'object';
+  if (col.dataType === "string") return "string";
+  if (col.dataType === "number") return "number";
+  if (col.dataType === "json") return "object";
   throw new Error(
     `openapi-from-drizzle: unsupported column type "${columnType}" / dataType "${col.dataType}"`,
   );
@@ -252,9 +252,9 @@ function mapColumnType(
 function literalDefault(col: DrizzleColumn): unknown {
   const raw = (col as unknown as { default: unknown }).default;
   if (raw === undefined) return undefined;
-  if (typeof raw === 'function') return undefined;
+  if (typeof raw === "function") return undefined;
   // SQL expressions (e.g., `sql\`CURRENT_TIMESTAMP\``) are objects; skip them.
-  if (typeof raw === 'object' && raw !== null) return undefined;
+  if (typeof raw === "object" && raw !== null) return undefined;
   return raw;
 }
 

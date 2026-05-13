@@ -1,10 +1,18 @@
-import { readFile, writeFile, mkdir, chmod, rename, unlink } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
-import type { ConfigFile, DeploymentRecord } from '../types.js';
+import {
+  readFile,
+  writeFile,
+  mkdir,
+  chmod,
+  rename,
+  unlink,
+} from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, dirname } from "node:path";
+import type { ConfigFile, DeploymentRecord } from "../types.js";
 
-const CONFIG_DIR = process.env.FLOWPUNK_CONFIG_DIR ?? join(homedir(), '.flowpunk');
-const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+const CONFIG_DIR =
+  process.env.FLOWPUNK_CONFIG_DIR ?? join(homedir(), ".flowpunk");
+const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
 /**
  * Read the config file, or return an empty config if absent. The file holds
@@ -13,18 +21,18 @@ const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
  */
 export async function readConfig(): Promise<ConfigFile> {
   try {
-    const text = await readFile(CONFIG_FILE, 'utf8');
+    const text = await readFile(CONFIG_FILE, "utf8");
     const parsed = JSON.parse(text) as unknown;
     if (
       parsed &&
-      typeof parsed === 'object' &&
+      typeof parsed === "object" &&
       (parsed as ConfigFile).version === 1 &&
-      typeof (parsed as ConfigFile).deployments === 'object'
+      typeof (parsed as ConfigFile).deployments === "object"
     ) {
       const config = parsed as ConfigFile;
       // Defensive: if any deployment carries an apiToken field, drop it on read.
       for (const dep of Object.values(config.deployments)) {
-        if (dep && 'apiToken' in (dep as unknown as Record<string, unknown>)) {
+        if (dep && "apiToken" in (dep as unknown as Record<string, unknown>)) {
           delete (dep as unknown as Record<string, unknown>).apiToken;
         }
       }
@@ -43,9 +51,9 @@ export async function readConfig(): Promise<ConfigFile> {
  */
 export async function writeConfig(config: ConfigFile): Promise<void> {
   for (const dep of Object.values(config.deployments)) {
-    if (dep && 'apiToken' in (dep as unknown as Record<string, unknown>)) {
+    if (dep && "apiToken" in (dep as unknown as Record<string, unknown>)) {
       throw new Error(
-        'token-store: deployment record carries an `apiToken` field — refusing to write. Tokens must never be persisted.',
+        "token-store: deployment record carries an `apiToken` field — refusing to write. Tokens must never be persisted.",
       );
     }
   }

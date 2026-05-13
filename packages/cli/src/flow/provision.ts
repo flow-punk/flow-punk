@@ -12,7 +12,7 @@ import {
   setWorkersDevSubdomain,
   workerScriptExists,
   type CfClient,
-} from '@flowpunk/cf-admin';
+} from "@flowpunk/cf-admin";
 
 import {
   KV_BINDING_KEYS,
@@ -22,20 +22,20 @@ import {
   type KvBindingKey,
   type ResourceInventory,
   type ServiceName,
-} from '../types.js';
+} from "../types.js";
 import {
   buildScriptMetadata,
   isPubliclyExposed,
   scriptName,
-} from './script-metadata.js';
-import { hashBundle, loadMigrations, loadWorkerBundle } from './bundles.js';
-import { runChecklist, type ChecklistItem } from '../ui/checklist.js';
-import { withRetry } from '../util/retry.js';
-import { seedAdmin } from './seed-admin.js';
-import { mintApiKey } from './mint-api-key.js';
-import { smokeGateway } from './smoke.js';
+} from "./script-metadata.js";
+import { hashBundle, loadMigrations, loadWorkerBundle } from "./bundles.js";
+import { runChecklist, type ChecklistItem } from "../ui/checklist.js";
+import { withRetry } from "../util/retry.js";
+import { seedAdmin } from "./seed-admin.js";
+import { mintApiKey } from "./mint-api-key.js";
+import { smokeGateway } from "./smoke.js";
 
-const DO_MIGRATION_TAG = 'mcp-session-do-v1';
+const DO_MIGRATION_TAG = "mcp-session-do-v1";
 
 export interface ProvisionResult {
   record: DeploymentRecord;
@@ -76,27 +76,27 @@ export async function provisionFresh(
 ): Promise<ProvisionResult> {
   const { prefix } = answers;
   const inventory: ResourceInventory = {
-    d1: { id: '', name: `${prefix}-indie` },
+    d1: { id: "", name: `${prefix}-indie` },
     kv: {
-      MCP_TOOLS_KV: '',
-      MCP_SESSIONS_KV: '',
-      LAST_USED_KV: '',
-      IDEMPOTENCY_KV: '',
-      OAUTH_TOKEN_CACHE: '',
+      MCP_TOOLS_KV: "",
+      MCP_SESSIONS_KV: "",
+      LAST_USED_KV: "",
+      IDEMPOTENCY_KV: "",
+      OAUTH_TOKEN_CACHE: "",
     },
     workers: {
-      gateway: { name: scriptName(prefix, 'gateway') },
-      auth: { name: scriptName(prefix, 'auth') },
-      contacts: { name: scriptName(prefix, 'contacts') },
-      pipeline: { name: scriptName(prefix, 'pipeline') },
-      users: { name: scriptName(prefix, 'users') },
+      gateway: { name: scriptName(prefix, "gateway") },
+      auth: { name: scriptName(prefix, "auth") },
+      contacts: { name: scriptName(prefix, "contacts") },
+      pipeline: { name: scriptName(prefix, "pipeline") },
+      users: { name: scriptName(prefix, "users") },
     },
     doMigrationTag: DO_MIGRATION_TAG,
   };
 
   const bundleHashes: Partial<Record<ServiceName, string>> = {};
-  let cookieValue = '';
-  let apiKey = '';
+  let cookieValue = "";
+  let apiKey = "";
   let accountSubdomain: string | null = null;
 
   const snapshotRecord = (): DeploymentRecord => {
@@ -105,7 +105,7 @@ export async function provisionFresh(
       accountId: answers.accountId,
       accountName: answers.accountName,
       prefix,
-      tokenSource: 'wrangler-oauth',
+      tokenSource: "wrangler-oauth",
       resources: inventory,
       lastDeployedBundleHashes: { ...bundleHashes },
       cliVersionAtLastUpdate: cliVersion,
@@ -127,13 +127,13 @@ export async function provisionFresh(
   // not of any single worker, and must be resolved before the gateway
   // upload.
   items.push({
-    key: 'account.subdomain',
-    label: 'Resolve account workers.dev subdomain',
+    key: "account.subdomain",
+    label: "Resolve account workers.dev subdomain",
     run: async () => {
       accountSubdomain = await withRetry(() => getAccountSubdomain(client));
       if (!accountSubdomain) {
         throw new Error(
-          'No workers.dev subdomain registered on this account. Visit dash.cloudflare.com → Workers & Pages and pick a subdomain, then re-run.',
+          "No workers.dev subdomain registered on this account. Visit dash.cloudflare.com → Workers & Pages and pick a subdomain, then re-run.",
         );
       }
       return accountSubdomain;
@@ -142,10 +142,12 @@ export async function provisionFresh(
 
   // 1. D1.
   items.push({
-    key: 'd1.create',
+    key: "d1.create",
     label: `Create D1: ${inventory.d1.name}`,
     run: async () => {
-      const existing = await withRetry(() => findD1ByName(client, inventory.d1.name));
+      const existing = await withRetry(() =>
+        findD1ByName(client, inventory.d1.name),
+      );
       if (existing) {
         inventory.d1.id = existing.uuid;
         await flush();
@@ -156,14 +158,14 @@ export async function provisionFresh(
       );
       inventory.d1.id = created.uuid;
       await flush();
-      return created.uuid.slice(0, 8) + '…';
+      return created.uuid.slice(0, 8) + "…";
     },
   });
 
   // 2. Migrations.
   items.push({
-    key: 'd1.migrate',
-    label: 'Apply D1 migrations',
+    key: "d1.migrate",
+    label: "Apply D1 migrations",
     run: async () => {
       const migrations = await loadMigrations();
       const result = await migrateD1(client, {
@@ -193,17 +195,17 @@ export async function provisionFresh(
   // so `seedAdmin`'s find-by-email branch matches and reuses it.
   if (options.revokeCredentialsBeforeSeed) {
     items.push({
-      key: 'credentials.revoke',
-      label: 'Revoke existing credentials (retained-D1 reuse)',
+      key: "credentials.revoke",
+      label: "Revoke existing credentials (retained-D1 reuse)",
       run: async () => {
         const tables = [
-          'api_keys',
-          'mcp_sessions',
-          'mcp_oauth_tokens',
-          'mcp_oauth_codes',
-          'mcp_oauth_authorize_requests',
-          'mcp_oauth_clients',
-          'auth_login_tokens',
+          "api_keys",
+          "mcp_sessions",
+          "mcp_oauth_tokens",
+          "mcp_oauth_codes",
+          "mcp_oauth_authorize_requests",
+          "mcp_oauth_clients",
+          "auth_login_tokens",
         ];
         for (const t of tables) {
           await queryD1(client, {
@@ -248,7 +250,7 @@ export async function provisionFresh(
       label: `Upload worker: ${name}`,
       run: async () => {
         if (!accountSubdomain) {
-          throw new Error('account subdomain not resolved');
+          throw new Error("account subdomain not resolved");
         }
         const isFreshDeploy = await isWorkerAbsent(client, name);
         const body = await loadWorkerBundle(service);
@@ -259,12 +261,12 @@ export async function provisionFresh(
           inventory,
           gatewayUrl,
           isFreshDeploy,
-          mainModuleFilename: 'index.js',
+          mainModuleFilename: "index.js",
         });
         await withRetry(() =>
           putWorkerScript(client, {
             scriptName: name,
-            deployment: { metadata, body, mainModuleFilename: 'index.js' },
+            deployment: { metadata, body, mainModuleFilename: "index.js" },
           }),
         );
         // Set workers_dev posture: gateway = on (public), backends = off.
@@ -277,19 +279,19 @@ export async function provisionFresh(
             enabled: isPubliclyExposed(service),
           }),
         );
-        if (service === 'gateway') {
+        if (service === "gateway") {
           inventory.workers.gateway.url = gatewayUrl;
         }
         await flush();
-        return isFreshDeploy ? 'created' : 'updated';
+        return isFreshDeploy ? "created" : "updated";
       },
     });
   }
 
   // 5. Seed admin user + session.
   items.push({
-    key: 'admin.seed',
-    label: 'Seed admin user + session',
+    key: "admin.seed",
+    label: "Seed admin user + session",
     run: async () => {
       const seeded = await seedAdmin(client, {
         databaseId: inventory.d1.id,
@@ -307,11 +309,11 @@ export async function provisionFresh(
   // worker. Hitting it during that window returns Cloudflare's HTML 404
   // (not the worker's JSON 404), which would fail the next step.
   items.push({
-    key: 'gateway.ready',
-    label: 'Wait for gateway to be reachable',
+    key: "gateway.ready",
+    label: "Wait for gateway to be reachable",
     run: async () => {
       const url = inventory.workers.gateway.url;
-      if (!url) throw new Error('Gateway URL not set');
+      if (!url) throw new Error("Gateway URL not set");
       await smokeGateway(url);
       return undefined;
     },
@@ -319,15 +321,15 @@ export async function provisionFresh(
 
   // 6. Mint first API key.
   items.push({
-    key: 'admin.api-key',
-    label: 'Mint first API key',
+    key: "admin.api-key",
+    label: "Mint first API key",
     run: async () => {
       const url = inventory.workers.gateway.url;
-      if (!url) throw new Error('Gateway URL not set');
+      if (!url) throw new Error("Gateway URL not set");
       const minted = await mintApiKey({
         gatewayUrl: url,
         cookieValue,
-        label: 'flowpunk init',
+        label: "flowpunk init",
       });
       apiKey = minted.apiKey;
       return undefined;
@@ -336,11 +338,11 @@ export async function provisionFresh(
 
   // 7. Smoke test.
   items.push({
-    key: 'smoke',
-    label: 'Smoke test GET /health',
+    key: "smoke",
+    label: "Smoke test GET /health",
     run: async () => {
       const url = inventory.workers.gateway.url;
-      if (!url) throw new Error('Gateway URL not set');
+      if (!url) throw new Error("Gateway URL not set");
       await smokeGateway(url);
       return undefined;
     },
@@ -404,7 +406,10 @@ export async function teardownDeployment(
   await runChecklist(items);
 }
 
-async function isWorkerAbsent(client: CfClient, name: string): Promise<boolean> {
+async function isWorkerAbsent(
+  client: CfClient,
+  name: string,
+): Promise<boolean> {
   const exists = await workerScriptExists(client, { scriptName: name });
   return !exists;
 }
@@ -412,6 +417,5 @@ async function isWorkerAbsent(client: CfClient, name: string): Promise<boolean> 
 function kvTitle(prefix: string, key: KvBindingKey): string {
   // Stable, deterministic titles so re-running init can find existing namespaces
   // by `findKvByTitle`. Lowercase, hyphen-separated.
-  return `${prefix}-${key.toLowerCase().replace(/_/g, '-')}`;
+  return `${prefix}-${key.toLowerCase().replace(/_/g, "-")}`;
 }
-

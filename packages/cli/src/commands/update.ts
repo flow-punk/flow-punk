@@ -1,16 +1,16 @@
-import * as p from '@clack/prompts';
-import { resolveAndVerify } from './helpers.js';
+import * as p from "@clack/prompts";
+import { resolveAndVerify } from "./helpers.js";
 import {
   deploymentKey,
   readConfig,
   writeDeployment,
-} from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
-import { updateDeployment } from '../flow/update.js';
-import type { ServiceName } from '../types.js';
+} from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
+import { updateDeployment } from "../flow/update.js";
+import type { ServiceName } from "../types.js";
 
-const CLI_VERSION = '0.0.1-alpha.0';
+const CLI_VERSION = "0.0.1-alpha.0";
 
 export interface UpdateOpts {
   token?: string;
@@ -21,7 +21,13 @@ export interface UpdateOpts {
   service?: string;
 }
 
-const SERVICES: ServiceName[] = ['gateway', 'auth', 'contacts', 'pipeline', 'users'];
+const SERVICES: ServiceName[] = [
+  "gateway",
+  "auth",
+  "contacts",
+  "pipeline",
+  "users",
+];
 
 export async function updateCommand(opts: UpdateOpts): Promise<void> {
   const { client, account } = await resolveAndVerify({
@@ -32,19 +38,18 @@ export async function updateCommand(opts: UpdateOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
   if (matching.length === 0) {
     throw new CliError(
       `No deployment for account ${account.name}`,
-      'Run `flowpunk init` first.',
+      "Run `flowpunk init` first.",
     );
   }
   if (matching.length > 1 && !opts.prefix) {
     throw new CliError(
-      `Multiple deployments: ${matching.map((d) => d.prefix).join(', ')}`,
-      'Pass --prefix <name>.',
+      `Multiple deployments: ${matching.map((d) => d.prefix).join(", ")}`,
+      "Pass --prefix <name>.",
     );
   }
   const dep = matching[0]!;
@@ -52,7 +57,7 @@ export async function updateCommand(opts: UpdateOpts): Promise<void> {
   if (opts.service && !SERVICES.includes(opts.service as ServiceName)) {
     throw new CliError(
       `Unknown service "${opts.service}"`,
-      `Valid: ${SERVICES.join(', ')}`,
+      `Valid: ${SERVICES.join(", ")}`,
     );
   }
 
@@ -62,15 +67,15 @@ export async function updateCommand(opts: UpdateOpts): Promise<void> {
       `Prefix:  ${dep.prefix}`,
       `Mode:    ${
         opts.schemaOnly
-          ? 'schema only'
+          ? "schema only"
           : opts.codeOnly
-            ? 'code only'
+            ? "code only"
             : opts.service
               ? `single service: ${opts.service}`
-              : 'schema + code'
+              : "schema + code"
       }`,
-    ].join('\n'),
-    'Update plan',
+    ].join("\n"),
+    "Update plan",
   );
 
   const outcome = await updateDeployment(client, dep, CLI_VERSION, {
@@ -79,14 +84,17 @@ export async function updateCommand(opts: UpdateOpts): Promise<void> {
     onlyService: opts.service as ServiceName | undefined,
   });
 
-  await writeDeployment(deploymentKey(dep.accountId, dep.prefix), outcome.record);
+  await writeDeployment(
+    deploymentKey(dep.accountId, dep.prefix),
+    outcome.record,
+  );
 
   p.note(
     [
-      `Migrations applied: ${outcome.migrationsApplied.length === 0 ? theme.dim('(none)') : outcome.migrationsApplied.join(', ')}`,
-      `Workers redeployed: ${outcome.workersRedeployed.length === 0 ? theme.dim('(none)') : outcome.workersRedeployed.join(', ')}`,
-      `Workers unchanged:  ${outcome.workersUnchanged.length === 0 ? theme.dim('(none)') : theme.dim(outcome.workersUnchanged.join(', '))}`,
-    ].join('\n'),
-    `${theme.ok('✓')} Update complete`,
+      `Migrations applied: ${outcome.migrationsApplied.length === 0 ? theme.dim("(none)") : outcome.migrationsApplied.join(", ")}`,
+      `Workers redeployed: ${outcome.workersRedeployed.length === 0 ? theme.dim("(none)") : outcome.workersRedeployed.join(", ")}`,
+      `Workers unchanged:  ${outcome.workersUnchanged.length === 0 ? theme.dim("(none)") : theme.dim(outcome.workersUnchanged.join(", "))}`,
+    ].join("\n"),
+    `${theme.ok("✓")} Update complete`,
   );
 }

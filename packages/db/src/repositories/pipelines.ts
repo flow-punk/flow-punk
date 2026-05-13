@@ -15,11 +15,11 @@
  * any active stages or active deals. Enforced by a single conditional
  * UPDATE — atomic vs. concurrent stage/deal inserts.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
-import { deals } from '../schema/deals.js';
+import { deals } from "../schema/deals.js";
 import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
@@ -29,23 +29,23 @@ import {
   type NewPipeline,
   type Pipeline,
   type PipelinePatchableField,
-} from '../schema/pipelines.js';
-import { stages } from '../schema/stages.js';
-import type { Stage, StageTerminalKind } from '../schema/stages.js';
+} from "../schema/pipelines.js";
+import { stages } from "../schema/stages.js";
+import type { Stage, StageTerminalKind } from "../schema/stages.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class PipelinesRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'PipelinesRepoError';
+    this.name = "PipelinesRepoError";
   }
 }
 
@@ -62,7 +62,7 @@ export interface CreatePipelineInput {
   name: string;
   description?: string | null;
   isDefault?: boolean | number;
-  template?: 'standard_sales';
+  template?: "standard_sales";
   stages?: CreatePipelineStageInput[];
 }
 
@@ -108,11 +108,11 @@ export async function create(
 ): Promise<Pipeline> {
   const normalized = validateCreate(input);
   const row: NewPipeline = {
-    id: generateId('pipe'),
+    id: generateId("pipe"),
     name: normalized.name,
     description: normalized.description ?? null,
     isDefault: normalized.isDefault ?? 0,
-    status: 'active',
+    status: "active",
     deletedAt: null,
     deletedBy: null,
     createdAt: now,
@@ -126,8 +126,8 @@ export async function create(
     const pipeline = inserted[0];
     if (!pipeline) {
       throw new PipelinesRepoError(
-        'invariant_violation',
-        'insert returned no row',
+        "invariant_violation",
+        "insert returned no row",
       );
     }
     return pipeline;
@@ -135,8 +135,8 @@ export async function create(
     // Partial unique index violation (default-pipeline collision).
     if (isUniqueDefaultViolation(err)) {
       throw new PipelinesRepoError(
-        'wrong_state',
-        'another active pipeline is already marked default',
+        "wrong_state",
+        "another active pipeline is already marked default",
       );
     }
     throw err;
@@ -148,12 +148,12 @@ const STANDARD_SALES_STAGES: Array<{
   terminalKind?: StageTerminalKind | null;
   probability?: number | null;
 }> = [
-  { name: 'New', probability: 10 },
-  { name: 'Qualified', probability: 25 },
-  { name: 'Proposal', probability: 50 },
-  { name: 'Agreement', probability: 75 },
-  { name: 'Complete', terminalKind: 'won', probability: 100 },
-  { name: 'Closed Lost', terminalKind: 'lost', probability: 0 },
+  { name: "New", probability: 10 },
+  { name: "Qualified", probability: 25 },
+  { name: "Proposal", probability: 50 },
+  { name: "Agreement", probability: 75 },
+  { name: "Complete", terminalKind: "won", probability: 100 },
+  { name: "Closed Lost", terminalKind: "lost", probability: 0 },
 ];
 
 export async function createWithStandardStages(
@@ -165,13 +165,13 @@ export async function createWithStandardStages(
   const stageInputs = resolvePipelineStageInputs(input);
   const pipeline = await create(db, input, actorId, now);
   const stageRows = stageInputs.map((stage) => ({
-    id: generateId('stag'),
+    id: generateId("stag"),
     pipelineId: pipeline.id,
     name: stage.name,
     position: stage.position,
     terminalKind: stage.terminalKind ?? null,
     probability: stage.probability ?? null,
-    status: 'active' as const,
+    status: "active" as const,
     deletedAt: null,
     deletedBy: null,
     createdAt: now,
@@ -181,11 +181,14 @@ export async function createWithStandardStages(
   }));
 
   try {
-    const insertedStages = await db.insert(stages).values(stageRows).returning();
+    const insertedStages = await db
+      .insert(stages)
+      .values(stageRows)
+      .returning();
     if (insertedStages.length !== stageRows.length) {
       throw new PipelinesRepoError(
-        'invariant_violation',
-        'pipeline stage insert returned an unexpected row count',
+        "invariant_violation",
+        "pipeline stage insert returned an unexpected row count",
       );
     }
     return { pipeline, stages: insertedStages };
@@ -199,60 +202,77 @@ export async function createWithStandardStages(
   }
 }
 
-function resolvePipelineStageInputs(input: CreatePipelineInput): CreatePipelineStageInput[] {
+function resolvePipelineStageInputs(
+  input: CreatePipelineInput,
+): CreatePipelineStageInput[] {
   const hasTemplate = input.template !== undefined;
   const hasStages = input.stages !== undefined;
   if (hasTemplate && hasStages) {
     throw new PipelinesRepoError(
-      'invalid_input',
-      'provide either template or stages, not both',
+      "invalid_input",
+      "provide either template or stages, not both",
     );
   }
   if (hasStages) return validateCustomStages(input.stages);
-  if (hasTemplate && input.template !== 'standard_sales') {
+  if (hasTemplate && input.template !== "standard_sales") {
     throw new PipelinesRepoError(
-      'invalid_input',
+      "invalid_input",
       'template must be "standard_sales"',
     );
   }
-  return STANDARD_SALES_STAGES.map((stage, position) => ({ ...stage, position }));
+  return STANDARD_SALES_STAGES.map((stage, position) => ({
+    ...stage,
+    position,
+  }));
 }
 
 function validateCustomStages(value: unknown): CreatePipelineStageInput[] {
   if (!Array.isArray(value)) {
-    throw new PipelinesRepoError('invalid_input', 'stages must be an array');
+    throw new PipelinesRepoError("invalid_input", "stages must be an array");
   }
-  if (value.length < MIN_PIPELINE_STAGES || value.length > MAX_PIPELINE_STAGES) {
+  if (
+    value.length < MIN_PIPELINE_STAGES ||
+    value.length > MAX_PIPELINE_STAGES
+  ) {
     throw new PipelinesRepoError(
-      'invalid_input',
+      "invalid_input",
       `stages must contain ${MIN_PIPELINE_STAGES}-${MAX_PIPELINE_STAGES} items`,
     );
   }
 
   const seenPositions = new Set<number>();
   const out = value.map((raw, index) => {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new PipelinesRepoError('invalid_input', `stages[${index}] must be an object`);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new PipelinesRepoError(
+        "invalid_input",
+        `stages[${index}] must be an object`,
+      );
     }
     const stage = raw as Record<string, unknown>;
-    if (typeof stage.name !== 'string') {
-      throw new PipelinesRepoError('invalid_input', `stages[${index}].name is required`);
+    if (typeof stage.name !== "string") {
+      throw new PipelinesRepoError(
+        "invalid_input",
+        `stages[${index}].name is required`,
+      );
     }
     const name = stage.name.trim();
     validateName(name);
 
     if (
-      typeof stage.position !== 'number' ||
+      typeof stage.position !== "number" ||
       !Number.isInteger(stage.position) ||
       stage.position < 0
     ) {
       throw new PipelinesRepoError(
-        'invalid_input',
+        "invalid_input",
         `stages[${index}].position must be a non-negative integer`,
       );
     }
     if (seenPositions.has(stage.position)) {
-      throw new PipelinesRepoError('invalid_input', 'stage positions must be unique');
+      throw new PipelinesRepoError(
+        "invalid_input",
+        "stage positions must be unique",
+      );
     }
     seenPositions.add(stage.position);
 
@@ -260,11 +280,11 @@ function validateCustomStages(value: unknown): CreatePipelineStageInput[] {
     if (
       terminalKind !== undefined &&
       terminalKind !== null &&
-      terminalKind !== 'won' &&
-      terminalKind !== 'lost'
+      terminalKind !== "won" &&
+      terminalKind !== "lost"
     ) {
       throw new PipelinesRepoError(
-        'invalid_input',
+        "invalid_input",
         `stages[${index}].terminalKind must be "won" or "lost"`,
       );
     }
@@ -273,13 +293,13 @@ function validateCustomStages(value: unknown): CreatePipelineStageInput[] {
     if (
       probability !== undefined &&
       probability !== null &&
-      (typeof probability !== 'number' ||
+      (typeof probability !== "number" ||
         !Number.isFinite(probability) ||
         probability < 0 ||
         probability > 100)
     ) {
       throw new PipelinesRepoError(
-        'invalid_input',
+        "invalid_input",
         `stages[${index}].probability must be a number in [0, 100]`,
       );
     }
@@ -296,14 +316,14 @@ function validateCustomStages(value: unknown): CreatePipelineStageInput[] {
   for (let i = 0; i < sortedPositions.length; i++) {
     if (sortedPositions[i] !== i) {
       throw new PipelinesRepoError(
-        'invalid_input',
-        'stage positions must be contiguous starting at 0',
+        "invalid_input",
+        "stage positions must be contiguous starting at 0",
       );
     }
   }
-  if (!out.some((stage) => stage.terminalKind === 'won')) {
+  if (!out.some((stage) => stage.terminalKind === "won")) {
     throw new PipelinesRepoError(
-      'invalid_input',
+      "invalid_input",
       'custom pipeline stages must include at least one terminalKind "won" stage',
     );
   }
@@ -323,16 +343,19 @@ export async function findById(
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!options.includeDeleted && row.status !== 'active') return null;
+  if (!options.includeDeleted && row.status !== "active") return null;
   return row;
 }
 
-export async function list(db: Db, options: ListOptions = {}): Promise<ListResult> {
+export async function list(
+  db: Db,
+  options: ListOptions = {},
+): Promise<ListResult> {
   const limit = clampLimit(options.limit);
   const cursor = options.cursor ? decodeCursor(options.cursor) : null;
 
   const filters = [];
-  if (!options.includeDeleted) filters.push(eq(pipelines.status, 'active'));
+  if (!options.includeDeleted) filters.push(eq(pipelines.status, "active"));
   if (cursor) {
     filters.push(
       or(
@@ -382,13 +405,13 @@ export async function update(
   for (const key of Object.keys(patch)) {
     if (isImmutablePatchField(key)) {
       throw new PipelinesRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is immutable`,
       );
     }
     if (!isAllowedPatchField(key)) {
       throw new PipelinesRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is not patchable`,
       );
     }
@@ -403,7 +426,7 @@ export async function update(
     if (value === null) {
       if (!NULLABLE_PATCH_FIELDS.has(field)) {
         throw new PipelinesRepoError(
-          'invalid_input',
+          "invalid_input",
           `field "${field}" cannot be null`,
         );
       }
@@ -420,7 +443,7 @@ export async function update(
   if (fieldsChanged.length === 0) {
     const current = await findById(db, id);
     if (!current) {
-      throw new PipelinesRepoError('not_found', `pipeline "${id}" not found`);
+      throw new PipelinesRepoError("not_found", `pipeline "${id}" not found`);
     }
     return { pipeline: current, fieldsChanged: [] };
   }
@@ -429,7 +452,7 @@ export async function update(
     const updated = await db
       .update(pipelines)
       .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-      .where(and(eq(pipelines.id, id), eq(pipelines.status, 'active')))
+      .where(and(eq(pipelines.id, id), eq(pipelines.status, "active")))
       .returning();
 
     const row = updated[0];
@@ -441,11 +464,11 @@ export async function update(
         .limit(1);
       if (existing[0]) {
         throw new PipelinesRepoError(
-          'wrong_state',
+          "wrong_state",
           `pipeline "${id}" is not active`,
         );
       }
-      throw new PipelinesRepoError('not_found', `pipeline "${id}" not found`);
+      throw new PipelinesRepoError("not_found", `pipeline "${id}" not found`);
     }
 
     return { pipeline: row, fieldsChanged };
@@ -453,8 +476,8 @@ export async function update(
     if (err instanceof PipelinesRepoError) throw err;
     if (isUniqueDefaultViolation(err)) {
       throw new PipelinesRepoError(
-        'wrong_state',
-        'another active pipeline is already marked default',
+        "wrong_state",
+        "another active pipeline is already marked default",
       );
     }
     throw err;
@@ -476,7 +499,7 @@ export async function softDelete(
   const updated = await db
     .update(pipelines)
     .set({
-      status: 'deleted',
+      status: "deleted",
       deletedAt: now,
       deletedBy: actorId,
       updatedAt: now,
@@ -485,7 +508,7 @@ export async function softDelete(
     .where(
       and(
         eq(pipelines.id, id),
-        eq(pipelines.status, 'active'),
+        eq(pipelines.status, "active"),
         sql`NOT EXISTS (SELECT 1 FROM stages WHERE pipeline_id = ${id} AND status = 'active')`,
         sql`NOT EXISTS (SELECT 1 FROM deals WHERE pipeline_id = ${id} AND status = 'active')`,
       ),
@@ -502,11 +525,11 @@ export async function softDelete(
     .where(eq(pipelines.id, id))
     .limit(1);
   if (!existing[0]) {
-    throw new PipelinesRepoError('not_found', `pipeline "${id}" not found`);
+    throw new PipelinesRepoError("not_found", `pipeline "${id}" not found`);
   }
-  if (existing[0].status !== 'active') {
+  if (existing[0].status !== "active") {
     throw new PipelinesRepoError(
-      'wrong_state',
+      "wrong_state",
       `pipeline "${id}" is already deleted`,
     );
   }
@@ -514,27 +537,27 @@ export async function softDelete(
   const stageCount = await db
     .select({ id: stages.id })
     .from(stages)
-    .where(and(eq(stages.pipelineId, id), eq(stages.status, 'active')))
+    .where(and(eq(stages.pipelineId, id), eq(stages.status, "active")))
     .limit(1);
   if (stageCount[0]) {
     throw new PipelinesRepoError(
-      'wrong_state',
+      "wrong_state",
       `pipeline "${id}" has active stages`,
     );
   }
   const dealCount = await db
     .select({ id: deals.id })
     .from(deals)
-    .where(and(eq(deals.pipelineId, id), eq(deals.status, 'active')))
+    .where(and(eq(deals.pipelineId, id), eq(deals.status, "active")))
     .limit(1);
   if (dealCount[0]) {
     throw new PipelinesRepoError(
-      'wrong_state',
+      "wrong_state",
       `pipeline "${id}" has active deals`,
     );
   }
   throw new PipelinesRepoError(
-    'invariant_violation',
+    "invariant_violation",
     `pipeline "${id}" softDelete failed for unknown reason`,
   );
 }
@@ -548,16 +571,16 @@ interface NormalizedCreate {
 }
 
 function validateCreate(input: CreatePipelineInput): NormalizedCreate {
-  if (typeof input.name !== 'string') {
+  if (typeof input.name !== "string") {
     throw new PipelinesRepoError(
-      'invalid_input',
-      'name is required and must be a string',
+      "invalid_input",
+      "name is required and must be a string",
     );
   }
   const out: NormalizedCreate = { name: input.name.trim() };
   validateName(out.name);
 
-  if ('description' in input) {
+  if ("description" in input) {
     if (input.description === null || input.description === undefined) {
       out.description = null;
     } else {
@@ -566,7 +589,7 @@ function validateCreate(input: CreatePipelineInput): NormalizedCreate {
     }
   }
 
-  if ('isDefault' in input && input.isDefault !== undefined) {
+  if ("isDefault" in input && input.isDefault !== undefined) {
     out.isDefault = normalizeIsDefault(input.isDefault);
   }
 
@@ -575,64 +598,67 @@ function validateCreate(input: CreatePipelineInput): NormalizedCreate {
 
 function validateField(field: PipelinePatchableField, value: unknown): void {
   switch (field) {
-    case 'name':
-      if (typeof value !== 'string') {
-        throw new PipelinesRepoError('invalid_input', 'name must be a string');
+    case "name":
+      if (typeof value !== "string") {
+        throw new PipelinesRepoError("invalid_input", "name must be a string");
       }
       validateName(value.trim());
       return;
-    case 'description':
+    case "description":
       validateDescription(value);
       return;
-    case 'isDefault':
+    case "isDefault":
       // normalize handles range; just type-check here
-      if (typeof value !== 'boolean' && typeof value !== 'number') {
+      if (typeof value !== "boolean" && typeof value !== "number") {
         throw new PipelinesRepoError(
-          'invalid_input',
-          'isDefault must be a boolean or 0/1',
+          "invalid_input",
+          "isDefault must be a boolean or 0/1",
         );
       }
       return;
   }
 }
 
-function normalizeField(field: PipelinePatchableField, value: unknown): unknown {
-  if (field === 'name' && typeof value === 'string') return value.trim();
-  if (field === 'description' && typeof value === 'string') {
+function normalizeField(
+  field: PipelinePatchableField,
+  value: unknown,
+): unknown {
+  if (field === "name" && typeof value === "string") return value.trim();
+  if (field === "description" && typeof value === "string") {
     return value.trim();
   }
-  if (field === 'isDefault') return normalizeIsDefault(value as any);
+  if (field === "isDefault") return normalizeIsDefault(value as any);
   return value;
 }
 
 function normalizeIsDefault(raw: boolean | number): number {
-  if (typeof raw === 'boolean') return raw ? 1 : 0;
+  if (typeof raw === "boolean") return raw ? 1 : 0;
   if (raw === 0 || raw === 1) return raw;
   throw new PipelinesRepoError(
-    'invalid_input',
-    'isDefault must be a boolean or 0/1',
+    "invalid_input",
+    "isDefault must be a boolean or 0/1",
   );
 }
 
 function validateName(value: string): void {
   if (value.length < NAME_MIN || value.length > NAME_MAX) {
     throw new PipelinesRepoError(
-      'invalid_input',
+      "invalid_input",
       `name must be ${NAME_MIN}-${NAME_MAX} characters`,
     );
   }
 }
 
 function validateDescription(value: unknown): void {
-  if (typeof value !== 'string') {
+  if (typeof value !== "string") {
     throw new PipelinesRepoError(
-      'invalid_input',
-      'description must be a string',
+      "invalid_input",
+      "description must be a string",
     );
   }
   if (value.length > DESCRIPTION_MAX) {
     throw new PipelinesRepoError(
-      'invalid_input',
+      "invalid_input",
       `description must be ≤ ${DESCRIPTION_MAX} characters`,
     );
   }
@@ -640,10 +666,10 @@ function validateDescription(value: unknown): void {
 
 function clampLimit(raw: unknown): number {
   if (raw === undefined || raw === null) return DEFAULT_LIMIT;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new PipelinesRepoError(
-      'invalid_input',
-      'limit must be a positive integer',
+      "invalid_input",
+      "limit must be a positive integer",
     );
   }
   return Math.min(raw, MAX_LIMIT);
@@ -671,57 +697,53 @@ export function decodeCursor(raw: string): CursorPayload {
   try {
     json = base64UrlDecode(raw);
   } catch {
-    throw new PipelinesRepoError('invalid_input', 'malformed cursor');
+    throw new PipelinesRepoError("invalid_input", "malformed cursor");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new PipelinesRepoError('invalid_input', 'malformed cursor');
+    throw new PipelinesRepoError("invalid_input", "malformed cursor");
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    throw new PipelinesRepoError('invalid_input', 'malformed cursor');
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new PipelinesRepoError("invalid_input", "malformed cursor");
   }
   const obj = parsed as Record<string, unknown>;
   const keys = Object.keys(obj);
   if (
     keys.length !== 2 ||
-    !keys.includes('createdAt') ||
-    !keys.includes('id') ||
-    typeof obj.createdAt !== 'string' ||
-    typeof obj.id !== 'string'
+    !keys.includes("createdAt") ||
+    !keys.includes("id") ||
+    typeof obj.createdAt !== "string" ||
+    typeof obj.id !== "string"
   ) {
-    throw new PipelinesRepoError('invalid_input', 'malformed cursor');
+    throw new PipelinesRepoError("invalid_input", "malformed cursor");
   }
   return { createdAt: obj.createdAt, id: obj.id };
 }
 
 function base64UrlEncode(input: string): string {
   const utf8 = new TextEncoder().encode(input);
-  let bin = '';
+  let bin = "";
   for (const byte of utf8) bin += String.fromCharCode(byte);
-  const b64 = typeof btoa === 'function' ? btoa(bin) : nodeBtoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = typeof btoa === "function" ? btoa(bin) : nodeBtoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): string {
   const padded =
-    input.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (input.length % 4)) % 4);
-  const bin = typeof atob === 'function' ? atob(padded) : nodeAtob(padded);
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (input.length % 4)) % 4);
+  const bin = typeof atob === "function" ? atob(padded) : nodeAtob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
 
 function nodeBtoa(s: string): string {
-  return Buffer.from(s, 'binary').toString('base64');
+  return Buffer.from(s, "binary").toString("base64");
 }
 
 function nodeAtob(s: string): string {
-  return Buffer.from(s, 'base64').toString('binary');
+  return Buffer.from(s, "base64").toString("binary");
 }

@@ -1,14 +1,14 @@
-import * as p from '@clack/prompts';
+import * as p from "@clack/prompts";
 import {
   findD1ByName,
   getWorkersDevSubdomainEnabled,
   workerScriptExists,
-} from '@flowpunk/cf-admin';
-import { resolveAndVerify } from './helpers.js';
-import { readConfig } from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
-import type { ServiceName } from '../types.js';
+} from "@flowpunk/cf-admin";
+import { resolveAndVerify } from "./helpers.js";
+import { readConfig } from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
+import type { ServiceName } from "../types.js";
 
 export interface DoctorOpts {
   token?: string;
@@ -31,24 +31,23 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
 
   if (matching.length === 0) {
     p.note(
-      `No deployment recorded for account ${account.name} (${account.id}).\n${theme.dim('Run `flowpunk init` to provision.')}`,
-      'No deployment',
+      `No deployment recorded for account ${account.name} (${account.id}).\n${theme.dim("Run `flowpunk init` to provision.")}`,
+      "No deployment",
     );
     return;
   }
 
   for (const dep of matching) {
-    p.intro(`${theme.brand('●')} ${dep.accountName} / ${dep.prefix}`);
+    p.intro(`${theme.brand("●")} ${dep.accountName} / ${dep.prefix}`);
     const checks: CheckResult[] = [];
 
     // Token verified during resolveAndVerify.
-    checks.push({ label: 'Token verified', ok: true });
+    checks.push({ label: "Token verified", ok: true });
 
     // D1.
     try {
@@ -56,7 +55,7 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
       checks.push({
         label: `D1 reachable: ${dep.resources.d1.name}`,
         ok: d1 !== null,
-        detail: d1 ? d1.uuid.slice(0, 8) + '…' : 'not found',
+        detail: d1 ? d1.uuid.slice(0, 8) + "…" : "not found",
       });
     } catch (err) {
       checks.push({
@@ -67,14 +66,20 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
     }
 
     // Workers + workers_dev posture.
-    for (const svc of ['gateway', 'auth', 'contacts', 'pipeline', 'users'] as ServiceName[]) {
+    for (const svc of [
+      "gateway",
+      "auth",
+      "contacts",
+      "pipeline",
+      "users",
+    ] as ServiceName[]) {
       const name = dep.resources.workers[svc].name;
       try {
         const exists = await workerScriptExists(client, { scriptName: name });
         checks.push({
           label: `Worker deployed: ${name}`,
           ok: exists,
-          detail: exists ? undefined : 'not found',
+          detail: exists ? undefined : "not found",
         });
       } catch (err) {
         checks.push({
@@ -105,7 +110,12 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
       // Backends NOT publicly reachable (security invariant per ADR-017).
       // Source of truth is the CF API — NOT an HTTP probe, which can falsely
       // pass when a publicly enabled worker just happens to return 404 for `/`.
-      for (const svc of ['auth', 'contacts', 'pipeline', 'users'] as ServiceName[]) {
+      for (const svc of [
+        "auth",
+        "contacts",
+        "pipeline",
+        "users",
+      ] as ServiceName[]) {
         const backendName = dep.resources.workers[svc].name;
         try {
           const enabled = await getWorkersDevSubdomainEnabled(client, {
@@ -115,8 +125,8 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
             label: `Backend not public: ${backendName}`,
             ok: enabled === false,
             detail: enabled
-              ? 'workers.dev subdomain ENABLED — security regression!'
-              : 'workers.dev disabled',
+              ? "workers.dev subdomain ENABLED — security regression!"
+              : "workers.dev disabled",
           });
         } catch (err) {
           checks.push({
@@ -136,7 +146,7 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
         checks.push({
           label: `Gateway publicly reachable`,
           ok: enabled === true,
-          detail: enabled ? 'workers.dev enabled' : 'workers.dev DISABLED',
+          detail: enabled ? "workers.dev enabled" : "workers.dev DISABLED",
         });
       } catch (err) {
         checks.push({
@@ -148,12 +158,12 @@ export async function doctorCommand(opts: DoctorOpts): Promise<void> {
     }
 
     for (const c of checks) {
-      const mark = c.ok ? theme.ok('✓') : theme.error('✗');
-      const tail = c.detail ? ` ${theme.dim(c.detail)}` : '';
+      const mark = c.ok ? theme.ok("✓") : theme.error("✗");
+      const tail = c.detail ? ` ${theme.dim(c.detail)}` : "";
       process.stdout.write(`  ${mark} ${c.label}${tail}\n`);
     }
     if (checks.some((c) => !c.ok)) {
-      throw new CliError('One or more health checks failed');
+      throw new CliError("One or more health checks failed");
     }
   }
 }

@@ -1,8 +1,5 @@
-import { drizzle } from 'drizzle-orm/d1';
-import {
-  oauthAuthorizeRequestsRepo,
-  oauthCodesRepo,
-} from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import { oauthAuthorizeRequestsRepo, oauthCodesRepo } from "@flowpunk-indie/db";
 import {
   isExpired,
   isoNow,
@@ -10,18 +7,18 @@ import {
   randomBase64Url,
   randomOpaqueId,
   sha256Hex,
-} from '@flowpunk-indie/oauth-protocol';
-import { clearCookie, parseCookies } from '../_lib/cookies.js';
+} from "@flowpunk-indie/oauth-protocol";
+import { clearCookie, parseCookies } from "../_lib/cookies.js";
 
-import type { OAuthEnv } from '../env.js';
+import type { OAuthEnv } from "../env.js";
 import {
   AUTH_CODE_TTL_SECONDS,
   AUTHORIZE_REQUEST_COOKIE,
   OAUTH_ACTOR,
-} from '../policy.js';
-import { safeFormUrlEncoded } from '../body.js';
-import { getIssuerOrigin } from '../origin.js';
-import { oauthJsonError, oauthRedirectError } from '../responses.js';
+} from "../policy.js";
+import { safeFormUrlEncoded } from "../body.js";
+import { getIssuerOrigin } from "../origin.js";
+import { oauthJsonError, oauthRedirectError } from "../responses.js";
 
 export interface ApproveSession {
   userId: string;
@@ -51,10 +48,10 @@ export function isApproveOriginAllowed(
   request: Request,
   issuerOrigin: string,
 ): boolean {
-  const origin = request.headers.get('Origin');
+  const origin = request.headers.get("Origin");
   if (origin === issuerOrigin) return true;
-  if (origin === null || origin === 'null') {
-    return request.headers.get('Sec-Fetch-Site') === 'same-origin';
+  if (origin === null || origin === "null") {
+    return request.headers.get("Sec-Fetch-Site") === "same-origin";
   }
   return false;
 }
@@ -82,43 +79,43 @@ export async function handleApprove(
   try {
     issuerOrigin = getIssuerOrigin(env, request);
   } catch {
-    return oauthJsonError(500, 'server_error');
+    return oauthJsonError(500, "server_error");
   }
   if (!isApproveOriginAllowed(request, issuerOrigin)) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
 
   // Form parse with body-size guard.
   const form = await safeFormUrlEncoded(request, env, requestId);
   if (form instanceof Response) return form;
-  if (!form) return oauthJsonError(400, 'invalid_request');
+  if (!form) return oauthJsonError(400, "invalid_request");
 
-  const arId = form.get('request_id');
-  const decision = form.get('decision');
-  const csrfNonce = form.get('csrf_nonce');
+  const arId = form.get("request_id");
+  const decision = form.get("decision");
+  const csrfNonce = form.get("csrf_nonce");
   if (
-    typeof arId !== 'string' ||
-    typeof decision !== 'string' ||
-    typeof csrfNonce !== 'string' ||
+    typeof arId !== "string" ||
+    typeof decision !== "string" ||
+    typeof csrfNonce !== "string" ||
     csrfNonce.length === 0
   ) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
 
   // Session required — the OAuth handler does not validate; the gateway
   // dispatcher does and passes the result.
   if (!session) {
-    return oauthJsonError(401, 'invalid_token', 'session_required');
+    return oauthJsonError(401, "invalid_token", "session_required");
   }
 
   const db = drizzle(env.DB);
   const ar = await oauthAuthorizeRequestsRepo.findById(db, arId);
   if (!ar || isExpired(ar.expiresAt)) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
 
   const cookieValue = parseCookies(request).get(AUTHORIZE_REQUEST_COOKIE);
-  if (!cookieValue) return oauthJsonError(400, 'invalid_request');
+  if (!cookieValue) return oauthJsonError(400, "invalid_request");
 
   const cookieHash = await sha256Hex(cookieValue);
   const submittedNonceHash = await sha256Hex(csrfNonce);
@@ -141,11 +138,11 @@ export async function handleApprove(
     cookieHash,
     submittedNonceHash,
   );
-  if (!consumed) return oauthJsonError(400, 'invalid_request');
+  if (!consumed) return oauthJsonError(400, "invalid_request");
 
-  if (decision !== 'approve') {
+  if (decision !== "approve") {
     return withClearedApprovalCookie(
-      oauthRedirectError(redirectUri, 'access_denied', state),
+      oauthRedirectError(redirectUri, "access_denied", state),
     );
   }
 
@@ -172,14 +169,14 @@ export async function handleApprove(
   });
 
   const redirect = new URL(redirectUri);
-  redirect.searchParams.set('code', code);
-  redirect.searchParams.set('state', state);
+  redirect.searchParams.set("code", code);
+  redirect.searchParams.set("state", state);
   return withClearedApprovalCookie(Response.redirect(redirect.toString(), 302));
 }
 
 function withClearedApprovalCookie(response: Response): Response {
   const headers = new Headers(response.headers);
-  headers.append('Set-Cookie', clearCookie(AUTHORIZE_REQUEST_COOKIE));
+  headers.append("Set-Cookie", clearCookie(AUTHORIZE_REQUEST_COOKIE));
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

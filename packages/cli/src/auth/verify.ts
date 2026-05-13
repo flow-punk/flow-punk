@@ -1,4 +1,4 @@
-import { parseEnvelope, type CfClient } from '@flowpunk/cf-admin';
+import { parseEnvelope, type CfClient } from "@flowpunk/cf-admin";
 
 export interface AccountSummary {
   id: string;
@@ -15,8 +15,10 @@ export interface AccountSummary {
  * tokens wrangler stores. A successful `/accounts` response is the
  * canonical evidence a token works for what we need.
  */
-export async function listAccounts(client: CfClient): Promise<AccountSummary[]> {
-  const response = await client.request('/accounts');
+export async function listAccounts(
+  client: CfClient,
+): Promise<AccountSummary[]> {
+  const response = await client.request("/accounts");
   type AccountWire = { id: string; name: string };
   const accounts = await parseEnvelope<AccountWire[]>(response);
   return accounts.map((a) => ({ id: a.id, name: a.name }));

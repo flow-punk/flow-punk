@@ -1,23 +1,23 @@
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
 import {
   check,
   index,
   primaryKey,
   sqliteTable,
   text,
-} from 'drizzle-orm/sqlite-core';
+} from "drizzle-orm/sqlite-core";
 
 const DEAL_CONTACT_ROLES = [
-  'decision_maker',
-  'champion',
-  'billing',
-  'technical',
-  'other',
+  "decision_maker",
+  "champion",
+  "billing",
+  "technical",
+  "other",
 ] as const;
 export type DealContactRole = (typeof DEAL_CONTACT_ROLES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Deal contacts (many-to-many between `deals` and `persons`).
@@ -58,23 +58,21 @@ const inList = (values: readonly string[]): string =>
  * a PII-bearing row but is itself an opaque id.
  */
 export const dealContacts = sqliteTable(
-  'deal_contacts',
+  "deal_contacts",
   {
-    dealId: text('deal_id').notNull(),
-    personId: text('person_id').notNull(),
-    role: text('role').$type<DealContactRole>(),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
+    dealId: text("deal_id").notNull(),
+    personId: text("person_id").notNull(),
+    role: text("role").$type<DealContactRole>(),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
   },
   (t) => ({
     pk: primaryKey({ columns: [t.dealId, t.personId] }),
-    dealIdIdx: index('idx_deal_contacts_deal_id').on(t.dealId),
-    personIdIdx: index('idx_deal_contacts_person_id').on(t.personId),
+    dealIdIdx: index("idx_deal_contacts_deal_id").on(t.dealId),
+    personIdIdx: index("idx_deal_contacts_person_id").on(t.personId),
     roleCheck: check(
-      'deal_contacts_role_check',
-      sql.raw(
-        `role IS NULL OR role IN (${inList(DEAL_CONTACT_ROLES)})`,
-      ),
+      "deal_contacts_role_check",
+      sql.raw(`role IS NULL OR role IN (${inList(DEAL_CONTACT_ROLES)})`),
     ),
   }),
 );

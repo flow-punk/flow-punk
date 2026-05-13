@@ -1,5 +1,5 @@
-import type { IdentityHeaderValues } from '@flowpunk/gateway/auth';
-import type { IdempotencyKvNamespace } from '@flowpunk/service-utils';
+import type { IdentityHeaderValues } from "@flowpunk/gateway/auth";
+import type { IdempotencyKvNamespace } from "@flowpunk/service-utils";
 
 /**
  * Edition-agnostic options handed in by the wrapper. Indie wrappers pass
@@ -45,7 +45,7 @@ export interface Actor {
   userId: string;
   tenantId: string;
   scope: string;
-  credentialType: IdentityHeaderValues['credentialType'];
+  credentialType: IdentityHeaderValues["credentialType"];
   credentialId?: string;
   clientId?: string;
 }

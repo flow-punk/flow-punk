@@ -11,9 +11,9 @@
  * `tenant_id` is intentionally absent (single-tenant indie per ADR-011);
  * isolation is the deploy itself.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, desc, eq, lt, or } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, desc, eq, lt, or } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
 import {
   ALLOWED_PATCH_FIELDS,
@@ -24,21 +24,21 @@ import {
   type Account,
   type AccountPatchableField,
   type NewAccount,
-} from '../schema/accounts.js';
+} from "../schema/accounts.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class AccountsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'AccountsRepoError';
+    this.name = "AccountsRepoError";
   }
 }
 
@@ -110,7 +110,7 @@ export async function create(
   const normalized = validateCreate(input);
 
   const row: NewAccount = {
-    id: generateId('acct'),
+    id: generateId("acct"),
     displayName: normalized.displayName,
     domain: normalized.domain ?? null,
     website: normalized.website ?? null,
@@ -131,7 +131,7 @@ export async function create(
     phone2Ext: normalized.phone2Ext ?? null,
     imageLogo: normalized.imageLogo ?? null,
     ownerUserId: normalized.ownerUserId ?? null,
-    status: 'active',
+    status: "active",
     deletedAt: null,
     deletedBy: null,
     createdAt: now,
@@ -144,8 +144,8 @@ export async function create(
   const account = inserted[0];
   if (!account) {
     throw new AccountsRepoError(
-      'invariant_violation',
-      'insert returned no row',
+      "invariant_violation",
+      "insert returned no row",
     );
   }
   return account;
@@ -163,16 +163,19 @@ export async function findById(
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!options.includeDeleted && row.status !== 'active') return null;
+  if (!options.includeDeleted && row.status !== "active") return null;
   return row;
 }
 
-export async function list(db: Db, options: ListOptions = {}): Promise<ListResult> {
+export async function list(
+  db: Db,
+  options: ListOptions = {},
+): Promise<ListResult> {
   const limit = clampLimit(options.limit);
   const cursor = options.cursor ? decodeCursor(options.cursor) : null;
 
   const filters = [];
-  if (!options.includeDeleted) filters.push(eq(accounts.status, 'active'));
+  if (!options.includeDeleted) filters.push(eq(accounts.status, "active"));
   if (cursor) {
     filters.push(
       or(
@@ -223,13 +226,13 @@ export async function update(
   for (const key of Object.keys(patch)) {
     if (isImmutablePatchField(key)) {
       throw new AccountsRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is immutable`,
       );
     }
     if (!isAllowedPatchField(key)) {
       throw new AccountsRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is not patchable`,
       );
     }
@@ -247,7 +250,7 @@ export async function update(
     if (value === null) {
       if (!NULLABLE_PATCH_FIELDS.has(field)) {
         throw new AccountsRepoError(
-          'invalid_input',
+          "invalid_input",
           `field "${field}" cannot be null`,
         );
       }
@@ -264,7 +267,7 @@ export async function update(
   if (fieldsChanged.length === 0) {
     const current = await findById(db, id);
     if (!current) {
-      throw new AccountsRepoError('not_found', `account "${id}" not found`);
+      throw new AccountsRepoError("not_found", `account "${id}" not found`);
     }
     return { account: current, fieldsChanged: [] };
   }
@@ -272,7 +275,7 @@ export async function update(
   const updated = await db
     .update(accounts)
     .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-    .where(and(eq(accounts.id, id), eq(accounts.status, 'active')))
+    .where(and(eq(accounts.id, id), eq(accounts.status, "active")))
     .returning();
 
   const row = updated[0];
@@ -285,11 +288,11 @@ export async function update(
       .limit(1);
     if (existing[0]) {
       throw new AccountsRepoError(
-        'wrong_state',
+        "wrong_state",
         `account "${id}" is not active`,
       );
     }
-    throw new AccountsRepoError('not_found', `account "${id}" not found`);
+    throw new AccountsRepoError("not_found", `account "${id}" not found`);
   }
 
   return { account: row, fieldsChanged };
@@ -304,13 +307,13 @@ export async function softDelete(
   const updated = await db
     .update(accounts)
     .set({
-      status: 'deleted',
+      status: "deleted",
       deletedAt: now,
       deletedBy: actorId,
       updatedAt: now,
       updatedBy: actorId,
     })
-    .where(and(eq(accounts.id, id), eq(accounts.status, 'active')))
+    .where(and(eq(accounts.id, id), eq(accounts.status, "active")))
     .returning();
 
   const row = updated[0];
@@ -322,11 +325,11 @@ export async function softDelete(
       .limit(1);
     if (existing[0]) {
       throw new AccountsRepoError(
-        'wrong_state',
+        "wrong_state",
         `account "${id}" is already deleted`,
       );
     }
-    throw new AccountsRepoError('not_found', `account "${id}" not found`);
+    throw new AccountsRepoError("not_found", `account "${id}" not found`);
   }
   return row;
 }
@@ -338,10 +341,10 @@ interface NormalizedCreate extends CreateAccountInput {
 }
 
 function validateCreate(input: CreateAccountInput): NormalizedCreate {
-  if (typeof input.displayName !== 'string') {
+  if (typeof input.displayName !== "string") {
     throw new AccountsRepoError(
-      'invalid_input',
-      'displayName is required and must be a string',
+      "invalid_input",
+      "displayName is required and must be a string",
     );
   }
   const out: NormalizedCreate = {
@@ -352,7 +355,7 @@ function validateCreate(input: CreateAccountInput): NormalizedCreate {
   const inputRecord = input as unknown as Record<string, unknown>;
   const outRecord = out as unknown as Record<string, unknown>;
   for (const field of ALLOWED_PATCH_FIELDS) {
-    if (field === 'displayName') continue;
+    if (field === "displayName") continue;
     if (!(field in inputRecord)) continue;
     const value = inputRecord[field];
     if (value === undefined || value === null) {
@@ -367,82 +370,92 @@ function validateCreate(input: CreateAccountInput): NormalizedCreate {
 
 function validateField(field: AccountPatchableField, value: unknown): void {
   switch (field) {
-    case 'displayName':
-      if (typeof value !== 'string') {
+    case "displayName":
+      if (typeof value !== "string") {
         throw new AccountsRepoError(
-          'invalid_input',
-          'displayName must be a string',
+          "invalid_input",
+          "displayName must be a string",
         );
       }
       validateDisplayName(value.trim());
       return;
-    case 'domain':
+    case "domain":
       validateDomain(value);
       return;
-    case 'website':
-      validateUrl('website', value);
+    case "website":
+      validateUrl("website", value);
       return;
-    case 'industry':
-      validateString('industry', value, 1, 64);
+    case "industry":
+      validateString("industry", value, 1, 64);
       return;
-    case 'streetLine1':
-    case 'streetLine2':
-    case 'city':
-    case 'region':
+    case "streetLine1":
+    case "streetLine2":
+    case "city":
+    case "region":
       validateString(field, value, 1, ADDRESS_MAX);
       return;
-    case 'postalCode':
+    case "postalCode":
       validateString(field, value, 1, POSTAL_CODE_MAX);
       return;
-    case 'country':
-      if (typeof value !== 'string' || !COUNTRY_REGEX.test(value)) {
+    case "country":
+      if (typeof value !== "string" || !COUNTRY_REGEX.test(value)) {
         throw new AccountsRepoError(
-          'invalid_input',
+          "invalid_input",
           'country must be ISO 3166-1 alpha-2 (e.g. "US")',
         );
       }
       return;
-    case 'latitude':
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < -90 || value > 90) {
+    case "latitude":
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < -90 ||
+        value > 90
+      ) {
         throw new AccountsRepoError(
-          'invalid_input',
-          'latitude must be a number in [-90, 90]',
+          "invalid_input",
+          "latitude must be a number in [-90, 90]",
         );
       }
       return;
-    case 'longitude':
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < -180 || value > 180) {
+    case "longitude":
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < -180 ||
+        value > 180
+      ) {
         throw new AccountsRepoError(
-          'invalid_input',
-          'longitude must be a number in [-180, 180]',
+          "invalid_input",
+          "longitude must be a number in [-180, 180]",
         );
       }
       return;
-    case 'phone1CountryCode':
-    case 'phone2CountryCode':
-      if (typeof value !== 'string' || !PHONE_COUNTRY_CODE_REGEX.test(value)) {
+    case "phone1CountryCode":
+    case "phone2CountryCode":
+      if (typeof value !== "string" || !PHONE_COUNTRY_CODE_REGEX.test(value)) {
         throw new AccountsRepoError(
-          'invalid_input',
+          "invalid_input",
           `${field} must match "+NN" (1-3 digits)`,
         );
       }
       return;
-    case 'phone1Number':
-    case 'phone2Number':
+    case "phone1Number":
+    case "phone2Number":
       validateString(field, value, 1, PHONE_NUMBER_MAX);
       return;
-    case 'phone1Ext':
-    case 'phone2Ext':
+    case "phone1Ext":
+    case "phone2Ext":
       validateString(field, value, 1, PHONE_EXT_MAX);
       return;
-    case 'imageLogo':
-      validateUrl('imageLogo', value);
+    case "imageLogo":
+      validateUrl("imageLogo", value);
       return;
-    case 'ownerUserId':
-      if (typeof value !== 'string' || !USER_ID_REGEX.test(value)) {
+    case "ownerUserId":
+      if (typeof value !== "string" || !USER_ID_REGEX.test(value)) {
         throw new AccountsRepoError(
-          'invalid_input',
-          'ownerUserId must be 1-64 chars [A-Za-z0-9_-]',
+          "invalid_input",
+          "ownerUserId must be 1-64 chars [A-Za-z0-9_-]",
         );
       }
       return;
@@ -450,16 +463,17 @@ function validateField(field: AccountPatchableField, value: unknown): void {
 }
 
 function normalizeField(field: AccountPatchableField, value: unknown): unknown {
-  if (field === 'displayName' && typeof value === 'string') return value.trim();
-  if (field === 'domain' && typeof value === 'string') return value.trim().toLowerCase();
-  if (typeof value === 'string') return value.trim();
+  if (field === "displayName" && typeof value === "string") return value.trim();
+  if (field === "domain" && typeof value === "string")
+    return value.trim().toLowerCase();
+  if (typeof value === "string") return value.trim();
   return value;
 }
 
 function validateDisplayName(value: string): void {
   if (value.length < DISPLAY_NAME_MIN || value.length > DISPLAY_NAME_MAX) {
     throw new AccountsRepoError(
-      'invalid_input',
+      "invalid_input",
       `displayName must be ${DISPLAY_NAME_MIN}-${DISPLAY_NAME_MAX} characters`,
     );
   }
@@ -471,57 +485,60 @@ function validateString(
   min: number,
   max: number,
 ): void {
-  if (typeof value !== 'string') {
-    throw new AccountsRepoError('invalid_input', `${field} must be a string`);
+  if (typeof value !== "string") {
+    throw new AccountsRepoError("invalid_input", `${field} must be a string`);
   }
   const trimmed = value.trim();
   if (trimmed.length < min || trimmed.length > max) {
     throw new AccountsRepoError(
-      'invalid_input',
+      "invalid_input",
       `${field} must be ${min}-${max} characters`,
     );
   }
 }
 
 function validateUrl(field: string, value: unknown): void {
-  if (typeof value !== 'string') {
-    throw new AccountsRepoError('invalid_input', `${field} must be a string`);
+  if (typeof value !== "string") {
+    throw new AccountsRepoError("invalid_input", `${field} must be a string`);
   }
   if (value.length > URL_MAX) {
     throw new AccountsRepoError(
-      'invalid_input',
+      "invalid_input",
       `${field} exceeds ${URL_MAX} characters`,
     );
   }
   try {
     const url = new URL(value);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new Error('non-http');
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("non-http");
     }
   } catch {
-    throw new AccountsRepoError('invalid_input', `${field} must be an http(s) URL`);
+    throw new AccountsRepoError(
+      "invalid_input",
+      `${field} must be an http(s) URL`,
+    );
   }
 }
 
 function validateDomain(value: unknown): void {
-  if (typeof value !== 'string') {
-    throw new AccountsRepoError('invalid_input', 'domain must be a string');
+  if (typeof value !== "string") {
+    throw new AccountsRepoError("invalid_input", "domain must be a string");
   }
   const lower = value.trim().toLowerCase();
   if (!DOMAIN_REGEX.test(lower)) {
     throw new AccountsRepoError(
-      'invalid_input',
-      'domain must be a valid DNS-shaped hostname',
+      "invalid_input",
+      "domain must be a valid DNS-shaped hostname",
     );
   }
 }
 
 function clampLimit(raw: unknown): number {
   if (raw === undefined || raw === null) return DEFAULT_LIMIT;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new AccountsRepoError(
-      'invalid_input',
-      'limit must be a positive integer',
+      "invalid_input",
+      "limit must be a positive integer",
     );
   }
   return Math.min(raw, MAX_LIMIT);
@@ -544,48 +561,44 @@ export function decodeCursor(raw: string): CursorPayload {
   try {
     json = base64UrlDecode(raw);
   } catch {
-    throw new AccountsRepoError('invalid_input', 'malformed cursor');
+    throw new AccountsRepoError("invalid_input", "malformed cursor");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new AccountsRepoError('invalid_input', 'malformed cursor');
+    throw new AccountsRepoError("invalid_input", "malformed cursor");
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    throw new AccountsRepoError('invalid_input', 'malformed cursor');
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new AccountsRepoError("invalid_input", "malformed cursor");
   }
   const obj = parsed as Record<string, unknown>;
   const keys = Object.keys(obj);
   if (
     keys.length !== 2 ||
-    !keys.includes('createdAt') ||
-    !keys.includes('id') ||
-    typeof obj.createdAt !== 'string' ||
-    typeof obj.id !== 'string'
+    !keys.includes("createdAt") ||
+    !keys.includes("id") ||
+    typeof obj.createdAt !== "string" ||
+    typeof obj.id !== "string"
   ) {
-    throw new AccountsRepoError('invalid_input', 'malformed cursor');
+    throw new AccountsRepoError("invalid_input", "malformed cursor");
   }
   return { createdAt: obj.createdAt, id: obj.id };
 }
 
 function base64UrlEncode(input: string): string {
   const utf8 = new TextEncoder().encode(input);
-  let bin = '';
+  let bin = "";
   for (const byte of utf8) bin += String.fromCharCode(byte);
-  const b64 = typeof btoa === 'function' ? btoa(bin) : nodeBtoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = typeof btoa === "function" ? btoa(bin) : nodeBtoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): string {
   const padded =
-    input.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (input.length % 4)) % 4);
-  const bin = typeof atob === 'function' ? atob(padded) : nodeAtob(padded);
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (input.length % 4)) % 4);
+  const bin = typeof atob === "function" ? atob(padded) : nodeAtob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
@@ -594,9 +607,9 @@ function base64UrlDecode(input: string): string {
 function nodeBtoa(s: string): string {
   // Workers and modern Node both expose `btoa`; this branch exists only as a
   // belt-and-braces fallback for unit tests under older Node.
-  return Buffer.from(s, 'binary').toString('base64');
+  return Buffer.from(s, "binary").toString("base64");
 }
 
 function nodeAtob(s: string): string {
-  return Buffer.from(s, 'base64').toString('binary');
+  return Buffer.from(s, "base64").toString("binary");
 }

@@ -25,9 +25,9 @@
  */
 
 const DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-const DEFAULT_HEADER_NAME = 'X-Idempotency-Key';
+const DEFAULT_HEADER_NAME = "X-Idempotency-Key";
 const DEFAULT_MAX_KEY_LENGTH = 255;
-const REPLAY_HEADER = 'Idempotency-Replayed';
+const REPLAY_HEADER = "Idempotency-Replayed";
 
 /**
  * Minimal structural KV interface so this package avoids a hard dependency
@@ -90,7 +90,7 @@ export async function withIdempotency(
     return jsonResponse(400, {
       success: false,
       error: {
-        code: 'INVALID_IDEMPOTENCY_KEY',
+        code: "INVALID_IDEMPOTENCY_KEY",
         message: `${headerName} must be between 1 and ${maxKeyLength} characters.`,
       },
     });
@@ -104,7 +104,7 @@ export async function withIdempotency(
     url.pathname,
     options.scopeKey,
     idempotencyKey,
-    options.keyPrefix ?? '',
+    options.keyPrefix ?? "",
   );
 
   const cached = await readCache(kv, cacheKey);
@@ -113,9 +113,8 @@ export async function withIdempotency(
       return jsonResponse(422, {
         success: false,
         error: {
-          code: 'IDEMPOTENCY_KEY_REUSED',
-          message:
-            `${headerName} was previously used with a different request payload.`,
+          code: "IDEMPOTENCY_KEY_REUSED",
+          message: `${headerName} was previously used with a different request payload.`,
         },
       });
     }
@@ -192,7 +191,7 @@ async function materializeForCache(
 
 function reviveCachedResponse(cached: CachedResponse): Response {
   const headers = new Headers(cached.headers);
-  headers.set(REPLAY_HEADER, 'true');
+  headers.set(REPLAY_HEADER, "true");
   return new Response(cached.body, {
     status: cached.status,
     headers,
@@ -212,17 +211,17 @@ function reviveStoredButFresh(stored: CachedResponse): Response {
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 async function sha256Hex(input: string | ArrayBuffer): Promise<string> {
   const data =
-    typeof input === 'string' ? new TextEncoder().encode(input) : input;
-  const buf = await crypto.subtle.digest('SHA-256', data);
-  let out = '';
+    typeof input === "string" ? new TextEncoder().encode(input) : input;
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  let out = "";
   for (const b of new Uint8Array(buf)) {
-    out += b.toString(16).padStart(2, '0');
+    out += b.toString(16).padStart(2, "0");
   }
   return out;
 }

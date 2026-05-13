@@ -1,7 +1,7 @@
-import { type CfClient } from './client.js';
-import { applyD1Migrations, queryD1 } from './d1.js';
+import { type CfClient } from "./client.js";
+import { applyD1Migrations, queryD1 } from "./d1.js";
 
-const TRACKING_TABLE = 'd1_migrations';
+const TRACKING_TABLE = "d1_migrations";
 
 export interface MigrationFile {
   /** Filename, e.g. `0001_users.sql`. Used as the unique tracking key. */
@@ -107,9 +107,9 @@ async function listApplied(
   for (const r of rows) {
     if (Array.isArray(r.results)) {
       for (const row of r.results) {
-        if (row && typeof row === 'object' && 'name' in row) {
+        if (row && typeof row === "object" && "name" in row) {
           const n = (row as { name: unknown }).name;
-          if (typeof n === 'string') names.add(n);
+          if (typeof n === "string") names.add(n);
         }
       }
     }

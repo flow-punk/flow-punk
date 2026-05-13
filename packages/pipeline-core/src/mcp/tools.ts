@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm';
-import { deals, pipelines, stages } from '@flowpunk-indie/db';
+import { eq } from "drizzle-orm";
+import { deals, pipelines, stages } from "@flowpunk-indie/db";
 import {
   buildToolRegistry,
   type McpToolState,
   type ToolMetadata,
-} from '@flowpunk/tool-registry';
+} from "@flowpunk/tool-registry";
 
-import type { PipelineEnv } from '../types.js';
-import { getDb, type Db } from '../handlers/_shared.js';
+import type { PipelineEnv } from "../types.js";
+import { getDb, type Db } from "../handlers/_shared.js";
 
 interface TenantPipelineExistence {
   hasPipelines: boolean;
@@ -21,9 +21,21 @@ interface TenantPipelineExistence {
 
 async function checkExistence(db: Db): Promise<TenantPipelineExistence> {
   const [pipelinesRows, stagesRows, dealsRows] = await Promise.all([
-    db.select({ id: pipelines.id }).from(pipelines).where(eq(pipelines.status, 'active')).limit(1),
-    db.select({ id: stages.id }).from(stages).where(eq(stages.status, 'active')).limit(2),
-    db.select({ id: deals.id }).from(deals).where(eq(deals.status, 'active')).limit(1),
+    db
+      .select({ id: pipelines.id })
+      .from(pipelines)
+      .where(eq(pipelines.status, "active"))
+      .limit(1),
+    db
+      .select({ id: stages.id })
+      .from(stages)
+      .where(eq(stages.status, "active"))
+      .limit(2),
+    db
+      .select({ id: deals.id })
+      .from(deals)
+      .where(eq(deals.status, "active"))
+      .limit(1),
   ]);
   return {
     hasPipelines: pipelinesRows.length > 0,
@@ -42,62 +54,70 @@ interface AvailabilityRule {
 
 const AVAILABILITY_RULES: AvailabilityRule[] = [
   {
-    toolName: 'pipeline_search',
+    toolName: "pipeline_search",
     available: (e) => e.hasPipelines,
-    reason: 'no pipelines exist for this tenant yet',
-    nextStep: 'Call the pipelines create action to create a standard sales pipeline, then re-run tools/list.',
+    reason: "no pipelines exist for this tenant yet",
+    nextStep:
+      "Call the pipelines create action to create a standard sales pipeline, then re-run tools/list.",
   },
   {
-    toolName: 'stages_search',
+    toolName: "stages_search",
     available: (e) => e.hasStages,
-    reason: 'no stages exist for this tenant yet',
-    nextStep: 'Create at least one stage via POST /api/v1/stages, then re-run tools/list.',
+    reason: "no stages exist for this tenant yet",
+    nextStep:
+      "Create at least one stage via POST /api/v1/stages, then re-run tools/list.",
   },
   {
-    toolName: 'stages_create',
+    toolName: "stages_create",
     available: (e) => e.hasPipelines,
-    reason: 'no active pipelines exist for this tenant yet',
-    nextStep: 'Call the pipelines create action first.',
+    reason: "no active pipelines exist for this tenant yet",
+    nextStep: "Call the pipelines create action first.",
   },
   {
-    toolName: 'stages_delete',
+    toolName: "stages_delete",
     available: (e) => e.hasStages,
-    reason: 'no active stages exist for this tenant yet',
-    nextStep: 'Create a pipeline with the standard sales template first.',
+    reason: "no active stages exist for this tenant yet",
+    nextStep: "Create a pipeline with the standard sales template first.",
   },
   {
-    toolName: 'deals_create',
+    toolName: "deals_create",
     available: (e) => e.hasStages,
-    reason: 'no stages exist — deals require a stage to land in',
-    nextStep: 'Create at least one stage via POST /api/v1/stages, then re-run tools/list.',
+    reason: "no stages exist — deals require a stage to land in",
+    nextStep:
+      "Create at least one stage via POST /api/v1/stages, then re-run tools/list.",
   },
   {
-    toolName: 'deals_search',
+    toolName: "deals_search",
     available: (e) => e.hasDeals,
-    reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
+    reason: "no deals exist for this tenant yet",
+    nextStep:
+      "Call the deals create action to add the first deal, then re-run tools/list.",
   },
   {
-    toolName: 'deals_get',
+    toolName: "deals_get",
     available: (e) => e.hasDeals,
-    reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
+    reason: "no deals exist for this tenant yet",
+    nextStep:
+      "Call the deals create action to add the first deal, then re-run tools/list.",
   },
   {
-    toolName: 'deals_update',
+    toolName: "deals_update",
     available: (e) => e.hasDeals,
-    reason: 'no deals exist for this tenant yet',
-    nextStep: 'Call the deals create action to add the first deal, then re-run tools/list.',
+    reason: "no deals exist for this tenant yet",
+    nextStep:
+      "Call the deals create action to add the first deal, then re-run tools/list.",
   },
   {
-    toolName: 'deals_move_stage',
+    toolName: "deals_move_stage",
     available: (e) => e.hasDeals && e.hasMultiStages,
-    reason: 'deals_move_stage requires at least one deal and a pipeline with two or more active stages',
-    nextStep: 'Add a second stage to the deal\'s pipeline, then re-run tools/list.',
+    reason:
+      "deals_move_stage requires at least one deal and a pipeline with two or more active stages",
+    nextStep:
+      "Add a second stage to the deal's pipeline, then re-run tools/list.",
   },
 ];
 
-const ALWAYS_AVAILABLE_TOOLS = new Set<string>(['pipeline_create']);
+const ALWAYS_AVAILABLE_TOOLS = new Set<string>(["pipeline_create"]);
 
 /**
  * Build the pipeline service's per-tenant tool state. List-time availability
@@ -105,16 +125,18 @@ const ALWAYS_AVAILABLE_TOOLS = new Set<string>(['pipeline_create']);
  * `deals_move_stage` (target stage in same pipeline as the deal) is enforced
  * at execute time via the deals repo's `assertStageInActivePipeline`.
  */
-export async function buildPipelineToolState(env: PipelineEnv): Promise<McpToolState> {
+export async function buildPipelineToolState(
+  env: PipelineEnv,
+): Promise<McpToolState> {
   const db = getDb(env);
   const existence = await checkExistence(db);
 
-  const registry = buildToolRegistry('indie');
+  const registry = buildToolRegistry("indie");
   const availableTools: ToolMetadata[] = [];
   const unavailableTools: ToolMetadata[] = [];
 
   for (const tool of registry.staticExecutableTools) {
-    if (tool.service !== 'pipeline') continue;
+    if (tool.service !== "pipeline") continue;
     const rule = AVAILABILITY_RULES.find((r) => r.toolName === tool.name);
     const isAvailable = ALWAYS_AVAILABLE_TOOLS.has(tool.name)
       ? true
@@ -128,7 +150,7 @@ export async function buildPipelineToolState(env: PipelineEnv): Promise<McpToolS
       unavailableTools.push({
         ...tool,
         availability: {
-          status: 'unavailable',
+          status: "unavailable",
           reason: rule.reason,
           nextStep: rule.nextStep,
         },
@@ -147,6 +169,6 @@ export async function handleMcpTools(env: PipelineEnv): Promise<Response> {
   const toolState = await buildPipelineToolState(env);
   return new Response(JSON.stringify({ toolState }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }

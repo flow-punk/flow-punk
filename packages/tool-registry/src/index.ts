@@ -1,13 +1,13 @@
-export type ToolScope = 'read' | 'write';
+export type ToolScope = "read" | "write";
 
-export type ToolKind = 'model' | 'action' | 'dynamic';
+export type ToolKind = "model" | "action" | "dynamic";
 
-export type Edition = 'indie' | 'managed';
+export type Edition = "indie" | "managed";
 
-export type McpServiceName = 'gateway' | 'contacts' | 'pipeline';
+export type McpServiceName = "gateway" | "contacts" | "pipeline";
 
 export interface ToolAvailability {
-  status: 'available' | 'unavailable';
+  status: "available" | "unavailable";
   reason?: string;
   nextStep?: string;
 }
@@ -19,7 +19,7 @@ export interface ToolActionMetadata {
   inputSchema: Record<string, unknown>;
   requiredScope: ToolScope;
   availability: ToolAvailability;
-  service: Exclude<McpServiceName, 'gateway'>;
+  service: Exclude<McpServiceName, "gateway">;
   model: string;
   editions: Edition[];
   examples?: Array<Record<string, unknown>>;
@@ -49,7 +49,7 @@ export interface ToolSearchResult {
   description: string;
   model: string;
   service: McpServiceName;
-  kind: Exclude<ToolKind, 'model'>;
+  kind: Exclude<ToolKind, "model">;
   availability: ToolAvailability;
   deprecated?: boolean;
   deprecatedMessage?: string;
@@ -59,7 +59,7 @@ export interface McpToolAdapterContext {
   tenantId?: string;
   userId?: string;
   scope?: string;
-  credentialType?: 'apikey' | 'oauth';
+  credentialType?: "apikey" | "oauth";
   includeStaticCatalog?: boolean;
   availableTools?: ToolMetadata[];
   unavailableTools?: ToolMetadata[];
@@ -95,8 +95,14 @@ export interface ModelActionDescription {
 export interface McpToolAdapter {
   listAvailableTools(): ToolMetadata[];
   getToolMetadata(name: string): ToolMetadata | null;
-  resolveModelAction(name: string, args: Record<string, unknown> | undefined): ModelActionCall | null;
-  describeModelAction(name: string, args: Record<string, unknown> | undefined): ModelActionDescription | null;
+  resolveModelAction(
+    name: string,
+    args: Record<string, unknown> | undefined,
+  ): ModelActionCall | null;
+  describeModelAction(
+    name: string,
+    args: Record<string, unknown> | undefined,
+  ): ModelActionDescription | null;
   requiredScopeForTool(name: string, args?: Record<string, unknown>): ToolScope;
 }
 
@@ -109,7 +115,7 @@ export interface ToolRegistry {
 interface ModelSeed {
   name: string;
   description: string;
-  service: Exclude<McpServiceName, 'gateway'>;
+  service: Exclude<McpServiceName, "gateway">;
   editions: Edition[];
   actions: ActionSeed[];
   keywords?: string[];
@@ -126,104 +132,220 @@ interface ActionSeed {
   keywords?: string[];
 }
 
-const SHARED_EDITIONS: Edition[] = ['indie', 'managed'];
+const SHARED_EDITIONS: Edition[] = ["indie", "managed"];
 
-const available = (): ToolAvailability => ({ status: 'available' });
+const available = (): ToolAvailability => ({ status: "available" });
 
 const MODEL_SEEDS: ModelSeed[] = [
   {
-    name: 'persons',
+    name: "persons",
     description:
-      'Individual human contacts. A person can stand alone or link to an account with accountId when they belong to a company or organization.',
-    service: 'contacts',
+      "Individual human contacts. A person can stand alone or link to an account with accountId when they belong to a company or organization.",
+    service: "contacts",
     editions: SHARED_EDITIONS,
-    keywords: ['people', 'contacts', 'individuals'],
+    keywords: ["people", "contacts", "individuals"],
     actions: [
-      makeActionSeed('search', 'persons_search', 'Search person records', searchSchema(), 'read'),
-      makeActionSeed('get', 'persons_get', 'Get a person by id', idSchema(), 'read'),
-      makeActionSeed('create', 'persons_create', 'Create a person record', personCreateSchema(), 'write', [
-        {
-          displayName: 'Alex Morgan',
-          emailPrimary: 'alex.morgan@example.com',
-          phone1Number: '+15551234567',
-          title: 'Marketing Manager',
-        },
-      ]),
-      makeActionSeed('update', 'persons_update', 'Update a person record', idWithFieldsSchema(personPatchSchema()), 'write'),
+      makeActionSeed(
+        "search",
+        "persons_search",
+        "Search person records",
+        searchSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "get",
+        "persons_get",
+        "Get a person by id",
+        idSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "create",
+        "persons_create",
+        "Create a person record",
+        personCreateSchema(),
+        "write",
+        [
+          {
+            displayName: "Alex Morgan",
+            emailPrimary: "alex.morgan@example.com",
+            phone1Number: "+15551234567",
+            title: "Marketing Manager",
+          },
+        ],
+      ),
+      makeActionSeed(
+        "update",
+        "persons_update",
+        "Update a person record",
+        idWithFieldsSchema(personPatchSchema()),
+        "write",
+      ),
     ],
   },
   {
-    name: 'accounts',
+    name: "accounts",
     description:
-      'Companies, organizations, or households. Accounts can group many persons and can be referenced from persons through accountId.',
-    service: 'contacts',
+      "Companies, organizations, or households. Accounts can group many persons and can be referenced from persons through accountId.",
+    service: "contacts",
     editions: SHARED_EDITIONS,
-    keywords: ['companies', 'organizations', 'businesses'],
+    keywords: ["companies", "organizations", "businesses"],
     actions: [
-      makeActionSeed('search', 'accounts_search', 'Search account records', searchSchema(), 'read'),
-      makeActionSeed('get', 'accounts_get', 'Get an account by id', idSchema(), 'read'),
-      makeActionSeed('create', 'accounts_create', 'Create an account record', accountCreateSchema(), 'write', [
-        {
-          displayName: 'Acme Corp',
-          domain: 'acme.example',
-          website: 'https://acme.example',
-          industry: 'Manufacturing',
-        },
-      ]),
-      makeActionSeed('update', 'accounts_update', 'Update an account record', idWithFieldsSchema(accountPatchSchema()), 'write'),
+      makeActionSeed(
+        "search",
+        "accounts_search",
+        "Search account records",
+        searchSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "get",
+        "accounts_get",
+        "Get an account by id",
+        idSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "create",
+        "accounts_create",
+        "Create an account record",
+        accountCreateSchema(),
+        "write",
+        [
+          {
+            displayName: "Acme Corp",
+            domain: "acme.example",
+            website: "https://acme.example",
+            industry: "Manufacturing",
+          },
+        ],
+      ),
+      makeActionSeed(
+        "update",
+        "accounts_update",
+        "Update an account record",
+        idWithFieldsSchema(accountPatchSchema()),
+        "write",
+      ),
     ],
   },
   {
-    name: 'deals',
+    name: "deals",
     description:
-      'Sales opportunities. Deals move through stages in a pipeline and may reference related account or person records.',
-    service: 'pipeline',
+      "Sales opportunities. Deals move through stages in a pipeline and may reference related account or person records.",
+    service: "pipeline",
     editions: SHARED_EDITIONS,
-    keywords: ['opportunities', 'sales'],
+    keywords: ["opportunities", "sales"],
     actions: [
-      makeActionSeed('search', 'deals_search', 'Search deals', dealSearchSchema(), 'read'),
-      makeActionSeed('get', 'deals_get', 'Get a deal by id', idSchema(), 'read'),
-      makeActionSeed('create', 'deals_create', 'Create a deal', dealCreateSchema(), 'write'),
-      makeActionSeed('update', 'deals_update', 'Update a deal', idWithFieldsSchema(dealPatchSchema()), 'write'),
-      makeActionSeed('move_stage', 'deals_move_stage', 'Move a deal to another stage', moveStageSchema(), 'write'),
+      makeActionSeed(
+        "search",
+        "deals_search",
+        "Search deals",
+        dealSearchSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "get",
+        "deals_get",
+        "Get a deal by id",
+        idSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "create",
+        "deals_create",
+        "Create a deal",
+        dealCreateSchema(),
+        "write",
+      ),
+      makeActionSeed(
+        "update",
+        "deals_update",
+        "Update a deal",
+        idWithFieldsSchema(dealPatchSchema()),
+        "write",
+      ),
+      makeActionSeed(
+        "move_stage",
+        "deals_move_stage",
+        "Move a deal to another stage",
+        moveStageSchema(),
+        "write",
+      ),
     ],
   },
   {
-    name: 'pipelines',
+    name: "pipelines",
     description:
-      'Sales processes that contain ordered stages. Deals belong to one pipeline and move through its stages.',
-    service: 'pipeline',
+      "Sales processes that contain ordered stages. Deals belong to one pipeline and move through its stages.",
+    service: "pipeline",
     editions: SHARED_EDITIONS,
-    keywords: ['sales process'],
+    keywords: ["sales process"],
     actions: [
-      makeActionSeed('create', 'pipeline_create', 'Create a pipeline with either the standard sales template or 2-12 custom stages', pipelineCreateSchema(), 'write', [
-        {
-          name: 'Sales',
-          template: 'standard_sales',
-          isDefault: true,
-        },
-        {
-          name: 'Enterprise Sales',
-          stages: [
-            { name: 'Discovery', position: 0, probability: 10 },
-            { name: 'Agreement', position: 1, terminalKind: 'won', probability: 100 },
-          ],
-        },
-      ]),
-      makeActionSeed('search', 'pipeline_search', 'Search pipelines', searchSchema(), 'read'),
+      makeActionSeed(
+        "create",
+        "pipeline_create",
+        "Create a pipeline with either the standard sales template or 2-12 custom stages",
+        pipelineCreateSchema(),
+        "write",
+        [
+          {
+            name: "Sales",
+            template: "standard_sales",
+            isDefault: true,
+          },
+          {
+            name: "Enterprise Sales",
+            stages: [
+              { name: "Discovery", position: 0, probability: 10 },
+              {
+                name: "Agreement",
+                position: 1,
+                terminalKind: "won",
+                probability: 100,
+              },
+            ],
+          },
+        ],
+      ),
+      makeActionSeed(
+        "search",
+        "pipeline_search",
+        "Search pipelines",
+        searchSchema(),
+        "read",
+      ),
     ],
   },
   {
-    name: 'stages',
+    name: "stages",
     description:
-      'Steps within a pipeline. Each stage belongs to a pipeline, and deals move between stages.',
-    service: 'pipeline',
+      "Steps within a pipeline. Each stage belongs to a pipeline, and deals move between stages.",
+    service: "pipeline",
     editions: SHARED_EDITIONS,
-    keywords: ['pipeline steps'],
+    keywords: ["pipeline steps"],
     actions: [
-      makeActionSeed('create', 'stages_create', 'Add one stage to an existing active pipeline after it has been created', stageCreateSchema(), 'write'),
-      makeActionSeed('search', 'stages_search', 'Search stages in a pipeline', stagesSearchSchema(), 'read'),
-      makeActionSeed('delete', 'stages_delete', 'Soft-delete an empty stage while preserving at least two active stages in the pipeline', idSchema(), 'write'),
+      makeActionSeed(
+        "create",
+        "stages_create",
+        "Add one stage to an existing active pipeline after it has been created",
+        stageCreateSchema(),
+        "write",
+      ),
+      makeActionSeed(
+        "search",
+        "stages_search",
+        "Search stages in a pipeline",
+        stagesSearchSchema(),
+        "read",
+      ),
+      makeActionSeed(
+        "delete",
+        "stages_delete",
+        "Soft-delete an empty stage while preserving at least two active stages in the pipeline",
+        idSchema(),
+        "write",
+      ),
     ],
   },
 ];
@@ -236,7 +358,9 @@ export function buildToolRegistry(
     .filter((seed) => seed.editions.includes(edition))
     .map<ModelSeed>((seed) => ({
       ...seed,
-      actions: seed.actions.filter((action) => action.editions.includes(edition)),
+      actions: seed.actions.filter((action) =>
+        action.editions.includes(edition),
+      ),
     }))
     .filter((seed) => seed.actions.length > 0);
 
@@ -245,7 +369,7 @@ export function buildToolRegistry(
       name: action.downstreamName,
       description: action.description,
       inputSchema: action.inputSchema,
-      kind: 'action',
+      kind: "action",
       model: model.name,
       service: model.service,
       requiredScope: action.requiredScope,
@@ -257,9 +381,16 @@ export function buildToolRegistry(
     })),
   );
 
-  const executableByName = new Map(staticExecutableTools.map((tool) => [tool.name, tool]));
+  const executableByName = new Map(
+    staticExecutableTools.map((tool) => [tool.name, tool]),
+  );
   const modelTools = seeds.map<ToolMetadata>((model) =>
-    toModelTool(model, model.actions.map((action) => executableByName.get(action.downstreamName)).filter(isToolMetadata)),
+    toModelTool(
+      model,
+      model.actions
+        .map((action) => executableByName.get(action.downstreamName))
+        .filter(isToolMetadata),
+    ),
   );
 
   return {
@@ -283,7 +414,7 @@ export function composeToolRegistries(
   };
 }
 
-const DEFAULT_REGISTRY = buildToolRegistry('indie');
+const DEFAULT_REGISTRY = buildToolRegistry("indie");
 
 export function createMcpToolAdapter(
   context: McpToolAdapterContext = {},
@@ -294,21 +425,35 @@ export function createMcpToolAdapter(
   const dynamicTools = context.dynamicTools ?? [];
   const availableExecutables = dedupeTools([
     ...(includeStaticCatalog ? registry.staticExecutableTools : []),
-    ...dynamicTools.filter((tool) => tool.availability.status === 'available'),
+    ...dynamicTools.filter((tool) => tool.availability.status === "available"),
     ...(context.availableTools ?? []),
   ]);
   const discoverableExecutables = dedupeTools([
     ...availableExecutables,
     ...unavailableTools,
-    ...dynamicTools.filter((tool) => tool.availability.status === 'unavailable'),
+    ...dynamicTools.filter(
+      (tool) => tool.availability.status === "unavailable",
+    ),
   ]);
 
-  const availableExecutableMap = new Map(availableExecutables.map((tool) => [tool.name, tool]));
-  const discoverableExecutableMap = new Map(discoverableExecutables.map((tool) => [tool.name, tool]));
-  const modelTools = buildModelTools(registry.modelTools, availableExecutableMap);
-  const discoverableModelTools = buildModelTools(registry.modelTools, discoverableExecutableMap);
+  const availableExecutableMap = new Map(
+    availableExecutables.map((tool) => [tool.name, tool]),
+  );
+  const discoverableExecutableMap = new Map(
+    discoverableExecutables.map((tool) => [tool.name, tool]),
+  );
+  const modelTools = buildModelTools(
+    registry.modelTools,
+    availableExecutableMap,
+  );
+  const discoverableModelTools = buildModelTools(
+    registry.modelTools,
+    discoverableExecutableMap,
+  );
   const modelToolMap = new Map(modelTools.map((tool) => [tool.name, tool]));
-  const discoverableModelToolMap = new Map(discoverableModelTools.map((tool) => [tool.name, tool]));
+  const discoverableModelToolMap = new Map(
+    discoverableModelTools.map((tool) => [tool.name, tool]),
+  );
 
   return {
     listAvailableTools(): ToolMetadata[] {
@@ -319,11 +464,14 @@ export function createMcpToolAdapter(
       return modelToolMap.get(name) ?? null;
     },
 
-    resolveModelAction(name: string, args: Record<string, unknown> | undefined): ModelActionCall | null {
+    resolveModelAction(
+      name: string,
+      args: Record<string, unknown> | undefined,
+    ): ModelActionCall | null {
       const parsed = parseModelActionArgs(args);
-      if (!parsed || parsed.action === 'describe') return null;
+      if (!parsed || parsed.action === "describe") return null;
       const action = availableActionForModel(name, parsed.action);
-      if (!action || action.availability.status !== 'available') return null;
+      if (!action || action.availability.status !== "available") return null;
       return {
         model: name,
         action: parsed.action,
@@ -333,12 +481,16 @@ export function createMcpToolAdapter(
       };
     },
 
-    describeModelAction(name: string, args: Record<string, unknown> | undefined): ModelActionDescription | null {
+    describeModelAction(
+      name: string,
+      args: Record<string, unknown> | undefined,
+    ): ModelActionDescription | null {
       const parsed = parseModelActionArgs(args);
-      if (!parsed || parsed.action !== 'describe') return null;
-      const requested = typeof parsed.arguments.action === 'string'
-        ? parsed.arguments.action
-        : undefined;
+      if (!parsed || parsed.action !== "describe") return null;
+      const requested =
+        typeof parsed.arguments.action === "string"
+          ? parsed.arguments.action
+          : undefined;
       if (!requested) return null;
       const action = discoverableActionForModel(name, requested);
       if (!action) return null;
@@ -354,24 +506,40 @@ export function createMcpToolAdapter(
       };
     },
 
-    requiredScopeForTool(name: string, args?: Record<string, unknown>): ToolScope {
+    requiredScopeForTool(
+      name: string,
+      args?: Record<string, unknown>,
+    ): ToolScope {
       const parsed = parseModelActionArgs(args);
       if (parsed) {
-        if (parsed.action === 'describe') return 'read';
-        return discoverableActionForModel(name, parsed.action)?.requiredScope ?? 'write';
+        if (parsed.action === "describe") return "read";
+        return (
+          discoverableActionForModel(name, parsed.action)?.requiredScope ??
+          "write"
+        );
       }
-      return modelToolMap.get(name)?.requiredScope ?? 'write';
+      return modelToolMap.get(name)?.requiredScope ?? "write";
     },
   };
 
-  function availableActionForModel(modelName: string, actionName: string): ToolActionMetadata | null {
+  function availableActionForModel(
+    modelName: string,
+    actionName: string,
+  ): ToolActionMetadata | null {
     const model = modelToolMap.get(modelName);
-    return model?.actions?.find((action) => action.action === actionName) ?? null;
+    return (
+      model?.actions?.find((action) => action.action === actionName) ?? null
+    );
   }
 
-  function discoverableActionForModel(modelName: string, actionName: string): ToolActionMetadata | null {
+  function discoverableActionForModel(
+    modelName: string,
+    actionName: string,
+  ): ToolActionMetadata | null {
     const model = discoverableModelToolMap.get(modelName);
-    return model?.actions?.find((action) => action.action === actionName) ?? null;
+    return (
+      model?.actions?.find((action) => action.action === actionName) ?? null
+    );
   }
 }
 
@@ -412,17 +580,19 @@ function toModelTool(model: ModelSeed, actions: ToolMetadata[]): ToolMetadata {
     service: model.service,
     model: model.name,
     editions: tool.editions,
-    examples: model.actions.find((action) => action.downstreamName === tool.name)?.examples,
+    examples: model.actions.find(
+      (action) => action.downstreamName === tool.name,
+    )?.examples,
     keywords: tool.keywords,
   }));
   return {
     name: model.name,
     description: model.description,
     inputSchema: modelInputSchema(actionMetadata),
-    kind: 'model',
+    kind: "model",
     model: model.name,
     service: model.service,
-    requiredScope: 'read',
+    requiredScope: "read",
     availability: available(),
     editions: model.editions,
     actions: actionMetadata,
@@ -430,25 +600,27 @@ function toModelTool(model: ModelSeed, actions: ToolMetadata[]): ToolMetadata {
   };
 }
 
-function modelInputSchema(actions: ToolActionMetadata[]): Record<string, unknown> {
-  const actionNames = ['describe', ...actions.map((action) => action.action)];
+function modelInputSchema(
+  actions: ToolActionMetadata[],
+): Record<string, unknown> {
+  const actionNames = ["describe", ...actions.map((action) => action.action)];
   return {
-    type: 'object',
+    type: "object",
     properties: {
       action: {
-        type: 'string',
+        type: "string",
         enum: actionNames,
         description:
-          'Use describe to inspect a single action schema, then call an executable action with arguments.',
+          "Use describe to inspect a single action schema, then call an executable action with arguments.",
       },
       arguments: {
-        type: 'object',
+        type: "object",
         description:
           'For describe, pass { action: "<action>" }. For executable actions, pass that action\'s arguments.',
         additionalProperties: true,
       },
     },
-    required: ['action'],
+    required: ["action"],
     additionalProperties: false,
   };
 }
@@ -456,13 +628,13 @@ function modelInputSchema(actions: ToolActionMetadata[]): Record<string, unknown
 function parseModelActionArgs(
   args: Record<string, unknown> | undefined,
 ): { action: string; arguments: Record<string, unknown> } | null {
-  if (!args || typeof args.action !== 'string') return null;
+  if (!args || typeof args.action !== "string") return null;
   const rawArgs = args.arguments;
   return {
     action: args.action,
     arguments:
-      rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs)
-        ? rawArgs as Record<string, unknown>
+      rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs)
+        ? (rawArgs as Record<string, unknown>)
         : {},
   };
 }
@@ -473,7 +645,9 @@ function dedupeTools(tools: ToolMetadata[]): ToolMetadata[] {
   return [...deduped.values()];
 }
 
-function isToolMetadata(value: ToolMetadata | undefined): value is ToolMetadata {
+function isToolMetadata(
+  value: ToolMetadata | undefined,
+): value is ToolMetadata {
   return value !== undefined;
 }
 
@@ -498,13 +672,15 @@ function makeActionSeed(
   };
 }
 
-function searchSchema(extraProperties: Record<string, unknown> = {}): Record<string, unknown> {
+function searchSchema(
+  extraProperties: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
-    type: 'object',
+    type: "object",
     properties: {
-      query: { type: 'string' },
-      limit: { type: 'number' },
-      cursor: { type: 'string' },
+      query: { type: "string" },
+      limit: { type: "number" },
+      cursor: { type: "string" },
       ...extraProperties,
     },
     additionalProperties: false,
@@ -513,121 +689,160 @@ function searchSchema(extraProperties: Record<string, unknown> = {}): Record<str
 
 function idSchema(): Record<string, unknown> {
   return {
-    type: 'object',
+    type: "object",
     properties: {
-      id: { type: 'string' },
+      id: { type: "string" },
     },
-    required: ['id'],
+    required: ["id"],
     additionalProperties: false,
   };
 }
 
-function idWithFieldsSchema(fieldsSchema: Record<string, unknown>): Record<string, unknown> {
+function idWithFieldsSchema(
+  fieldsSchema: Record<string, unknown>,
+): Record<string, unknown> {
   return {
-    type: 'object',
+    type: "object",
     properties: {
-      id: { type: 'string' },
+      id: { type: "string" },
       fields: fieldsSchema,
     },
-    required: ['id', 'fields'],
+    required: ["id", "fields"],
     additionalProperties: false,
   };
 }
 
 function stagesSearchSchema(): Record<string, unknown> {
-  return searchSchema({ pipelineId: { type: 'string' } });
+  return searchSchema({ pipelineId: { type: "string" } });
 }
 
 function pipelineCreateSchema(): Record<string, unknown> {
-  return objectSchema({
-    name: { type: 'string', description: 'Pipeline name.' },
-    description: { type: 'string', description: 'Optional pipeline description.' },
-    isDefault: { type: 'boolean', description: 'Whether this should be the default active pipeline.' },
-    template: {
-      type: 'string',
-      enum: ['standard_sales'],
-      description:
-        'Use this for the built-in stages: New, Qualified, Proposal, Agreement, Complete, Closed Lost. Do not send stages when using template.',
-    },
-    stages: {
-      type: 'array',
-      description:
-        'Custom stages to create with the pipeline. Use this instead of template. Must contain 2-12 stages, positions must be unique and contiguous from 0, and at least one stage must have terminalKind "won".',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Stage label.' },
-          position: { type: 'number', description: 'Zero-based stage order. Must be contiguous from 0.' },
-          terminalKind: {
-            type: 'string',
-            enum: ['won', 'lost'],
-            description: 'Set "won" for a successful terminal stage or "lost" for an unsuccessful terminal stage.',
+  return objectSchema(
+    {
+      name: { type: "string", description: "Pipeline name." },
+      description: {
+        type: "string",
+        description: "Optional pipeline description.",
+      },
+      isDefault: {
+        type: "boolean",
+        description: "Whether this should be the default active pipeline.",
+      },
+      template: {
+        type: "string",
+        enum: ["standard_sales"],
+        description:
+          "Use this for the built-in stages: New, Qualified, Proposal, Agreement, Complete, Closed Lost. Do not send stages when using template.",
+      },
+      stages: {
+        type: "array",
+        description:
+          'Custom stages to create with the pipeline. Use this instead of template. Must contain 2-12 stages, positions must be unique and contiguous from 0, and at least one stage must have terminalKind "won".',
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Stage label." },
+            position: {
+              type: "number",
+              description: "Zero-based stage order. Must be contiguous from 0.",
+            },
+            terminalKind: {
+              type: "string",
+              enum: ["won", "lost"],
+              description:
+                'Set "won" for a successful terminal stage or "lost" for an unsuccessful terminal stage.',
+            },
+            probability: {
+              type: "number",
+              description: "Optional probability from 0 to 100.",
+            },
           },
-          probability: { type: 'number', description: 'Optional probability from 0 to 100.' },
+          required: ["name", "position"],
+          additionalProperties: false,
         },
-        required: ['name', 'position'],
-        additionalProperties: false,
       },
     },
-  }, ['name']);
+    ["name"],
+  );
 }
 
 function stageCreateSchema(): Record<string, unknown> {
-  return objectSchema({
-    pipelineId: { type: 'string', description: 'Existing active pipeline id.' },
-    name: { type: 'string', description: 'Stage label.' },
-    position: { type: 'number', description: 'Zero-based stage order within the pipeline.' },
-    terminalKind: {
-      type: 'string',
-      enum: ['won', 'lost'],
-      description: 'Set only for terminal outcome stages.',
+  return objectSchema(
+    {
+      pipelineId: {
+        type: "string",
+        description: "Existing active pipeline id.",
+      },
+      name: { type: "string", description: "Stage label." },
+      position: {
+        type: "number",
+        description: "Zero-based stage order within the pipeline.",
+      },
+      terminalKind: {
+        type: "string",
+        enum: ["won", "lost"],
+        description: "Set only for terminal outcome stages.",
+      },
+      probability: {
+        type: "number",
+        description: "Optional probability from 0 to 100.",
+      },
     },
-    probability: { type: 'number', description: 'Optional probability from 0 to 100.' },
-  }, ['pipelineId', 'name', 'position']);
+    ["pipelineId", "name", "position"],
+  );
 }
 
 function dealSearchSchema(): Record<string, unknown> {
   return searchSchema({
-    pipelineId: { type: 'string' },
-    stageId: { type: 'string' },
+    pipelineId: { type: "string" },
+    stageId: { type: "string" },
   });
 }
 
 function moveStageSchema(): Record<string, unknown> {
   return {
-    type: 'object',
+    type: "object",
     properties: {
-      id: { type: 'string' },
-      stageId: { type: 'string' },
+      id: { type: "string" },
+      stageId: { type: "string" },
     },
-    required: ['id', 'stageId'],
+    required: ["id", "stageId"],
     additionalProperties: false,
   };
 }
 
 function personCreateSchema(): Record<string, unknown> {
-  return objectSchema({
-    accountId: { type: 'string' },
-    displayName: { type: 'string' },
-    firstName: { type: 'string' },
-    lastName: { type: 'string' },
-    emailPrimary: { type: 'string' },
-    phone1CountryCode: { type: 'string' },
-    phone1Number: { type: 'string' },
-    phone1Ext: { type: 'string' },
-    phone1Type: { type: 'string', enum: ['mobile', 'landline', 'voip', 'fax', 'other'] },
-    title: { type: 'string' },
-    streetLine1: { type: 'string' },
-    streetLine2: { type: 'string' },
-    city: { type: 'string' },
-    region: { type: 'string' },
-    postalCode: { type: 'string' },
-    country: { type: 'string' },
-    latitude: { type: 'number' },
-    longitude: { type: 'number' },
-    imageAvatar: { type: 'string' },
-    consentEmail: { type: 'string', enum: ['subscribed', 'unsubscribed', 'no_consent'] },
-  }, ['displayName']);
+  return objectSchema(
+    {
+      accountId: { type: "string" },
+      displayName: { type: "string" },
+      firstName: { type: "string" },
+      lastName: { type: "string" },
+      emailPrimary: { type: "string" },
+      phone1CountryCode: { type: "string" },
+      phone1Number: { type: "string" },
+      phone1Ext: { type: "string" },
+      phone1Type: {
+        type: "string",
+        enum: ["mobile", "landline", "voip", "fax", "other"],
+      },
+      title: { type: "string" },
+      streetLine1: { type: "string" },
+      streetLine2: { type: "string" },
+      city: { type: "string" },
+      region: { type: "string" },
+      postalCode: { type: "string" },
+      country: { type: "string" },
+      latitude: { type: "number" },
+      longitude: { type: "number" },
+      imageAvatar: { type: "string" },
+      consentEmail: {
+        type: "string",
+        enum: ["subscribed", "unsubscribed", "no_consent"],
+      },
+    },
+    ["displayName"],
+  );
 }
 
 function personPatchSchema(): Record<string, unknown> {
@@ -635,27 +850,30 @@ function personPatchSchema(): Record<string, unknown> {
 }
 
 function accountCreateSchema(): Record<string, unknown> {
-  return objectSchema({
-    displayName: { type: 'string' },
-    domain: { type: 'string' },
-    website: { type: 'string' },
-    industry: { type: 'string' },
-    streetLine1: { type: 'string' },
-    streetLine2: { type: 'string' },
-    city: { type: 'string' },
-    region: { type: 'string' },
-    postalCode: { type: 'string' },
-    country: { type: 'string' },
-    latitude: { type: 'number' },
-    longitude: { type: 'number' },
-    phone1CountryCode: { type: 'string' },
-    phone1Number: { type: 'string' },
-    phone1Ext: { type: 'string' },
-    phone2CountryCode: { type: 'string' },
-    phone2Number: { type: 'string' },
-    phone2Ext: { type: 'string' },
-    imageLogo: { type: 'string' },
-  }, ['displayName']);
+  return objectSchema(
+    {
+      displayName: { type: "string" },
+      domain: { type: "string" },
+      website: { type: "string" },
+      industry: { type: "string" },
+      streetLine1: { type: "string" },
+      streetLine2: { type: "string" },
+      city: { type: "string" },
+      region: { type: "string" },
+      postalCode: { type: "string" },
+      country: { type: "string" },
+      latitude: { type: "number" },
+      longitude: { type: "number" },
+      phone1CountryCode: { type: "string" },
+      phone1Number: { type: "string" },
+      phone1Ext: { type: "string" },
+      phone2CountryCode: { type: "string" },
+      phone2Number: { type: "string" },
+      phone2Ext: { type: "string" },
+      imageLogo: { type: "string" },
+    },
+    ["displayName"],
+  );
 }
 
 function accountPatchSchema(): Record<string, unknown> {
@@ -663,19 +881,22 @@ function accountPatchSchema(): Record<string, unknown> {
 }
 
 function dealCreateSchema(): Record<string, unknown> {
-  return objectSchema({
-    name: { type: 'string' },
-    pipelineId: { type: 'string' },
-    stageId: { type: 'string' },
-    accountId: { type: 'string' },
-    primaryPersonId: { type: 'string' },
-    ownerUserId: { type: 'string' },
-    amount: { type: 'number' },
-    currency: { type: 'string' },
-    closeDate: { type: 'string' },
-    probability: { type: 'number' },
-    description: { type: 'string' },
-  }, ['name', 'pipelineId', 'stageId']);
+  return objectSchema(
+    {
+      name: { type: "string" },
+      pipelineId: { type: "string" },
+      stageId: { type: "string" },
+      accountId: { type: "string" },
+      primaryPersonId: { type: "string" },
+      ownerUserId: { type: "string" },
+      amount: { type: "number" },
+      currency: { type: "string" },
+      closeDate: { type: "string" },
+      probability: { type: "number" },
+      description: { type: "string" },
+    },
+    ["name", "pipelineId", "stageId"],
+  );
 }
 
 function dealPatchSchema(): Record<string, unknown> {
@@ -687,7 +908,7 @@ function objectSchema(
   required: string[] = [],
 ): Record<string, unknown> {
   return {
-    type: 'object',
+    type: "object",
     properties,
     ...(required.length > 0 ? { required } : {}),
     additionalProperties: false,

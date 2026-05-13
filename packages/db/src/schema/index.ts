@@ -1,7 +1,7 @@
-export * from './users.js';
-export * from './mcp-sessions.js';
-export * from './auth-login-tokens.js';
-export * from './api-keys.js';
+export * from "./users.js";
+export * from "./mcp-sessions.js";
+export * from "./auth-login-tokens.js";
+export * from "./api-keys.js";
 
 // Per-table modules each export their own `ALLOWED_PATCH_FIELDS`,
 // `IMMUTABLE_PATCH_FIELDS`, `NULLABLE_PATCH_FIELDS`, etc. — names collide
@@ -15,7 +15,7 @@ export {
   type AccountStatus,
   type AccountPatchableField,
   type NewAccount,
-} from './accounts.js';
+} from "./accounts.js";
 export {
   persons,
   type Person,
@@ -24,14 +24,14 @@ export {
   type Phone1Type,
   type EmailConsent,
   type NewPerson,
-} from './persons.js';
+} from "./persons.js";
 export {
   pipelines,
   type Pipeline,
   type PipelineStatus,
   type PipelinePatchableField,
   type NewPipeline,
-} from './pipelines.js';
+} from "./pipelines.js";
 export {
   stages,
   type Stage,
@@ -39,21 +39,21 @@ export {
   type StageTerminalKind,
   type StagePatchableField,
   type NewStage,
-} from './stages.js';
+} from "./stages.js";
 export {
   deals,
   type Deal,
   type DealStatus,
   type DealPatchableField,
   type NewDeal,
-} from './deals.js';
+} from "./deals.js";
 export {
   dealContacts,
   type DealContact,
   type DealContactRole,
   type NewDealContact,
   DEAL_CONTACT_ROLE_VALUES,
-} from './deal-contacts.js';
+} from "./deal-contacts.js";
 export {
   dealHistory,
   type DealHistoryRow,
@@ -62,7 +62,7 @@ export {
   type NewDealHistoryRow,
   DEAL_HISTORY_KINDS,
   DEAL_HISTORY_CREDENTIAL_TYPES,
-} from './deal-history.js';
+} from "./deal-history.js";
 export {
   customFieldDefs,
   type CustomFieldDef,
@@ -75,24 +75,24 @@ export {
   CUSTOM_FIELD_CAPS,
   FILTERABLE_TRANSITIONS,
   isAllowedFilterableTransition,
-} from './custom-field-defs.js';
+} from "./custom-field-defs.js";
 export {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,
-} from './mcp-oauth-clients.js';
+} from "./mcp-oauth-clients.js";
 export {
   mcpOauthTokens,
   type McpOauthToken,
   type NewMcpOauthToken,
-} from './mcp-oauth-tokens.js';
+} from "./mcp-oauth-tokens.js";
 export {
   mcpOauthCodes,
   type McpOauthCode,
   type NewMcpOauthCode,
-} from './mcp-oauth-codes.js';
+} from "./mcp-oauth-codes.js";
 export {
   mcpOauthAuthorizeRequests,
   type McpOauthAuthorizeRequest,
   type NewMcpOauthAuthorizeRequest,
-} from './mcp-oauth-authorize-requests.js';
+} from "./mcp-oauth-authorize-requests.js";

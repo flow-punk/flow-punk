@@ -1,7 +1,7 @@
-import { usersRepo } from '@flowpunk-indie/db';
+import { usersRepo } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
-import { forbidden, getDb, jsonResponse, notFound } from './_shared.js';
+import type { Actor, UsersEnv } from "../types.js";
+import { forbidden, getDb, jsonResponse, notFound } from "./_shared.js";
 
 /**
  * GET /api/v1/users/:id — self OR admin.

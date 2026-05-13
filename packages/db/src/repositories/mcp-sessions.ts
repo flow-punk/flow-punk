@@ -1,11 +1,11 @@
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { eq } from "drizzle-orm";
 
 import {
   mcpSessions,
   type McpSession,
   type NewMcpSession,
-} from '../schema/mcp-sessions.js';
+} from "../schema/mcp-sessions.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 

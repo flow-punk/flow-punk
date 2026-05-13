@@ -21,16 +21,16 @@
  *   documented in `repositories/persons.ts:374-388`. The pre-check is
  *   defense in depth; the SQLite FK is the floor.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
-import { accounts } from '../schema/accounts.js';
-import { dealContacts } from '../schema/deal-contacts.js';
+import { accounts } from "../schema/accounts.js";
+import { dealContacts } from "../schema/deal-contacts.js";
 import {
   type DealHistoryCredentialType,
   type DealHistoryKind,
-} from '../schema/deal-history.js';
+} from "../schema/deal-history.js";
 import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
@@ -40,15 +40,15 @@ import {
   type Deal,
   type DealPatchableField,
   type NewDeal,
-} from '../schema/deals.js';
-import { persons } from '../schema/persons.js';
-import { pipelines } from '../schema/pipelines.js';
-import { stages } from '../schema/stages.js';
+} from "../schema/deals.js";
+import { persons } from "../schema/persons.js";
+import { pipelines } from "../schema/pipelines.js";
+import { stages } from "../schema/stages.js";
 import {
   buildHistoryInsert,
   buildHistoryInsertUnconditional,
   generateHistoryId,
-} from './deal-history.js';
+} from "./deal-history.js";
 
 /**
  * Per-mutation context. Bundles the actor identity + history toggle + the
@@ -74,15 +74,15 @@ type Db = DrizzleD1Database<Record<string, never>>;
 export class DealsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'conflict'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "conflict"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'DealsRepoError';
+    this.name = "DealsRepoError";
   }
 }
 
@@ -164,7 +164,7 @@ export async function create(
   }
 
   const row: NewDeal = {
-    id: generateId('deal'),
+    id: generateId("deal"),
     name: normalized.name,
     pipelineId: normalized.pipelineId,
     stageId: normalized.stageId,
@@ -177,7 +177,7 @@ export async function create(
     probability: normalized.probability ?? null,
     ownerUserId: normalized.ownerUserId ?? null,
     lostReason: normalized.lostReason ?? null,
-    status: 'active',
+    status: "active",
     deletedAt: null,
     deletedBy: null,
     createdAt: now,
@@ -199,7 +199,7 @@ export async function create(
       db.run(
         buildHistoryInsertUnconditional(historyId, {
           dealId: row.id,
-          kind: 'created',
+          kind: "created",
           changes: changesPayload,
           actorId: ctx.actorId,
           credentialType: ctx.credentialType,
@@ -227,7 +227,7 @@ export async function create(
     const inserted = results[0] as Deal[];
     const deal = inserted?.[0];
     if (!deal) {
-      throw new DealsRepoError('invariant_violation', 'insert returned no row');
+      throw new DealsRepoError("invariant_violation", "insert returned no row");
     }
     return deal;
   }
@@ -236,7 +236,7 @@ export async function create(
   const inserted = await db.insert(deals).values(row).returning();
   const deal = inserted[0];
   if (!deal) {
-    throw new DealsRepoError('invariant_violation', 'insert returned no row');
+    throw new DealsRepoError("invariant_violation", "insert returned no row");
   }
   if (deal.primaryPersonId) {
     await db
@@ -266,17 +266,17 @@ function buildCreatedChangesPayload(
   row: NewDeal,
 ): Array<{ field: string; from: null; to: unknown }> {
   const fields: Array<keyof NewDeal> = [
-    'name',
-    'pipelineId',
-    'stageId',
-    'accountId',
-    'primaryPersonId',
-    'amount',
-    'currency',
-    'expectedCloseDate',
-    'probability',
-    'ownerUserId',
-    'lostReason',
+    "name",
+    "pipelineId",
+    "stageId",
+    "accountId",
+    "primaryPersonId",
+    "amount",
+    "currency",
+    "expectedCloseDate",
+    "probability",
+    "ownerUserId",
+    "lostReason",
   ];
   const out: Array<{ field: string; from: null; to: unknown }> = [];
   for (const field of fields) {
@@ -295,21 +295,24 @@ export async function findById(
   const rows = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!options.includeDeleted && row.status !== 'active') return null;
+  if (!options.includeDeleted && row.status !== "active") return null;
   return row;
 }
 
-export async function list(db: Db, options: ListOptions = {}): Promise<ListResult> {
+export async function list(
+  db: Db,
+  options: ListOptions = {},
+): Promise<ListResult> {
   const limit = clampLimit(options.limit);
   const cursor = options.cursor ? decodeCursor(options.cursor) : null;
 
   const filters = [];
-  if (!options.includeDeleted) filters.push(eq(deals.status, 'active'));
+  if (!options.includeDeleted) filters.push(eq(deals.status, "active"));
 
   if (options.pipelineId !== undefined) {
     if (!PIPELINE_ID_REGEX.test(options.pipelineId)) {
       throw new DealsRepoError(
-        'invalid_input',
+        "invalid_input",
         'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
       );
     }
@@ -318,7 +321,7 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
   if (options.stageId !== undefined) {
     if (!STAGE_ID_REGEX.test(options.stageId)) {
       throw new DealsRepoError(
-        'invalid_input',
+        "invalid_input",
         'stageId must match "stag_<21 lowercase alphanumeric>"',
       );
     }
@@ -327,7 +330,7 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
   if (options.accountId !== undefined) {
     if (!ACCOUNT_ID_REGEX.test(options.accountId)) {
       throw new DealsRepoError(
-        'invalid_input',
+        "invalid_input",
         'accountId must match "acct_<21 lowercase alphanumeric>"',
       );
     }
@@ -336,7 +339,7 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
   if (options.primaryPersonId !== undefined) {
     if (!PERSON_ID_REGEX.test(options.primaryPersonId)) {
       throw new DealsRepoError(
-        'invalid_input',
+        "invalid_input",
         'primaryPersonId must match "per_<21 lowercase alphanumeric>"',
       );
     }
@@ -410,21 +413,18 @@ export async function update(
 ): Promise<UpdateResult> {
   if (!DEAL_ID_REGEX.test(id)) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       'deal id must match "deal_<21 lowercase alphanumeric>"',
     );
   }
 
   for (const key of Object.keys(patch)) {
     if (isImmutablePatchField(key)) {
-      throw new DealsRepoError(
-        'invalid_input',
-        `field "${key}" is immutable`,
-      );
+      throw new DealsRepoError("invalid_input", `field "${key}" is immutable`);
     }
     if (!isAllowedPatchField(key)) {
       throw new DealsRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is not patchable`,
       );
     }
@@ -439,7 +439,7 @@ export async function update(
     if (value === null) {
       if (!NULLABLE_PATCH_FIELDS.has(field)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           `field "${field}" cannot be null`,
         );
       }
@@ -456,18 +456,18 @@ export async function update(
   if (fieldsChanged.length === 0) {
     const current = await findById(db, id);
     if (!current) {
-      throw new DealsRepoError('not_found', `deal "${id}" not found`);
+      throw new DealsRepoError("not_found", `deal "${id}" not found`);
     }
     return { deal: current, fieldsChanged: [] };
   }
 
   // Optional-parent active pre-checks (TOCTOU acknowledged — see file header).
-  if ('accountId' in changes && typeof changes.accountId === 'string') {
+  if ("accountId" in changes && typeof changes.accountId === "string") {
     await assertAccountActive(db, changes.accountId);
   }
   if (
-    'primaryPersonId' in changes &&
-    typeof changes.primaryPersonId === 'string'
+    "primaryPersonId" in changes &&
+    typeof changes.primaryPersonId === "string"
   ) {
     await assertPersonActive(db, changes.primaryPersonId);
   }
@@ -477,7 +477,7 @@ export async function update(
   // value mirrored into the conditional UPDATE's WHERE clause.
   const current = await findById(db, id);
   if (!current) {
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+    throw new DealsRepoError("not_found", `deal "${id}" not found`);
   }
 
   // Compute the actual diff (filters from===to). If empty, the patch was
@@ -492,12 +492,10 @@ export async function update(
   // Re-derive fieldsChanged from the diff so the API response matches
   // reality (a same-value PATCH that included `stageId` no longer reports
   // it as changed).
-  const actualFieldsChanged = diff.map(
-    (d) => d.field as DealPatchableField,
-  );
+  const actualFieldsChanged = diff.map((d) => d.field as DealPatchableField);
 
   // Real stage transition iff the diff shows stageId actually moved.
-  const isStageTransition = diff.some((d) => d.field === 'stageId');
+  const isStageTransition = diff.some((d) => d.field === "stageId");
 
   if (isStageTransition) {
     return await applyStageTransition(
@@ -538,13 +536,14 @@ async function applyNonTransitionUpdate(
   ctx: MutationContext,
 ): Promise<UpdateResult> {
   const { actorId, now } = ctx;
-  const updateSet = { ...changes, updatedAt: now, updatedBy: actorId } as Record<
-    string,
-    unknown
-  >;
+  const updateSet = {
+    ...changes,
+    updatedAt: now,
+    updatedBy: actorId,
+  } as Record<string, unknown>;
   const updateWhere = and(
     eq(deals.id, id),
-    eq(deals.status, 'active'),
+    eq(deals.status, "active"),
     eq(deals.updatedAt, current.updatedAt),
   );
 
@@ -560,13 +559,17 @@ async function applyNonTransitionUpdate(
     // ADR-022 §7 as a known-limitation).
     const witness = sql`SELECT 1 FROM ${deals} WHERE ${deals.id} = ${id} AND ${deals.updatedAt} = ${now} AND ${deals.updatedBy} = ${actorId}`;
     const results = (await db.batch([
-      db.update(deals).set(updateSet as never).where(updateWhere).returning(),
+      db
+        .update(deals)
+        .set(updateSet as never)
+        .where(updateWhere)
+        .returning(),
       db.run(
         buildHistoryInsert(
           historyId,
           {
             dealId: id,
-            kind: 'updated' as DealHistoryKind,
+            kind: "updated" as DealHistoryKind,
             changes: JSON.stringify(diff),
             actorId: ctx.actorId,
             credentialType: ctx.credentialType,
@@ -601,13 +604,13 @@ export async function softDelete(
 ): Promise<Deal> {
   const { actorId, now } = ctx;
   const updateSet = {
-    status: 'deleted' as const,
+    status: "deleted" as const,
     deletedAt: now,
     deletedBy: actorId,
     updatedAt: now,
     updatedBy: actorId,
   };
-  const updateWhere = and(eq(deals.id, id), eq(deals.status, 'active'));
+  const updateWhere = and(eq(deals.id, id), eq(deals.status, "active"));
 
   let row: Deal | undefined;
   if (ctx.recordHistory) {
@@ -625,7 +628,7 @@ export async function softDelete(
           historyId,
           {
             dealId: id,
-            kind: 'soft_deleted' as DealHistoryKind,
+            kind: "soft_deleted" as DealHistoryKind,
             changes: null,
             actorId: ctx.actorId,
             credentialType: ctx.credentialType,
@@ -653,11 +656,11 @@ export async function softDelete(
       .limit(1);
     if (existing[0]) {
       throw new DealsRepoError(
-        'wrong_state',
+        "wrong_state",
         `deal "${id}" is already deleted`,
       );
     }
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+    throw new DealsRepoError("not_found", `deal "${id}" not found`);
   }
   return row;
 }
@@ -706,7 +709,7 @@ async function applyStageTransition(
   } as Record<string, unknown>;
   const updateWhere = and(
     eq(deals.id, id),
-    eq(deals.status, 'active'),
+    eq(deals.status, "active"),
     eq(deals.updatedAt, current.updatedAt),
     sql`${deals.stageId} != ${targetStageId}`,
     sql`EXISTS (SELECT 1 FROM stages WHERE id = ${targetStageId} AND status = 'active' AND pipeline_id = ${deals.pipelineId})`,
@@ -724,13 +727,17 @@ async function applyStageTransition(
     // same-millisecond collision race (see ADR-022 §7).
     const witness = sql`SELECT 1 FROM ${deals} WHERE ${deals.id} = ${id} AND ${deals.stageId} = ${targetStageId} AND ${deals.updatedAt} = ${now} AND ${deals.updatedBy} = ${actorId}`;
     const results = (await db.batch([
-      db.update(deals).set(updateSet as never).where(updateWhere).returning(),
+      db
+        .update(deals)
+        .set(updateSet as never)
+        .where(updateWhere)
+        .returning(),
       db.run(
         buildHistoryInsert(
           historyId,
           {
             dealId: id,
-            kind: 'stage_moved' as DealHistoryKind,
+            kind: "stage_moved" as DealHistoryKind,
             changes: stageMovedPayload,
             actorId: ctx.actorId,
             credentialType: ctx.credentialType,
@@ -804,18 +811,18 @@ async function disambiguateMissedUpdate(
     .where(eq(deals.id, id))
     .limit(1);
   const post = rows[0];
-  if (!post) return new DealsRepoError('not_found', `deal "${id}" not found`);
-  if (post.status !== 'active') {
-    return new DealsRepoError('wrong_state', `deal "${id}" is not active`);
+  if (!post) return new DealsRepoError("not_found", `deal "${id}" not found`);
+  if (post.status !== "active") {
+    return new DealsRepoError("wrong_state", `deal "${id}" is not active`);
   }
   if (post.updatedAt !== seenUpdatedAt) {
     return new DealsRepoError(
-      'conflict',
+      "conflict",
       `deal "${id}" was modified concurrently — re-read and retry`,
     );
   }
   return new DealsRepoError(
-    'invariant_violation',
+    "invariant_violation",
     `update did not land for deal "${id}"`,
   );
 }
@@ -837,18 +844,18 @@ async function disambiguateMissedTransition(
     .where(eq(deals.id, id))
     .limit(1);
   const post = rows[0];
-  if (!post) return new DealsRepoError('not_found', `deal "${id}" not found`);
-  if (post.status !== 'active') {
-    return new DealsRepoError('wrong_state', `deal "${id}" is not active`);
+  if (!post) return new DealsRepoError("not_found", `deal "${id}" not found`);
+  if (post.status !== "active") {
+    return new DealsRepoError("wrong_state", `deal "${id}" is not active`);
   }
   if (post.updatedAt !== seenUpdatedAt) {
     return new DealsRepoError(
-      'conflict',
+      "conflict",
       `deal "${id}" was modified concurrently — re-read and retry`,
     );
   }
   return new DealsRepoError(
-    'invalid_input',
+    "invalid_input",
     `stage "${targetStageId}" is not active or does not belong to deal's pipeline`,
   );
 }
@@ -873,9 +880,9 @@ async function maybeUpsertPrimaryAsContact(
   changes: Partial<Record<DealPatchableField, unknown>>,
   ctx: MutationContext,
 ): Promise<void> {
-  if (!('primaryPersonId' in changes)) return;
+  if (!("primaryPersonId" in changes)) return;
   const newPrimary = changes.primaryPersonId;
-  if (typeof newPrimary !== 'string') return; // null / undefined → no upsert
+  if (typeof newPrimary !== "string") return; // null / undefined → no upsert
   await db
     .insert(dealContacts)
     .values({
@@ -918,25 +925,25 @@ async function assertStageInActivePipeline(
   const row = rows[0];
   if (!row) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `stage "${stageId}" not found (stage_not_found)`,
     );
   }
-  if (row.stageStatus !== 'active') {
+  if (row.stageStatus !== "active") {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `stage "${stageId}" is not active (stage_not_active)`,
     );
   }
   if (row.stagePipelineId !== pipelineId) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `stage "${stageId}" does not belong to pipeline "${pipelineId}" (stage_pipeline_mismatch)`,
     );
   }
-  if (row.pipelineStatus !== 'active') {
+  if (row.pipelineStatus !== "active") {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `pipeline "${pipelineId}" is not active (pipeline_not_active)`,
     );
   }
@@ -951,13 +958,13 @@ async function assertAccountActive(db: Db, accountId: string): Promise<void> {
   const row = rows[0];
   if (!row) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `account "${accountId}" not found (account_not_found)`,
     );
   }
-  if (row.status !== 'active') {
+  if (row.status !== "active") {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `account "${accountId}" is not active (account_not_active)`,
     );
   }
@@ -972,13 +979,13 @@ async function assertPersonActive(db: Db, personId: string): Promise<void> {
   const row = rows[0];
   if (!row) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `person "${personId}" not found (person_not_found)`,
     );
   }
-  if (row.status !== 'active') {
+  if (row.status !== "active") {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `person "${personId}" is not active (person_not_active)`,
     );
   }
@@ -993,21 +1000,27 @@ interface NormalizedCreate extends CreateDealInput {
 }
 
 function validateCreate(input: CreateDealInput): NormalizedCreate {
-  if (typeof input.name !== 'string') {
-    throw new DealsRepoError('invalid_input', 'name must be a string');
+  if (typeof input.name !== "string") {
+    throw new DealsRepoError("invalid_input", "name must be a string");
   }
   const name = input.name.trim();
   validateName(name);
 
-  if (typeof input.pipelineId !== 'string' || !PIPELINE_ID_REGEX.test(input.pipelineId)) {
+  if (
+    typeof input.pipelineId !== "string" ||
+    !PIPELINE_ID_REGEX.test(input.pipelineId)
+  ) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
-  if (typeof input.stageId !== 'string' || !STAGE_ID_REGEX.test(input.stageId)) {
+  if (
+    typeof input.stageId !== "string" ||
+    !STAGE_ID_REGEX.test(input.stageId)
+  ) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       'stageId must match "stag_<21 lowercase alphanumeric>"',
     );
   }
@@ -1019,7 +1032,7 @@ function validateCreate(input: CreateDealInput): NormalizedCreate {
   };
 
   for (const field of ALLOWED_PATCH_FIELDS) {
-    if (field === 'name' || field === 'stageId') continue;
+    if (field === "name" || field === "stageId") continue;
     const inputRecord = input as unknown as Record<string, unknown>;
     if (!(field in inputRecord)) continue;
     const value = inputRecord[field];
@@ -1038,91 +1051,91 @@ function validateCreate(input: CreateDealInput): NormalizedCreate {
 
 function validateField(field: DealPatchableField, value: unknown): void {
   switch (field) {
-    case 'name':
-      if (typeof value !== 'string') {
-        throw new DealsRepoError('invalid_input', 'name must be a string');
+    case "name":
+      if (typeof value !== "string") {
+        throw new DealsRepoError("invalid_input", "name must be a string");
       }
       validateName(value.trim());
       return;
-    case 'stageId':
-      if (typeof value !== 'string' || !STAGE_ID_REGEX.test(value)) {
+    case "stageId":
+      if (typeof value !== "string" || !STAGE_ID_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           'stageId must match "stag_<21 lowercase alphanumeric>"',
         );
       }
       return;
-    case 'accountId':
-      if (typeof value !== 'string' || !ACCOUNT_ID_REGEX.test(value)) {
+    case "accountId":
+      if (typeof value !== "string" || !ACCOUNT_ID_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           'accountId must match "acct_<21 lowercase alphanumeric>"',
         );
       }
       return;
-    case 'primaryPersonId':
-      if (typeof value !== 'string' || !PERSON_ID_REGEX.test(value)) {
+    case "primaryPersonId":
+      if (typeof value !== "string" || !PERSON_ID_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           'primaryPersonId must match "per_<21 lowercase alphanumeric>"',
         );
       }
       return;
-    case 'amount':
-      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    case "amount":
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
         throw new DealsRepoError(
-          'invalid_input',
-          'amount must be a non-negative number',
+          "invalid_input",
+          "amount must be a non-negative number",
         );
       }
       return;
-    case 'currency':
-      if (typeof value !== 'string' || !CURRENCY_REGEX.test(value)) {
+    case "currency":
+      if (typeof value !== "string" || !CURRENCY_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           'currency must be ISO 4217 alpha-3 (e.g. "USD")',
         );
       }
       return;
-    case 'expectedCloseDate':
-      if (typeof value !== 'string' || !DATE_REGEX.test(value)) {
+    case "expectedCloseDate":
+      if (typeof value !== "string" || !DATE_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           'expectedCloseDate must be ISO date "YYYY-MM-DD"',
         );
       }
       return;
-    case 'probability':
+    case "probability":
       if (
-        typeof value !== 'number' ||
+        typeof value !== "number" ||
         !Number.isFinite(value) ||
         value < 0 ||
         value > 100
       ) {
         throw new DealsRepoError(
-          'invalid_input',
-          'probability must be a number in [0, 100]',
+          "invalid_input",
+          "probability must be a number in [0, 100]",
         );
       }
       return;
-    case 'ownerUserId':
-      if (typeof value !== 'string' || !USER_ID_REGEX.test(value)) {
+    case "ownerUserId":
+      if (typeof value !== "string" || !USER_ID_REGEX.test(value)) {
         throw new DealsRepoError(
-          'invalid_input',
-          'ownerUserId must be 1-64 chars [A-Za-z0-9_-]',
+          "invalid_input",
+          "ownerUserId must be 1-64 chars [A-Za-z0-9_-]",
         );
       }
       return;
-    case 'lostReason':
-      if (typeof value !== 'string') {
+    case "lostReason":
+      if (typeof value !== "string") {
         throw new DealsRepoError(
-          'invalid_input',
-          'lostReason must be a string',
+          "invalid_input",
+          "lostReason must be a string",
         );
       }
       if (value.length > LOST_REASON_MAX) {
         throw new DealsRepoError(
-          'invalid_input',
+          "invalid_input",
           `lostReason must be ≤ ${LOST_REASON_MAX} characters`,
         );
       }
@@ -1131,18 +1144,18 @@ function validateField(field: DealPatchableField, value: unknown): void {
 }
 
 function normalizeField(field: DealPatchableField, value: unknown): unknown {
-  if (field === 'name' && typeof value === 'string') return value.trim();
-  if (field === 'currency' && typeof value === 'string') {
+  if (field === "name" && typeof value === "string") return value.trim();
+  if (field === "currency" && typeof value === "string") {
     return value.trim().toUpperCase();
   }
-  if (field === 'lostReason' && typeof value === 'string') return value.trim();
+  if (field === "lostReason" && typeof value === "string") return value.trim();
   return value;
 }
 
 function validateName(value: string): void {
   if (value.length < NAME_MIN || value.length > NAME_MAX) {
     throw new DealsRepoError(
-      'invalid_input',
+      "invalid_input",
       `name must be ${NAME_MIN}-${NAME_MAX} characters`,
     );
   }
@@ -1150,10 +1163,10 @@ function validateName(value: string): void {
 
 function clampLimit(raw: unknown): number {
   if (raw === undefined || raw === null) return DEFAULT_LIMIT;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new DealsRepoError(
-      'invalid_input',
-      'limit must be a positive integer',
+      "invalid_input",
+      "limit must be a positive integer",
     );
   }
   return Math.min(raw, MAX_LIMIT);
@@ -1176,50 +1189,46 @@ export function decodeCursor(raw: string): CursorPayload {
   try {
     json = base64UrlDecode(raw);
   } catch {
-    throw new DealsRepoError('invalid_input', 'malformed cursor');
+    throw new DealsRepoError("invalid_input", "malformed cursor");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new DealsRepoError('invalid_input', 'malformed cursor');
+    throw new DealsRepoError("invalid_input", "malformed cursor");
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    throw new DealsRepoError('invalid_input', 'malformed cursor');
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new DealsRepoError("invalid_input", "malformed cursor");
   }
   const obj = parsed as Record<string, unknown>;
-  if (typeof obj.createdAt !== 'string' || typeof obj.id !== 'string') {
-    throw new DealsRepoError('invalid_input', 'malformed cursor');
+  if (typeof obj.createdAt !== "string" || typeof obj.id !== "string") {
+    throw new DealsRepoError("invalid_input", "malformed cursor");
   }
   return { createdAt: obj.createdAt, id: obj.id };
 }
 
 function base64UrlEncode(input: string): string {
   const utf8 = new TextEncoder().encode(input);
-  let bin = '';
+  let bin = "";
   for (const byte of utf8) bin += String.fromCharCode(byte);
-  const b64 = typeof btoa === 'function' ? btoa(bin) : nodeBtoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = typeof btoa === "function" ? btoa(bin) : nodeBtoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): string {
   const padded =
-    input.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (input.length % 4)) % 4);
-  const bin = typeof atob === 'function' ? atob(padded) : nodeAtob(padded);
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (input.length % 4)) % 4);
+  const bin = typeof atob === "function" ? atob(padded) : nodeAtob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
 
 function nodeBtoa(s: string): string {
-  return Buffer.from(s, 'binary').toString('base64');
+  return Buffer.from(s, "binary").toString("base64");
 }
 
 function nodeAtob(s: string): string {
-  return Buffer.from(s, 'base64').toString('binary');
+  return Buffer.from(s, "base64").toString("binary");
 }

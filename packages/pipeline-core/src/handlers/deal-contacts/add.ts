@@ -1,13 +1,13 @@
-import { dealContactsRepo, type DealContactRole } from '@flowpunk-indie/db';
+import { dealContactsRepo, type DealContactRole } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
+import type { Actor, PipelineEnv } from "../../types.js";
 import {
   buildMutationCtx,
   getDb,
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from '../_shared.js';
+} from "../_shared.js";
 
 interface AddDealContactBody {
   personId: string;
@@ -29,7 +29,7 @@ export async function handleAddDealContact(
   dealId: string,
 ): Promise<Response> {
   const body = await requireJsonBody<AddDealContactBody>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);

@@ -3,18 +3,18 @@
  * `/.well-known/oauth-*` here. Public paths (no auth required); the
  * handlers do their own credential validation per RFC.
  */
-import type { OAuthEnv } from './env.js';
-import { handleAuthorize } from './handlers/authorize.js';
-import { handleApprove, type ApproveSession } from './handlers/approve.js';
-import { handleLoginPage, handleLoginSubmit } from './handlers/login.js';
-import { handleRegister } from './handlers/register.js';
-import { handleRevoke } from './handlers/revoke.js';
-import { handleToken } from './handlers/token.js';
+import type { OAuthEnv } from "./env.js";
+import { handleAuthorize } from "./handlers/authorize.js";
+import { handleApprove, type ApproveSession } from "./handlers/approve.js";
+import { handleLoginPage, handleLoginSubmit } from "./handlers/login.js";
+import { handleRegister } from "./handlers/register.js";
+import { handleRevoke } from "./handlers/revoke.js";
+import { handleToken } from "./handlers/token.js";
 import {
   handleAuthorizationServerMetadata,
   handleProtectedResourceMetadata,
-} from './handlers/metadata.js';
-import { oauthMethodNotAllowed } from './responses.js';
+} from "./handlers/metadata.js";
+import { oauthMethodNotAllowed } from "./responses.js";
 
 export interface OAuthRouteContext {
   requestId: string;
@@ -41,65 +41,69 @@ export async function route(
   // form for the canonical MCP endpoint resource. The metadata payload
   // is the same — both refer to the same `<origin>/mcp` resource.
   if (
-    pathname === '/.well-known/oauth-protected-resource' ||
-    pathname === '/.well-known/oauth-protected-resource/mcp'
+    pathname === "/.well-known/oauth-protected-resource" ||
+    pathname === "/.well-known/oauth-protected-resource/mcp"
   ) {
-    if (request.method !== 'GET') return oauthMethodNotAllowed('GET');
+    if (request.method !== "GET") return oauthMethodNotAllowed("GET");
     return handleProtectedResourceMetadata(request, env);
   }
-  if (pathname === '/.well-known/oauth-authorization-server') {
-    if (request.method !== 'GET') return oauthMethodNotAllowed('GET');
+  if (pathname === "/.well-known/oauth-authorization-server") {
+    if (request.method !== "GET") return oauthMethodNotAllowed("GET");
     return handleAuthorizationServerMetadata(request, env);
   }
 
   // OAuth endpoints.
-  if (pathname === '/oauth/register') {
-    if (request.method !== 'POST') return oauthMethodNotAllowed('POST');
+  if (pathname === "/oauth/register") {
+    if (request.method !== "POST") return oauthMethodNotAllowed("POST");
     return handleRegister(request, env, ctx.requestId);
   }
-  if (pathname === '/oauth/authorize') {
-    if (request.method !== 'GET') return oauthMethodNotAllowed('GET');
+  if (pathname === "/oauth/authorize") {
+    if (request.method !== "GET") return oauthMethodNotAllowed("GET");
     return handleAuthorize(request, env, ctx.requestId, ctx.session);
   }
-  if (pathname === '/auth/login') {
-    if (request.method === 'GET') {
+  if (pathname === "/auth/login") {
+    if (request.method === "GET") {
       return handleLoginPage(request, env, ctx.requestId);
     }
-    if (request.method === 'POST') {
+    if (request.method === "POST") {
       return handleLoginSubmit(request, env, ctx.requestId);
     }
-    return oauthMethodNotAllowed('GET, POST');
+    return oauthMethodNotAllowed("GET, POST");
   }
-  if (pathname === '/oauth/approve') {
-    if (request.method !== 'POST') return oauthMethodNotAllowed('POST');
+  if (pathname === "/oauth/approve") {
+    if (request.method !== "POST") return oauthMethodNotAllowed("POST");
     return handleApprove(request, env, ctx.requestId, ctx.session);
   }
-  if (pathname === '/oauth/token') {
-    if (request.method !== 'POST') return oauthMethodNotAllowed('POST');
+  if (pathname === "/oauth/token") {
+    if (request.method !== "POST") return oauthMethodNotAllowed("POST");
     return handleToken(request, env, ctx.requestId);
   }
-  if (pathname === '/oauth/revoke') {
-    if (request.method !== 'POST') return oauthMethodNotAllowed('POST');
+  if (pathname === "/oauth/revoke") {
+    if (request.method !== "POST") return oauthMethodNotAllowed("POST");
     return handleRevoke(request, env, ctx.requestId);
   }
 
-  return new Response('Not Found', { status: 404 });
+  return new Response("Not Found", { status: 404 });
 }
 
-export type { OAuthEnv } from './env.js';
-export type { OAuthIdentity } from './validate.js';
-export type { ApproveSession } from './handlers/approve.js';
-export { validateOAuthToken } from './validate.js';
+export type { OAuthEnv } from "./env.js";
+export type { OAuthIdentity } from "./validate.js";
+export type { ApproveSession } from "./handlers/approve.js";
+export { validateOAuthToken } from "./validate.js";
 export {
   protectRevokedOauthTokens,
   writeUserInvalidationTombstone,
   oauthTokenHashFromRawToken,
   type OauthRevocationCacheResult,
-} from './revoke-cache.js';
-export { isIndieToken, isIndieClientId } from './codec.js';
-export { ALLOWED_SCOPES, AS_SCOPES_SUPPORTED, PRM_SCOPES_SUPPORTED } from './policy.js';
+} from "./revoke-cache.js";
+export { isIndieToken, isIndieClientId } from "./codec.js";
+export {
+  ALLOWED_SCOPES,
+  AS_SCOPES_SUPPORTED,
+  PRM_SCOPES_SUPPORTED,
+} from "./policy.js";
 export {
   getAllowedResources,
   getIssuerOrigin,
   getProtectedResource,
-} from './origin.js';
+} from "./origin.js";

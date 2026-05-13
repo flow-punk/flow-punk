@@ -1,16 +1,19 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { oauthTokensRepo, usersRepo } from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import { oauthTokensRepo, usersRepo } from "@flowpunk-indie/db";
 
-import type { OAuthEnv } from './env.js';
-import { INDIE_SCOPE } from './env.js';
-import { isIndieToken } from './codec.js';
+import type { OAuthEnv } from "./env.js";
+import { INDIE_SCOPE } from "./env.js";
+import { isIndieToken } from "./codec.js";
 import {
   oauthTokenCacheKeyFromTokenHash,
   oauthTokenHashFromRawToken,
   readOauthTokenRevocationTombstone,
   readUserInvalidationTombstone,
-} from './revoke-cache.js';
-import { isExpired, scopeListFromSerialized } from '@flowpunk-indie/oauth-protocol';
+} from "./revoke-cache.js";
+import {
+  isExpired,
+  scopeListFromSerialized,
+} from "@flowpunk-indie/oauth-protocol";
 
 const IDENTITY_CACHE_TTL_SECONDS = 60;
 
@@ -69,7 +72,10 @@ export async function validateOAuthToken(
   if (tombstone) return null;
 
   // 2-3. Identity cache hit (gated on user-invalidation tombstone).
-  const cached = await env.OAUTH_TOKEN_CACHE.get<CachedIdentity>(cacheKey, 'json');
+  const cached = await env.OAUTH_TOKEN_CACHE.get<CachedIdentity>(
+    cacheKey,
+    "json",
+  );
   if (cached) {
     if (cached.tokenHash !== tokenHash) {
       // KV value should never disagree with key; defensive.
@@ -98,13 +104,15 @@ export async function validateOAuthToken(
   const db = drizzle(env.DB);
   const row = await oauthTokensRepo.findByHash(db, tokenHash);
   if (!row) return null;
-  if (row.tokenType !== 'access') return null;
+  if (row.tokenType !== "access") return null;
   if (row.revokedAt) return null;
   if (isExpired(row.expiresAt)) return null;
   if (!allowedAudiences.includes(row.audience)) return null;
 
   // Defense-in-depth user soft-delete check.
-  const user = await usersRepo.findById(db, row.userId, { includeDeleted: true });
+  const user = await usersRepo.findById(db, row.userId, {
+    includeDeleted: true,
+  });
   if (!user || user.deletedAt) return null;
 
   const identity: OAuthIdentity = {

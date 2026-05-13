@@ -1,8 +1,8 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import assert from "node:assert/strict";
+import test from "node:test";
 
-import { route } from './router.js';
-import type { ContactsEnv } from './types.js';
+import { route } from "./router.js";
+import type { ContactsEnv } from "./types.js";
 
 /**
  * Method-dispatch and identity-guard tests. Calls that would touch D1 are
@@ -16,32 +16,29 @@ const stubEnv = {
   IDEMPOTENCY_KV: {
     get: async () => null,
     put: async () => undefined,
-  } as unknown as ContactsEnv['IDEMPOTENCY_KV'],
+  } as unknown as ContactsEnv["IDEMPOTENCY_KV"],
 } satisfies ContactsEnv;
 
 function withApikey(url: string, init?: RequestInit): Request {
   const headers = new Headers(init?.headers ?? {});
-  headers.set('X-Tenant-Id', 'ten_a');
-  headers.set('X-User-Id', 'usr_a');
-  headers.set('X-Scope', 'read');
-  headers.set('X-Credential-Type', 'apikey');
+  headers.set("X-Tenant-Id", "ten_a");
+  headers.set("X-User-Id", "usr_a");
+  headers.set("X-Scope", "read");
+  headers.set("X-Credential-Type", "apikey");
   return new Request(url, { ...init, headers });
 }
 
-test('GET /health returns 200 without identity headers', async () => {
-  const response = await route(
-    new Request('http://internal/health'),
-    stubEnv,
-  );
+test("GET /health returns 200 without identity headers", async () => {
+  const response = await route(new Request("http://internal/health"), stubEnv);
   assert.equal(response.status, 200);
   const body = (await response.json()) as { ok: boolean; service: string };
   assert.equal(body.ok, true);
-  assert.equal(body.service, 'contacts');
+  assert.equal(body.service, "contacts");
 });
 
-test('non-health request without identity headers returns 401', async () => {
+test("non-health request without identity headers returns 401", async () => {
   const response = await route(
-    new Request('http://internal/api/v1/accounts'),
+    new Request("http://internal/api/v1/accounts"),
     stubEnv,
   );
   assert.equal(response.status, 401);
@@ -50,39 +47,39 @@ test('non-health request without identity headers returns 401', async () => {
     error: { code: string };
   };
   assert.equal(body.success, false);
-  assert.equal(body.error.code, 'UNAUTHENTICATED');
+  assert.equal(body.error.code, "UNAUTHENTICATED");
 });
 
-test('GET /api/v1/people (legacy path) returns 404', async () => {
+test("GET /api/v1/people (legacy path) returns 404", async () => {
   // The persons entity moved from /api/v1/people to /api/v1/persons. The
   // old path is unreserved and falls through to the catch-all 404.
   const response = await route(
-    withApikey('http://internal/api/v1/people'),
+    withApikey("http://internal/api/v1/people"),
     stubEnv,
   );
   assert.equal(response.status, 404);
 });
 
-test('GET /api/v1/persons/:id with sub-path returns 404', async () => {
+test("GET /api/v1/persons/:id with sub-path returns 404", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/persons/per_x/notes'),
+    withApikey("http://internal/api/v1/persons/per_x/notes"),
     stubEnv,
   );
   assert.equal(response.status, 404);
 });
 
-test('PUT /api/v1/persons returns 405', async () => {
+test("PUT /api/v1/persons returns 405", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/persons', { method: 'PUT' }),
+    withApikey("http://internal/api/v1/persons", { method: "PUT" }),
     stubEnv,
   );
   assert.equal(response.status, 405);
-  assert.ok(response.headers.get('Allow')?.includes('GET'));
+  assert.ok(response.headers.get("Allow")?.includes("GET"));
 });
 
-test('POST /api/v1/persons without body returns 400 INVALID_BODY', async () => {
+test("POST /api/v1/persons without body returns 400 INVALID_BODY", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/persons', { method: 'POST' }),
+    withApikey("http://internal/api/v1/persons", { method: "POST" }),
     stubEnv,
   );
   assert.equal(response.status, 400);
@@ -90,12 +87,12 @@ test('POST /api/v1/persons without body returns 400 INVALID_BODY', async () => {
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'INVALID_BODY');
+  assert.equal(body.error.code, "INVALID_BODY");
 });
 
-test('GET /api/v1/persons?limit=999 returns 400 INVALID_INPUT', async () => {
+test("GET /api/v1/persons?limit=999 returns 400 INVALID_INPUT", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/persons?limit=999'),
+    withApikey("http://internal/api/v1/persons?limit=999"),
     stubEnv,
   );
   assert.equal(response.status, 400);
@@ -103,12 +100,12 @@ test('GET /api/v1/persons?limit=999 returns 400 INVALID_INPUT', async () => {
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'INVALID_INPUT');
+  assert.equal(body.error.code, "INVALID_INPUT");
 });
 
-test('GET /api/v1/persons?accountId=bogus returns 400 INVALID_INPUT', async () => {
+test("GET /api/v1/persons?accountId=bogus returns 400 INVALID_INPUT", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/persons?accountId=bogus'),
+    withApikey("http://internal/api/v1/persons?accountId=bogus"),
     stubEnv,
   );
   assert.equal(response.status, 400);
@@ -116,50 +113,47 @@ test('GET /api/v1/persons?accountId=bogus returns 400 INVALID_INPUT', async () =
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'INVALID_INPUT');
+  assert.equal(body.error.code, "INVALID_INPUT");
 });
 
-test('GET /api/v1/accounts/:id with sub-path returns 404', async () => {
+test("GET /api/v1/accounts/:id with sub-path returns 404", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/accounts/acct_x/people'),
+    withApikey("http://internal/api/v1/accounts/acct_x/people"),
     stubEnv,
   );
   assert.equal(response.status, 404);
 });
 
-test('PUT /api/v1/accounts returns 405', async () => {
+test("PUT /api/v1/accounts returns 405", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/accounts', { method: 'PUT' }),
+    withApikey("http://internal/api/v1/accounts", { method: "PUT" }),
     stubEnv,
   );
   assert.equal(response.status, 405);
-  assert.ok(response.headers.get('Allow')?.includes('GET'));
+  assert.ok(response.headers.get("Allow")?.includes("GET"));
 });
 
-test('GET /unknown with apikey identity returns 404', async () => {
-  const response = await route(
-    withApikey('http://internal/unknown'),
-    stubEnv,
-  );
+test("GET /unknown with apikey identity returns 404", async () => {
+  const response = await route(withApikey("http://internal/unknown"), stubEnv);
   assert.equal(response.status, 404);
   const body = (await response.json()) as {
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'NOT_FOUND');
+  assert.equal(body.error.code, "NOT_FOUND");
 });
 
-test('POST /health returns 405', async () => {
+test("POST /health returns 405", async () => {
   const response = await route(
-    new Request('http://internal/health', { method: 'POST' }),
+    new Request("http://internal/health", { method: "POST" }),
     stubEnv,
   );
   assert.equal(response.status, 405);
 });
 
-test('POST /api/v1/accounts without body returns 400 INVALID_BODY', async () => {
+test("POST /api/v1/accounts without body returns 400 INVALID_BODY", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/accounts', { method: 'POST' }),
+    withApikey("http://internal/api/v1/accounts", { method: "POST" }),
     stubEnv,
   );
   // No JSON body — repo never reached, returns 400 before touching D1.
@@ -168,12 +162,12 @@ test('POST /api/v1/accounts without body returns 400 INVALID_BODY', async () => 
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'INVALID_BODY');
+  assert.equal(body.error.code, "INVALID_BODY");
 });
 
-test('GET /api/v1/accounts?limit=999 returns 400 INVALID_INPUT', async () => {
+test("GET /api/v1/accounts?limit=999 returns 400 INVALID_INPUT", async () => {
   const response = await route(
-    withApikey('http://internal/api/v1/accounts?limit=999'),
+    withApikey("http://internal/api/v1/accounts?limit=999"),
     stubEnv,
   );
   assert.equal(response.status, 400);
@@ -181,5 +175,5 @@ test('GET /api/v1/accounts?limit=999 returns 400 INVALID_INPUT', async () => {
     success: boolean;
     error: { code: string };
   };
-  assert.equal(body.error.code, 'INVALID_INPUT');
+  assert.equal(body.error.code, "INVALID_INPUT");
 });

@@ -14,12 +14,12 @@
  * Soft-delete is atomic: the conditional UPDATE includes a `NOT EXISTS`
  * clause that blocks deletion when any active deal references the stage.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, asc, eq, or, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, asc, eq, or, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
-import { deals } from '../schema/deals.js';
-import { pipelines } from '../schema/pipelines.js';
+import { deals } from "../schema/deals.js";
+import { pipelines } from "../schema/pipelines.js";
 import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
@@ -31,21 +31,21 @@ import {
   type Stage,
   type StagePatchableField,
   type StageTerminalKind,
-} from '../schema/stages.js';
+} from "../schema/stages.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class StagesRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
   ) {
     super(message);
-    this.name = 'StagesRepoError';
+    this.name = "StagesRepoError";
   }
 }
 
@@ -104,13 +104,13 @@ export async function create(
   await assertPipelineCanAcceptStage(db, normalized.pipelineId);
 
   const row: NewStage = {
-    id: generateId('stag'),
+    id: generateId("stag"),
     pipelineId: normalized.pipelineId,
     name: normalized.name,
     position: normalized.position,
     terminalKind: normalized.terminalKind ?? null,
     probability: normalized.probability ?? null,
-    status: 'active',
+    status: "active",
     deletedAt: null,
     deletedBy: null,
     createdAt: now,
@@ -124,15 +124,15 @@ export async function create(
     const stage = inserted[0];
     if (!stage) {
       throw new StagesRepoError(
-        'invariant_violation',
-        'insert returned no row',
+        "invariant_violation",
+        "insert returned no row",
       );
     }
     return stage;
   } catch (err) {
     if (isPositionUniqueViolation(err)) {
       throw new StagesRepoError(
-        'wrong_state',
+        "wrong_state",
         `position ${normalized.position} is already taken in pipeline "${normalized.pipelineId}"`,
       );
     }
@@ -148,7 +148,7 @@ export async function findById(
   const rows = await db.select().from(stages).where(eq(stages.id, id)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!options.includeDeleted && row.status !== 'active') return null;
+  if (!options.includeDeleted && row.status !== "active") return null;
   return row;
 }
 
@@ -161,7 +161,7 @@ export async function findById(
 export async function list(db: Db, options: ListOptions): Promise<ListResult> {
   if (!PIPELINE_ID_REGEX.test(options.pipelineId)) {
     throw new StagesRepoError(
-      'invalid_input',
+      "invalid_input",
       'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
@@ -169,12 +169,15 @@ export async function list(db: Db, options: ListOptions): Promise<ListResult> {
   const cursor = options.cursor ? decodeStageCursor(options.cursor) : null;
 
   const filters = [eq(stages.pipelineId, options.pipelineId)];
-  if (!options.includeDeleted) filters.push(eq(stages.status, 'active'));
+  if (!options.includeDeleted) filters.push(eq(stages.status, "active"));
   if (cursor) {
     filters.push(
       or(
         sql`${stages.position} > ${cursor.position}`,
-        and(eq(stages.position, cursor.position), sql`${stages.id} > ${cursor.id}`),
+        and(
+          eq(stages.position, cursor.position),
+          sql`${stages.id} > ${cursor.id}`,
+        ),
       )!,
     );
   }
@@ -208,14 +211,11 @@ export async function update(
 ): Promise<UpdateResult> {
   for (const key of Object.keys(patch)) {
     if (isImmutablePatchField(key)) {
-      throw new StagesRepoError(
-        'invalid_input',
-        `field "${key}" is immutable`,
-      );
+      throw new StagesRepoError("invalid_input", `field "${key}" is immutable`);
     }
     if (!isAllowedPatchField(key)) {
       throw new StagesRepoError(
-        'invalid_input',
+        "invalid_input",
         `field "${key}" is not patchable`,
       );
     }
@@ -230,7 +230,7 @@ export async function update(
     if (value === null) {
       if (!NULLABLE_PATCH_FIELDS.has(field)) {
         throw new StagesRepoError(
-          'invalid_input',
+          "invalid_input",
           `field "${field}" cannot be null`,
         );
       }
@@ -247,7 +247,7 @@ export async function update(
   if (fieldsChanged.length === 0) {
     const current = await findById(db, id);
     if (!current) {
-      throw new StagesRepoError('not_found', `stage "${id}" not found`);
+      throw new StagesRepoError("not_found", `stage "${id}" not found`);
     }
     return { stage: current, fieldsChanged: [] };
   }
@@ -256,7 +256,7 @@ export async function update(
     const updated = await db
       .update(stages)
       .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-      .where(and(eq(stages.id, id), eq(stages.status, 'active')))
+      .where(and(eq(stages.id, id), eq(stages.status, "active")))
       .returning();
 
     const row = updated[0];
@@ -267,12 +267,9 @@ export async function update(
         .where(eq(stages.id, id))
         .limit(1);
       if (existing[0]) {
-        throw new StagesRepoError(
-          'wrong_state',
-          `stage "${id}" is not active`,
-        );
+        throw new StagesRepoError("wrong_state", `stage "${id}" is not active`);
       }
-      throw new StagesRepoError('not_found', `stage "${id}" not found`);
+      throw new StagesRepoError("not_found", `stage "${id}" not found`);
     }
 
     return { stage: row, fieldsChanged };
@@ -280,8 +277,8 @@ export async function update(
     if (err instanceof StagesRepoError) throw err;
     if (isPositionUniqueViolation(err)) {
       throw new StagesRepoError(
-        'wrong_state',
-        'position is already taken by another active stage in this pipeline',
+        "wrong_state",
+        "position is already taken by another active stage in this pipeline",
       );
     }
     throw err;
@@ -304,7 +301,7 @@ export async function softDelete(
   const updated = await db
     .update(stages)
     .set({
-      status: 'deleted',
+      status: "deleted",
       deletedAt: now,
       deletedBy: actorId,
       updatedAt: now,
@@ -313,7 +310,7 @@ export async function softDelete(
     .where(
       and(
         eq(stages.id, id),
-        eq(stages.status, 'active'),
+        eq(stages.status, "active"),
         sql`NOT EXISTS (SELECT 1 FROM deals WHERE stage_id = ${id} AND status = 'active')`,
         sql`(SELECT COUNT(*) FROM stages AS active_stages WHERE active_stages.pipeline_id = ${stages.pipelineId} AND active_stages.status = 'active') > ${MIN_ACTIVE_STAGES_PER_PIPELINE}`,
       ),
@@ -329,31 +326,31 @@ export async function softDelete(
     .where(eq(stages.id, id))
     .limit(1);
   if (!existing[0]) {
-    throw new StagesRepoError('not_found', `stage "${id}" not found`);
+    throw new StagesRepoError("not_found", `stage "${id}" not found`);
   }
-  if (existing[0].status !== 'active') {
-    throw new StagesRepoError('wrong_state', `stage "${id}" is already deleted`);
+  if (existing[0].status !== "active") {
+    throw new StagesRepoError(
+      "wrong_state",
+      `stage "${id}" is already deleted`,
+    );
   }
   const dealCount = await db
     .select({ id: deals.id })
     .from(deals)
-    .where(and(eq(deals.stageId, id), eq(deals.status, 'active')))
+    .where(and(eq(deals.stageId, id), eq(deals.status, "active")))
     .limit(1);
   if (dealCount[0]) {
-    throw new StagesRepoError(
-      'wrong_state',
-      `stage "${id}" has active deals`,
-    );
+    throw new StagesRepoError("wrong_state", `stage "${id}" has active deals`);
   }
   const activeStageCount = await countActiveStages(db, existing[0].pipelineId);
   if (activeStageCount <= MIN_ACTIVE_STAGES_PER_PIPELINE) {
     throw new StagesRepoError(
-      'wrong_state',
+      "wrong_state",
       `pipeline "${existing[0].pipelineId}" must keep at least ${MIN_ACTIVE_STAGES_PER_PIPELINE} active stages`,
     );
   }
   throw new StagesRepoError(
-    'invariant_violation',
+    "invariant_violation",
     `stage "${id}" softDelete failed for unknown reason`,
   );
 }
@@ -365,7 +362,7 @@ async function assertPipelineCanAcceptStage(
   const activeStageCount = await countActiveStages(db, pipelineId);
   if (activeStageCount >= MAX_ACTIVE_STAGES_PER_PIPELINE) {
     throw new StagesRepoError(
-      'wrong_state',
+      "wrong_state",
       `pipeline "${pipelineId}" already has the maximum ${MAX_ACTIVE_STAGES_PER_PIPELINE} active stages`,
     );
   }
@@ -375,7 +372,7 @@ async function countActiveStages(db: Db, pipelineId: string): Promise<number> {
   const rows = await db
     .select({ id: stages.id })
     .from(stages)
-    .where(and(eq(stages.pipelineId, pipelineId), eq(stages.status, 'active')))
+    .where(and(eq(stages.pipelineId, pipelineId), eq(stages.status, "active")))
     .limit(MAX_ACTIVE_STAGES_PER_PIPELINE + 1);
   return rows.length;
 }
@@ -391,10 +388,7 @@ async function countActiveStages(db: Db, pipelineId: string): Promise<number> {
  * cascade-block guards the other direction (soft-deleting a pipeline
  * with active stages is rejected atomically).
  */
-async function assertPipelineActive(
-  db: Db,
-  pipelineId: string,
-): Promise<void> {
+async function assertPipelineActive(db: Db, pipelineId: string): Promise<void> {
   const rows = await db
     .select({ status: pipelines.status })
     .from(pipelines)
@@ -403,13 +397,13 @@ async function assertPipelineActive(
   const row = rows[0];
   if (!row) {
     throw new StagesRepoError(
-      'invalid_input',
+      "invalid_input",
       `pipeline "${pipelineId}" not found (pipeline_not_found)`,
     );
   }
-  if (row.status !== 'active') {
+  if (row.status !== "active") {
     throw new StagesRepoError(
-      'invalid_input',
+      "invalid_input",
       `pipeline "${pipelineId}" is not active (pipeline_not_active)`,
     );
   }
@@ -426,22 +420,29 @@ interface NormalizedCreate {
 }
 
 function validateCreate(input: CreateStageInput): NormalizedCreate {
-  if (typeof input.pipelineId !== 'string' || !PIPELINE_ID_REGEX.test(input.pipelineId)) {
+  if (
+    typeof input.pipelineId !== "string" ||
+    !PIPELINE_ID_REGEX.test(input.pipelineId)
+  ) {
     throw new StagesRepoError(
-      'invalid_input',
+      "invalid_input",
       'pipelineId must match "pipe_<21 lowercase alphanumeric>"',
     );
   }
-  if (typeof input.name !== 'string') {
-    throw new StagesRepoError('invalid_input', 'name must be a string');
+  if (typeof input.name !== "string") {
+    throw new StagesRepoError("invalid_input", "name must be a string");
   }
   const name = input.name.trim();
   validateName(name);
 
-  if (typeof input.position !== 'number' || !Number.isInteger(input.position) || input.position < 0) {
+  if (
+    typeof input.position !== "number" ||
+    !Number.isInteger(input.position) ||
+    input.position < 0
+  ) {
     throw new StagesRepoError(
-      'invalid_input',
-      'position must be a non-negative integer',
+      "invalid_input",
+      "position must be a non-negative integer",
     );
   }
 
@@ -451,7 +452,7 @@ function validateCreate(input: CreateStageInput): NormalizedCreate {
     position: input.position,
   };
 
-  if ('terminalKind' in input) {
+  if ("terminalKind" in input) {
     if (input.terminalKind === null || input.terminalKind === undefined) {
       out.terminalKind = null;
     } else {
@@ -459,7 +460,7 @@ function validateCreate(input: CreateStageInput): NormalizedCreate {
       out.terminalKind = input.terminalKind;
     }
   }
-  if ('probability' in input) {
+  if ("probability" in input) {
     if (input.probability === null || input.probability === undefined) {
       out.probability = null;
     } else {
@@ -472,72 +473,72 @@ function validateCreate(input: CreateStageInput): NormalizedCreate {
 
 function validateField(field: StagePatchableField, value: unknown): void {
   switch (field) {
-    case 'name':
-      if (typeof value !== 'string') {
-        throw new StagesRepoError('invalid_input', 'name must be a string');
+    case "name":
+      if (typeof value !== "string") {
+        throw new StagesRepoError("invalid_input", "name must be a string");
       }
       validateName(value.trim());
       return;
-    case 'position':
-      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    case "position":
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
         throw new StagesRepoError(
-          'invalid_input',
-          'position must be a non-negative integer',
+          "invalid_input",
+          "position must be a non-negative integer",
         );
       }
       return;
-    case 'terminalKind':
+    case "terminalKind":
       validateTerminalKind(value);
       return;
-    case 'probability':
+    case "probability":
       validateProbability(value);
       return;
   }
 }
 
 function normalizeField(field: StagePatchableField, value: unknown): unknown {
-  if (field === 'name' && typeof value === 'string') return value.trim();
+  if (field === "name" && typeof value === "string") return value.trim();
   return value;
 }
 
 function validateName(value: string): void {
   if (value.length < NAME_MIN || value.length > NAME_MAX) {
     throw new StagesRepoError(
-      'invalid_input',
+      "invalid_input",
       `name must be ${NAME_MIN}-${NAME_MAX} characters`,
     );
   }
 }
 
 function validateTerminalKind(value: unknown): void {
-  if (typeof value !== 'string' || !TERMINAL_KIND_SET.has(value)) {
+  if (typeof value !== "string" || !TERMINAL_KIND_SET.has(value)) {
     throw new StagesRepoError(
-      'invalid_input',
-      `terminalKind must be one of ${[...TERMINAL_KIND_VALUES].join(' | ')}`,
+      "invalid_input",
+      `terminalKind must be one of ${[...TERMINAL_KIND_VALUES].join(" | ")}`,
     );
   }
 }
 
 function validateProbability(value: unknown): void {
   if (
-    typeof value !== 'number' ||
+    typeof value !== "number" ||
     !Number.isFinite(value) ||
     value < 0 ||
     value > 100
   ) {
     throw new StagesRepoError(
-      'invalid_input',
-      'probability must be a number in [0, 100]',
+      "invalid_input",
+      "probability must be a number in [0, 100]",
     );
   }
 }
 
 function clampLimit(raw: unknown): number {
   if (raw === undefined || raw === null) return DEFAULT_LIMIT;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1) {
     throw new StagesRepoError(
-      'invalid_input',
-      'limit must be a positive integer',
+      "invalid_input",
+      "limit must be a positive integer",
     );
   }
   return Math.min(raw, MAX_LIMIT);
@@ -565,54 +566,50 @@ function decodeStageCursor(raw: string): StageCursorPayload {
   try {
     json = base64UrlDecode(raw);
   } catch {
-    throw new StagesRepoError('invalid_input', 'malformed cursor');
+    throw new StagesRepoError("invalid_input", "malformed cursor");
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
   } catch {
-    throw new StagesRepoError('invalid_input', 'malformed cursor');
+    throw new StagesRepoError("invalid_input", "malformed cursor");
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    throw new StagesRepoError('invalid_input', 'malformed cursor');
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new StagesRepoError("invalid_input", "malformed cursor");
   }
   const obj = parsed as Record<string, unknown>;
   if (
-    typeof obj.position !== 'number' ||
+    typeof obj.position !== "number" ||
     !Number.isInteger(obj.position) ||
-    typeof obj.id !== 'string'
+    typeof obj.id !== "string"
   ) {
-    throw new StagesRepoError('invalid_input', 'malformed cursor');
+    throw new StagesRepoError("invalid_input", "malformed cursor");
   }
   return { position: obj.position, id: obj.id };
 }
 
 function base64UrlEncode(input: string): string {
   const utf8 = new TextEncoder().encode(input);
-  let bin = '';
+  let bin = "";
   for (const byte of utf8) bin += String.fromCharCode(byte);
-  const b64 = typeof btoa === 'function' ? btoa(bin) : nodeBtoa(bin);
-  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const b64 = typeof btoa === "function" ? btoa(bin) : nodeBtoa(bin);
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): string {
   const padded =
-    input.replace(/-/g, '+').replace(/_/g, '/') +
-    '='.repeat((4 - (input.length % 4)) % 4);
-  const bin = typeof atob === 'function' ? atob(padded) : nodeAtob(padded);
+    input.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (input.length % 4)) % 4);
+  const bin = typeof atob === "function" ? atob(padded) : nodeAtob(padded);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new TextDecoder().decode(bytes);
 }
 
 function nodeBtoa(s: string): string {
-  return Buffer.from(s, 'binary').toString('base64');
+  return Buffer.from(s, "binary").toString("base64");
 }
 
 function nodeAtob(s: string): string {
-  return Buffer.from(s, 'base64').toString('binary');
+  return Buffer.from(s, "base64").toString("binary");
 }

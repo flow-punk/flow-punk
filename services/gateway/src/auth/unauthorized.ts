@@ -11,17 +11,17 @@ export interface UnauthorizedOptions {
 
 export function unauthorized(options?: UnauthorizedOptions): Response {
   const challenge = buildWwwAuthenticate(options);
-  return new Response(JSON.stringify({ error: 'unauthorized' }), {
+  return new Response(JSON.stringify({ error: "unauthorized" }), {
     status: 401,
     headers: {
-      'Content-Type': 'application/json',
-      'WWW-Authenticate': challenge,
+      "Content-Type": "application/json",
+      "WWW-Authenticate": challenge,
     },
   });
 }
 
 function buildWwwAuthenticate(options?: UnauthorizedOptions): string {
-  if (!options?.invalidToken) return 'Bearer';
-  const description = options.description ?? 'The access token is invalid';
+  if (!options?.invalidToken) return "Bearer";
+  const description = options.description ?? "The access token is invalid";
   return `Bearer error="invalid_token", error_description="${description}"`;
 }

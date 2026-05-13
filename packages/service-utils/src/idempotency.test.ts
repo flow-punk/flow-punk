@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import assert from "node:assert/strict";
+import test from "node:test";
 
-import { withIdempotency, type IdempotencyKvNamespace } from './idempotency.js';
+import { withIdempotency, type IdempotencyKvNamespace } from "./idempotency.js";
 
 function makeKv(): IdempotencyKvNamespace & { _store: Map<string, string> } {
   const store = new Map<string, string>();
@@ -25,14 +25,14 @@ function makeRequest(
   body: string | null,
   headers: Record<string, string> = {},
 ): Request {
-  return new Request('http://internal/api/v1/tenants', {
+  return new Request("http://internal/api/v1/tenants", {
     method,
     headers,
     body,
   });
 }
 
-test('withIdempotency bypasses caching when header is absent', async () => {
+test("withIdempotency bypasses caching when header is absent", async () => {
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -41,16 +41,16 @@ test('withIdempotency bypasses caching when header is absent', async () => {
   };
 
   const r1 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}'),
+    makeRequest("POST", '{"slug":"acme"}'),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}'),
+    makeRequest("POST", '{"slug":"acme"}'),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(r1.status, 201);
@@ -59,7 +59,7 @@ test('withIdempotency bypasses caching when header is absent', async () => {
   assert.equal(kv._store.size, 0);
 });
 
-test('withIdempotency caches response and replays with header on hit', async () => {
+test("withIdempotency caches response and replays with header on hit", async () => {
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -67,29 +67,29 @@ test('withIdempotency caches response and replays with header on hit', async () 
     return new Response('{"id":"ten_1"}', { status: 201 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   const r1 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(callCount, 1);
   assert.equal(r1.status, 201);
-  assert.equal(r1.headers.get('Idempotency-Replayed'), null);
+  assert.equal(r1.headers.get("Idempotency-Replayed"), null);
   assert.equal(r2.status, 201);
-  assert.equal(r2.headers.get('Idempotency-Replayed'), 'true');
+  assert.equal(r2.headers.get("Idempotency-Replayed"), "true");
   assert.equal(await r2.text(), '{"id":"ten_1"}');
 });
 
-test('withIdempotency returns 422 when same key is reused with different body', async () => {
+test("withIdempotency returns 422 when same key is reused with different body", async () => {
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -97,27 +97,27 @@ test('withIdempotency returns 422 when same key is reused with different body', 
     return new Response('{"id":"ten_1"}', { status: 201 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"slug":"different"}', headers),
+    makeRequest("POST", '{"slug":"different"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(callCount, 1);
   assert.equal(r2.status, 422);
   const body = (await r2.json()) as { error: { code: string } };
-  assert.equal(body.error.code, 'IDEMPOTENCY_KEY_REUSED');
+  assert.equal(body.error.code, "IDEMPOTENCY_KEY_REUSED");
 });
 
-test('withIdempotency does not cache 5xx responses', async () => {
+test("withIdempotency does not cache 5xx responses", async () => {
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -125,18 +125,18 @@ test('withIdempotency does not cache 5xx responses', async () => {
     return new Response('{"error":"boom"}', { status: 500 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   const r1 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(callCount, 2);
@@ -145,7 +145,7 @@ test('withIdempotency does not cache 5xx responses', async () => {
   assert.equal(kv._store.size, 0);
 });
 
-test('withIdempotency does not cache 4xx responses (no validation-error pinning)', async () => {
+test("withIdempotency does not cache 4xx responses (no validation-error pinning)", async () => {
   // 4xx means the request was rejected before any side effect — a corrected
   // retry under the same key must reach the handler. Caching the 4xx would
   // wedge MCP tool-call slots whose JSON-RPC id (and thus synthesized
@@ -157,28 +157,28 @@ test('withIdempotency does not cache 4xx responses (no validation-error pinning)
     return new Response('{"error":"INVALID_SLUG"}', { status: 400 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   const r1 = await withIdempotency(
-    makeRequest('POST', '{"slug":"BAD"}', headers),
+    makeRequest("POST", '{"slug":"BAD"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"slug":"BAD"}', headers),
+    makeRequest("POST", '{"slug":"BAD"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(callCount, 2);
   assert.equal(r1.status, 400);
   assert.equal(r2.status, 400);
-  assert.equal(r2.headers.get('Idempotency-Replayed'), null);
+  assert.equal(r2.headers.get("Idempotency-Replayed"), null);
   assert.equal(kv._store.size, 0);
 });
 
-test('withIdempotency lets corrected payload succeed after a prior 4xx under the same key', async () => {
+test("withIdempotency lets corrected payload succeed after a prior 4xx under the same key", async () => {
   // Regression for the MCP-connector pin: same idempotency key, first call
   // returns 4xx (validation), second call has a corrected body and must
   // execute normally rather than 422 IDEMPOTENCY_KEY_REUSED.
@@ -192,18 +192,18 @@ test('withIdempotency lets corrected payload succeed after a prior 4xx under the
     return new Response('{"id":"per_1"}', { status: 201 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   const r1 = await withIdempotency(
-    makeRequest('POST', '{"phone":"1-617-555-0100"}', headers),
+    makeRequest("POST", '{"phone":"1-617-555-0100"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const r2 = await withIdempotency(
-    makeRequest('POST', '{"phone":"+1-617-555-0100"}', headers),
+    makeRequest("POST", '{"phone":"+1-617-555-0100"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   assert.equal(r1.status, 400);
@@ -211,7 +211,7 @@ test('withIdempotency lets corrected payload succeed after a prior 4xx under the
   assert.equal(callCount, 2);
 });
 
-test('withIdempotency isolates by scopeKey (no cross-tenant collision)', async () => {
+test("withIdempotency isolates by scopeKey (no cross-tenant collision)", async () => {
   const kv = makeKv();
   let callCount = 0;
   const handler = async (): Promise<Response> => {
@@ -219,18 +219,18 @@ test('withIdempotency isolates by scopeKey (no cross-tenant collision)', async (
     return new Response(`{"caller":"${callCount}"}`, { status: 201 });
   };
 
-  const headers = { 'X-Idempotency-Key': 'key-1' };
+  const headers = { "X-Idempotency-Key": "key-1" };
   const tenantA = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   const tenantB = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', headers),
+    makeRequest("POST", '{"slug":"acme"}', headers),
     kv,
     handler,
-    { scopeKey: 'ten_b:usr_b' },
+    { scopeKey: "ten_b:usr_b" },
   );
 
   assert.equal(callCount, 2);
@@ -238,40 +238,40 @@ test('withIdempotency isolates by scopeKey (no cross-tenant collision)', async (
   assert.equal(await tenantB.text(), '{"caller":"2"}');
 });
 
-test('withIdempotency rejects empty idempotency key with 400', async () => {
+test("withIdempotency rejects empty idempotency key with 400", async () => {
   const kv = makeKv();
   const handler = async (): Promise<Response> => {
-    throw new Error('handler should not run');
+    throw new Error("handler should not run");
   };
 
   const r = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': '' }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": "" }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   assert.equal(r.status, 400);
   const body = (await r.json()) as { error: { code: string } };
-  assert.equal(body.error.code, 'INVALID_IDEMPOTENCY_KEY');
+  assert.equal(body.error.code, "INVALID_IDEMPOTENCY_KEY");
 });
 
-test('withIdempotency rejects over-length idempotency key with 400', async () => {
+test("withIdempotency rejects over-length idempotency key with 400", async () => {
   const kv = makeKv();
   const handler = async (): Promise<Response> => {
-    throw new Error('handler should not run');
+    throw new Error("handler should not run");
   };
 
-  const overLong = 'x'.repeat(256);
+  const overLong = "x".repeat(256);
   const r = await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': overLong }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": overLong }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
   assert.equal(r.status, 400);
 });
 
-test('withIdempotency without keyPrefix produces idemp:<hash> (managed compat)', async () => {
+test("withIdempotency without keyPrefix produces idemp:<hash> (managed compat)", async () => {
   // Cache key shape MUST stay byte-identical to the pre-consolidation
   // format when keyPrefix is unset, otherwise managed wrappers — which
   // continue to omit the option — would see a 24h cache transient on
@@ -281,10 +281,10 @@ test('withIdempotency without keyPrefix produces idemp:<hash> (managed compat)',
     new Response('{"ok":true}', { status: 201 });
 
   await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": "k" }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a' },
+    { scopeKey: "ten_a:usr_a" },
   );
 
   const keys = Array.from(kv._store.keys());
@@ -292,7 +292,7 @@ test('withIdempotency without keyPrefix produces idemp:<hash> (managed compat)',
   assert.match(keys[0]!, /^idemp:[0-9a-f]{64}$/);
 });
 
-test('withIdempotency with keyPrefix prepends prefix between idemp: and the hash', async () => {
+test("withIdempotency with keyPrefix prepends prefix between idemp: and the hash", async () => {
   // Indie services pass `keyPrefix: 'contacts:' | 'pipeline:' | 'users:'`
   // so a single shared IDEMPOTENCY_KV namespace can be listed/cleared
   // per-service via `wrangler kv key list --prefix idem:contacts:`.
@@ -301,10 +301,10 @@ test('withIdempotency with keyPrefix prepends prefix between idemp: and the hash
     new Response('{"ok":true}', { status: 201 });
 
   await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": "k" }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a', keyPrefix: 'contacts:' },
+    { scopeKey: "ten_a:usr_a", keyPrefix: "contacts:" },
   );
 
   const keys = Array.from(kv._store.keys());
@@ -312,7 +312,7 @@ test('withIdempotency with keyPrefix prepends prefix between idemp: and the hash
   assert.match(keys[0]!, /^idemp:contacts:[0-9a-f]{64}$/);
 });
 
-test('withIdempotency keyPrefix does not collide across services', async () => {
+test("withIdempotency keyPrefix does not collide across services", async () => {
   // Same scope + same path + same idemKey under two different prefixes
   // must produce two distinct cache entries — proves the prefix is part
   // of the lookup, not just decoration.
@@ -321,16 +321,16 @@ test('withIdempotency keyPrefix does not collide across services', async () => {
     new Response('{"ok":true}', { status: 201 });
 
   await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": "k" }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a', keyPrefix: 'contacts:' },
+    { scopeKey: "ten_a:usr_a", keyPrefix: "contacts:" },
   );
   await withIdempotency(
-    makeRequest('POST', '{"slug":"acme"}', { 'X-Idempotency-Key': 'k' }),
+    makeRequest("POST", '{"slug":"acme"}', { "X-Idempotency-Key": "k" }),
     kv,
     handler,
-    { scopeKey: 'ten_a:usr_a', keyPrefix: 'pipeline:' },
+    { scopeKey: "ten_a:usr_a", keyPrefix: "pipeline:" },
   );
 
   assert.equal(kv._store.size, 2);

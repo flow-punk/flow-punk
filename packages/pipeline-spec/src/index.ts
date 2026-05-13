@@ -5,49 +5,49 @@
  * Source of truth: `indie/packages/db/src/schema/{pipelines,stages,deals}.ts`.
  */
 
-import { tableToSchemas } from '@flowpunk-indie/openapi-from-drizzle';
+import { tableToSchemas } from "@flowpunk-indie/openapi-from-drizzle";
 import {
   ALLOWED_PATCH_FIELDS as PIPELINE_PATCH,
   NULLABLE_PATCH_FIELDS as PIPELINE_NULLABLE,
   pipelines,
-} from '@flowpunk-indie/db/schema/pipelines';
+} from "@flowpunk-indie/db/schema/pipelines";
 import {
   ALLOWED_PATCH_FIELDS as STAGE_PATCH,
   NULLABLE_PATCH_FIELDS as STAGE_NULLABLE,
   TERMINAL_KIND_VALUES,
   stages,
-} from '@flowpunk-indie/db/schema/stages';
+} from "@flowpunk-indie/db/schema/stages";
 import {
   ALLOWED_PATCH_FIELDS as DEAL_PATCH,
   NULLABLE_PATCH_FIELDS as DEAL_NULLABLE,
   deals,
-} from '@flowpunk-indie/db/schema/deals';
+} from "@flowpunk-indie/db/schema/deals";
 import {
   DEAL_CONTACT_ROLE_VALUES,
   dealContacts,
-} from '@flowpunk-indie/db/schema/deal-contacts';
+} from "@flowpunk-indie/db/schema/deal-contacts";
 import {
   DEAL_HISTORY_CREDENTIAL_TYPES,
   DEAL_HISTORY_KINDS,
   dealHistory,
-} from '@flowpunk-indie/db/schema/deal-history';
+} from "@flowpunk-indie/db/schema/deal-history";
 
-const PIPELINE_STATUSES = ['active', 'deleted'] as const;
-const STAGE_STATUSES = ['active', 'deleted'] as const;
-const DEAL_STATUSES = ['active', 'deleted'] as const;
+const PIPELINE_STATUSES = ["active", "deleted"] as const;
+const STAGE_STATUSES = ["active", "deleted"] as const;
+const DEAL_STATUSES = ["active", "deleted"] as const;
 
 const pipelineSchemas = tableToSchemas(pipelines, {
-  name: 'Pipeline',
+  name: "Pipeline",
   enums: { status: PIPELINE_STATUSES },
   patch: { allowed: PIPELINE_PATCH, nullable: PIPELINE_NULLABLE },
 });
 const stageSchemas = tableToSchemas(stages, {
-  name: 'Stage',
+  name: "Stage",
   enums: { status: STAGE_STATUSES, terminalKind: TERMINAL_KIND_VALUES },
   patch: { allowed: STAGE_PATCH, nullable: STAGE_NULLABLE },
 });
 const dealSchemas = tableToSchemas(deals, {
-  name: 'Deal',
+  name: "Deal",
   enums: { status: DEAL_STATUSES },
   patch: { allowed: DEAL_PATCH, nullable: DEAL_NULLABLE },
 });
@@ -56,9 +56,9 @@ const dealSchemas = tableToSchemas(deals, {
 // generated DealContactCreate body. No PATCH for v1 — clients DELETE+POST
 // to change role.
 const dealContactSchemas = tableToSchemas(dealContacts, {
-  name: 'DealContact',
+  name: "DealContact",
   enums: { role: DEAL_CONTACT_ROLE_VALUES },
-  audit: ['dealId', 'createdAt', 'createdBy'],
+  audit: ["dealId", "createdAt", "createdBy"],
 });
 // `deal_history` is append-only — no Create or Patch surface. We only use
 // the generated `DealHistory` (entity) schema; `DealHistoryCreate` is
@@ -66,33 +66,45 @@ const dealContactSchemas = tableToSchemas(dealContacts, {
 // (column type `text`); the Drizzle column type drives the OpenAPI string
 // type — clients parse the JSON themselves.
 const dealHistorySchemas = tableToSchemas(dealHistory, {
-  name: 'DealHistory',
+  name: "DealHistory",
   enums: {
     kind: DEAL_HISTORY_KINDS,
     credentialType: DEAL_HISTORY_CREDENTIAL_TYPES,
   },
 });
 
-const ERROR_REF = { $ref: '#/components/schemas/ErrorResponse' } as const;
+const ERROR_REF = { $ref: "#/components/schemas/ErrorResponse" } as const;
 
 const stdErrors = {
-  '400': { description: 'Invalid input', content: { 'application/json': { schema: ERROR_REF } } },
-  '401': { description: 'Unauthenticated', content: { 'application/json': { schema: ERROR_REF } } },
-  '404': { description: 'Not found', content: { 'application/json': { schema: ERROR_REF } } },
-  '409': { description: 'Conflict (e.g., child rows still active)', content: { 'application/json': { schema: ERROR_REF } } },
+  "400": {
+    description: "Invalid input",
+    content: { "application/json": { schema: ERROR_REF } },
+  },
+  "401": {
+    description: "Unauthenticated",
+    content: { "application/json": { schema: ERROR_REF } },
+  },
+  "404": {
+    description: "Not found",
+    content: { "application/json": { schema: ERROR_REF } },
+  },
+  "409": {
+    description: "Conflict (e.g., child rows still active)",
+    content: { "application/json": { schema: ERROR_REF } },
+  },
 } as const;
 
 function listResponse(itemRef: string) {
   return {
-    description: 'List of items',
+    description: "List of items",
     content: {
-      'application/json': {
+      "application/json": {
         schema: {
-          type: 'object',
-          required: ['success', 'data'],
+          type: "object",
+          required: ["success", "data"],
           properties: {
-            success: { type: 'boolean', enum: [true] },
-            data: { type: 'array', items: { $ref: itemRef } },
+            success: { type: "boolean", enum: [true] },
+            data: { type: "array", items: { $ref: itemRef } },
           },
         },
       },
@@ -104,12 +116,12 @@ function itemResponse(description: string, itemRef: string) {
   return {
     description,
     content: {
-      'application/json': {
+      "application/json": {
         schema: {
-          type: 'object',
-          required: ['success', 'data'],
+          type: "object",
+          required: ["success", "data"],
           properties: {
-            success: { type: 'boolean', enum: [true] },
+            success: { type: "boolean", enum: [true] },
             data: { $ref: itemRef },
           },
         },
@@ -121,7 +133,7 @@ function itemResponse(description: string, itemRef: string) {
 function jsonBody(ref: string) {
   return {
     required: true,
-    content: { 'application/json': { schema: { $ref: ref } } },
+    content: { "application/json": { schema: { $ref: ref } } },
   } as const;
 }
 
@@ -132,7 +144,13 @@ function crudPaths(opts: {
   entityRef: string;
   createRef: string;
   patchRef: string;
-  ids: { list: string; create: string; get: string; update: string; del: string };
+  ids: {
+    list: string;
+    create: string;
+    get: string;
+    update: string;
+    del: string;
+  };
   noun: string; // e.g., "pipeline" / "stage"
 }) {
   const itemPath = opts.itemPattern;
@@ -142,7 +160,10 @@ function crudPaths(opts: {
         operationId: opts.ids.list,
         summary: `List ${opts.tag.toLowerCase()}`,
         tags: [opts.tag],
-        responses: { '200': listResponse(opts.entityRef), '401': stdErrors['401'] },
+        responses: {
+          "200": listResponse(opts.entityRef),
+          "401": stdErrors["401"],
+        },
       },
       post: {
         operationId: opts.ids.create,
@@ -150,23 +171,28 @@ function crudPaths(opts: {
         tags: [opts.tag],
         requestBody: jsonBody(opts.createRef),
         responses: {
-          '201': itemResponse(`${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} created`, opts.entityRef),
-          '400': stdErrors['400'],
-          '401': stdErrors['401'],
-          '409': stdErrors['409'],
+          "201": itemResponse(
+            `${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} created`,
+            opts.entityRef,
+          ),
+          "400": stdErrors["400"],
+          "401": stdErrors["401"],
+          "409": stdErrors["409"],
         },
       },
     },
     [itemPath]: {
-      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+      parameters: [
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
+      ],
       get: {
         operationId: opts.ids.get,
         summary: `Get a ${opts.noun} by ID`,
         tags: [opts.tag],
         responses: {
-          '200': itemResponse(`The requested ${opts.noun}`, opts.entityRef),
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
+          "200": itemResponse(`The requested ${opts.noun}`, opts.entityRef),
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
         },
       },
       patch: {
@@ -175,11 +201,14 @@ function crudPaths(opts: {
         tags: [opts.tag],
         requestBody: jsonBody(opts.patchRef),
         responses: {
-          '200': itemResponse(`${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} updated`, opts.entityRef),
-          '400': stdErrors['400'],
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
-          '409': stdErrors['409'],
+          "200": itemResponse(
+            `${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} updated`,
+            opts.entityRef,
+          ),
+          "400": stdErrors["400"],
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
+          "409": stdErrors["409"],
         },
       },
       delete: {
@@ -187,10 +216,13 @@ function crudPaths(opts: {
         summary: `Soft-delete a ${opts.noun}`,
         tags: [opts.tag],
         responses: {
-          '200': itemResponse(`${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} soft-deleted`, opts.entityRef),
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
-          '409': stdErrors['409'],
+          "200": itemResponse(
+            `${opts.noun.charAt(0).toUpperCase()}${opts.noun.slice(1)} soft-deleted`,
+            opts.entityRef,
+          ),
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
+          "409": stdErrors["409"],
         },
       },
     },
@@ -199,11 +231,20 @@ function crudPaths(opts: {
 
 export const pipelineSpec = {
   tags: [
-    { name: 'Pipelines', description: 'Sales pipelines.' },
-    { name: 'Stages', description: 'Stages within a pipeline.' },
-    { name: 'Deals', description: 'Deals (opportunities) flowing through stages.' },
-    { name: 'Deal contacts', description: 'Persons associated with a deal (many-to-many).' },
-    { name: 'Deal history', description: 'Append-only timeline of deal mutations (per ADR-022).' },
+    { name: "Pipelines", description: "Sales pipelines." },
+    { name: "Stages", description: "Stages within a pipeline." },
+    {
+      name: "Deals",
+      description: "Deals (opportunities) flowing through stages.",
+    },
+    {
+      name: "Deal contacts",
+      description: "Persons associated with a deal (many-to-many).",
+    },
+    {
+      name: "Deal history",
+      description: "Append-only timeline of deal mutations (per ADR-022).",
+    },
   ],
   components: {
     schemas: {
@@ -216,154 +257,163 @@ export const pipelineSpec = {
   },
   paths: {
     ...crudPaths({
-      collection: '/api/v1/pipelines',
-      itemPattern: '/api/v1/pipelines/{id}',
-      tag: 'Pipelines',
-      entityRef: '#/components/schemas/Pipeline',
-      createRef: '#/components/schemas/PipelineCreate',
-      patchRef: '#/components/schemas/PipelinePatch',
+      collection: "/api/v1/pipelines",
+      itemPattern: "/api/v1/pipelines/{id}",
+      tag: "Pipelines",
+      entityRef: "#/components/schemas/Pipeline",
+      createRef: "#/components/schemas/PipelineCreate",
+      patchRef: "#/components/schemas/PipelinePatch",
       ids: {
-        list: 'listPipelines', create: 'createPipeline', get: 'getPipeline',
-        update: 'updatePipeline', del: 'deletePipeline',
+        list: "listPipelines",
+        create: "createPipeline",
+        get: "getPipeline",
+        update: "updatePipeline",
+        del: "deletePipeline",
       },
-      noun: 'pipeline',
+      noun: "pipeline",
     }),
     ...crudPaths({
-      collection: '/api/v1/stages',
-      itemPattern: '/api/v1/stages/{id}',
-      tag: 'Stages',
-      entityRef: '#/components/schemas/Stage',
-      createRef: '#/components/schemas/StageCreate',
-      patchRef: '#/components/schemas/StagePatch',
+      collection: "/api/v1/stages",
+      itemPattern: "/api/v1/stages/{id}",
+      tag: "Stages",
+      entityRef: "#/components/schemas/Stage",
+      createRef: "#/components/schemas/StageCreate",
+      patchRef: "#/components/schemas/StagePatch",
       ids: {
-        list: 'listStages', create: 'createStage', get: 'getStage',
-        update: 'updateStage', del: 'deleteStage',
+        list: "listStages",
+        create: "createStage",
+        get: "getStage",
+        update: "updateStage",
+        del: "deleteStage",
       },
-      noun: 'stage',
+      noun: "stage",
     }),
     ...crudPaths({
-      collection: '/api/v1/deals',
-      itemPattern: '/api/v1/deals/{id}',
-      tag: 'Deals',
-      entityRef: '#/components/schemas/Deal',
-      createRef: '#/components/schemas/DealCreate',
-      patchRef: '#/components/schemas/DealPatch',
+      collection: "/api/v1/deals",
+      itemPattern: "/api/v1/deals/{id}",
+      tag: "Deals",
+      entityRef: "#/components/schemas/Deal",
+      createRef: "#/components/schemas/DealCreate",
+      patchRef: "#/components/schemas/DealPatch",
       ids: {
-        list: 'listDeals', create: 'createDeal', get: 'getDeal',
-        update: 'updateDeal', del: 'deleteDeal',
+        list: "listDeals",
+        create: "createDeal",
+        get: "getDeal",
+        update: "updateDeal",
+        del: "deleteDeal",
       },
-      noun: 'deal',
+      noun: "deal",
     }),
-    '/api/v1/deals/{id}/contacts': {
+    "/api/v1/deals/{id}/contacts": {
       parameters: [
-        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
       ],
       get: {
-        operationId: 'listDealContacts',
-        summary: 'List contacts on a deal',
-        tags: ['Deal contacts'],
+        operationId: "listDealContacts",
+        summary: "List contacts on a deal",
+        tags: ["Deal contacts"],
         responses: {
-          '200': listResponse('#/components/schemas/DealContact'),
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
+          "200": listResponse("#/components/schemas/DealContact"),
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
         },
       },
       post: {
-        operationId: 'addDealContact',
-        summary: 'Add a person as a contact on a deal',
-        tags: ['Deal contacts'],
-        requestBody: jsonBody('#/components/schemas/DealContactCreate'),
+        operationId: "addDealContact",
+        summary: "Add a person as a contact on a deal",
+        tags: ["Deal contacts"],
+        requestBody: jsonBody("#/components/schemas/DealContactCreate"),
         responses: {
-          '201': itemResponse(
-            'Contact added',
-            '#/components/schemas/DealContact',
+          "201": itemResponse(
+            "Contact added",
+            "#/components/schemas/DealContact",
           ),
-          '400': stdErrors['400'],
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
-          '409': stdErrors['409'],
+          "400": stdErrors["400"],
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
+          "409": stdErrors["409"],
         },
       },
     },
-    '/api/v1/deals/{id}/history': {
+    "/api/v1/deals/{id}/history": {
       parameters: [
-        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
       ],
       get: {
-        operationId: 'listDealHistory',
-        summary: 'List deal history (append-only timeline)',
+        operationId: "listDealHistory",
+        summary: "List deal history (append-only timeline)",
         description:
-          'Returns the deal history timeline ordered by `created_at DESC, id DESC`. Cursor-paginated. Survives soft-delete of the parent deal.',
-        tags: ['Deal history'],
+          "Returns the deal history timeline ordered by `created_at DESC, id DESC`. Cursor-paginated. Survives soft-delete of the parent deal.",
+        tags: ["Deal history"],
         parameters: [
           {
-            name: 'limit',
-            in: 'query',
+            name: "limit",
+            in: "query",
             required: false,
-            schema: { type: 'integer', minimum: 1, maximum: 200 },
+            schema: { type: "integer", minimum: 1, maximum: 200 },
           },
           {
-            name: 'cursor',
-            in: 'query',
+            name: "cursor",
+            in: "query",
             required: false,
-            schema: { type: 'string' },
+            schema: { type: "string" },
           },
         ],
         responses: {
-          '200': listResponse('#/components/schemas/DealHistory'),
-          '400': stdErrors['400'],
-          '401': stdErrors['401'],
+          "200": listResponse("#/components/schemas/DealHistory"),
+          "400": stdErrors["400"],
+          "401": stdErrors["401"],
         },
       },
     },
-    '/api/v1/deal-history/{id}': {
+    "/api/v1/deal-history/{id}": {
       parameters: [
-        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
       ],
       get: {
-        operationId: 'getDealHistory',
-        summary: 'Get a single deal-history row by id',
-        tags: ['Deal history'],
+        operationId: "getDealHistory",
+        summary: "Get a single deal-history row by id",
+        tags: ["Deal history"],
         responses: {
-          '200': itemResponse(
-            'The requested deal-history row',
-            '#/components/schemas/DealHistory',
+          "200": itemResponse(
+            "The requested deal-history row",
+            "#/components/schemas/DealHistory",
           ),
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
         },
       },
     },
-    '/api/v1/deals/{id}/contacts/{personId}': {
+    "/api/v1/deals/{id}/contacts/{personId}": {
       parameters: [
-        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
         {
-          name: 'personId',
-          in: 'path',
+          name: "personId",
+          in: "path",
           required: true,
-          schema: { type: 'string' },
+          schema: { type: "string" },
         },
       ],
       delete: {
-        operationId: 'removeDealContact',
-        summary: 'Remove a contact from a deal',
-        tags: ['Deal contacts'],
+        operationId: "removeDealContact",
+        summary: "Remove a contact from a deal",
+        tags: ["Deal contacts"],
         responses: {
-          '200': {
-            description: 'Contact removed',
+          "200": {
+            description: "Contact removed",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
-                  required: ['success'],
-                  properties: { success: { type: 'boolean', enum: [true] } },
+                  type: "object",
+                  required: ["success"],
+                  properties: { success: { type: "boolean", enum: [true] } },
                 },
               },
             },
           },
-          '401': stdErrors['401'],
-          '404': stdErrors['404'],
-          '409': stdErrors['409'],
+          "401": stdErrors["401"],
+          "404": stdErrors["404"],
+          "409": stdErrors["409"],
         },
       },
     },

@@ -54,7 +54,7 @@ export interface Env {
    * Edition is a wrapper concern, not a per-tenant concern; it is set once
    * per worker deployment.
    */
-  EDITION: 'indie' | 'managed';
+  EDITION: "indie" | "managed";
   /**
    * Local-dev-only flag (ADR-014). When set to `'1'`, exposes the OpenAPI
    * spec at `/openapi.json` and Swagger UI at `/docs`. The flag MUST live
@@ -64,7 +64,7 @@ export interface Env {
   OPENAPI_ENABLED?: string;
 }
 
-import type { CredentialType } from './auth/identity-headers.js';
+import type { CredentialType } from "./auth/identity-headers.js";
 
 export interface AppContext {
   request: Request;

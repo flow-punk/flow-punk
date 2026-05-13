@@ -1,14 +1,14 @@
-import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { createLogger } from '@flowpunk/service-utils';
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import { createLogger } from "@flowpunk/service-utils";
 import {
   DealContactsRepoError,
   DealHistoryRepoError,
   DealsRepoError,
   PipelinesRepoError,
   StagesRepoError,
-} from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../types.js';
+import type { Actor, PipelineEnv } from "../types.js";
 
 /**
  * Per-mutation context shared by deals/deal-contacts repo writes.
@@ -17,7 +17,7 @@ import type { Actor, PipelineEnv } from '../types.js';
  */
 export interface MutationContext {
   actorId: string;
-  credentialType: 'apikey' | 'oauth' | 'session' | 'system';
+  credentialType: "apikey" | "oauth" | "session" | "system";
   recordHistory: boolean;
   now: string;
 }
@@ -49,7 +49,7 @@ export function getDb(env: PipelineEnv): Db {
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -77,35 +77,35 @@ export function badRequest(
   return errorResponse(400, code, message, details);
 }
 
-export function notFound(code = 'NOT_FOUND'): Response {
+export function notFound(code = "NOT_FOUND"): Response {
   return errorResponse(404, code);
 }
 
 export type ReadJsonResult<T> =
-  | { kind: 'none' }
-  | { kind: 'malformed' }
-  | { kind: 'parsed'; value: T };
+  | { kind: "none" }
+  | { kind: "malformed" }
+  | { kind: "parsed"; value: T };
 
 export async function tryReadJson<T>(
   request: Request,
 ): Promise<ReadJsonResult<T>> {
-  const contentType = request.headers.get('Content-Type') ?? '';
-  if (!contentType.includes('application/json')) return { kind: 'none' };
+  const contentType = request.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) return { kind: "none" };
   try {
-    return { kind: 'parsed', value: (await request.json()) as T };
+    return { kind: "parsed", value: (await request.json()) as T };
   } catch {
-    return { kind: 'malformed' };
+    return { kind: "malformed" };
   }
 }
 
 export async function requireJsonBody<T>(
   request: Request,
-): Promise<{ kind: 'ok'; value: T } | { kind: 'err'; response: Response }> {
+): Promise<{ kind: "ok"; value: T } | { kind: "err"; response: Response }> {
   const result = await tryReadJson<T>(request);
-  if (result.kind === 'parsed') return { kind: 'ok', value: result.value };
+  if (result.kind === "parsed") return { kind: "ok", value: result.value };
   return {
-    kind: 'err',
-    response: badRequest('INVALID_BODY', 'request body must be JSON'),
+    kind: "err",
+    response: badRequest("INVALID_BODY", "request body must be JSON"),
   };
 }
 
@@ -127,34 +127,34 @@ export function mapRepoError(err: unknown): Response {
   }
   const repoLabel =
     err instanceof PipelinesRepoError
-      ? 'pipelines'
+      ? "pipelines"
       : err instanceof StagesRepoError
-        ? 'stages'
+        ? "stages"
         : err instanceof DealsRepoError
-          ? 'deals'
+          ? "deals"
           : err instanceof DealContactsRepoError
-            ? 'deal_contacts'
-            : 'deal_history';
+            ? "deal_contacts"
+            : "deal_history";
   switch (err.code) {
-    case 'not_found':
-      return errorResponse(404, 'NOT_FOUND', err.message);
-    case 'invalid_input':
-      return errorResponse(400, 'INVALID_INPUT', err.message);
-    case 'wrong_state':
-      return errorResponse(409, 'WRONG_STATE', err.message);
-    case 'already_exists':
-      return errorResponse(409, 'CONFLICT', err.message);
-    case 'conflict':
+    case "not_found":
+      return errorResponse(404, "NOT_FOUND", err.message);
+    case "invalid_input":
+      return errorResponse(400, "INVALID_INPUT", err.message);
+    case "wrong_state":
+      return errorResponse(409, "WRONG_STATE", err.message);
+    case "already_exists":
+      return errorResponse(409, "CONFLICT", err.message);
+    case "conflict":
       // Per ADR-022 §8: optimistic-concurrency miss on a deal write.
       // Caller should re-read and retry.
-      return errorResponse(409, 'CONFLICT', err.message);
-    case 'invariant_violation': {
-      const logger = createLogger({ service: 'pipeline' });
+      return errorResponse(409, "CONFLICT", err.message);
+    case "invariant_violation": {
+      const logger = createLogger({ service: "pipeline" });
       logger.error(`${repoLabel} repo invariant violation`, {
         error: err,
         repoCode: err.code,
       });
-      return errorResponse(500, 'INTERNAL_ERROR');
+      return errorResponse(500, "INTERNAL_ERROR");
     }
   }
 }

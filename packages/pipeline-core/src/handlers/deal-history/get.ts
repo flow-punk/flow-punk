@@ -1,7 +1,7 @@
-import { dealHistoryRepo } from '@flowpunk-indie/db';
+import { dealHistoryRepo } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, notFound } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import { getDb, jsonResponse, mapRepoError, notFound } from "../_shared.js";
 
 /**
  * GET /api/v1/deal-history/:id

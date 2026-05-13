@@ -1,11 +1,11 @@
-import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { sql } from 'drizzle-orm';
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import { sql } from "drizzle-orm";
 import {
   oauthClientsRepo,
   oauthCodesRepo,
   oauthTokensRepo,
-} from '@flowpunk-indie/db';
-import { mcpOauthTokens } from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
+import { mcpOauthTokens } from "@flowpunk-indie/db";
 import {
   isExpired,
   isoNow,
@@ -15,19 +15,23 @@ import {
   randomOpaqueId,
   redirectUriMatches,
   sha256Hex,
-} from '@flowpunk-indie/oauth-protocol';
+} from "@flowpunk-indie/oauth-protocol";
 
-import type { OAuthEnv } from '../env.js';
-import { isIndieToken, mintIndieAccessToken, mintIndieRefreshToken } from '../codec.js';
-import { safeFormUrlEncoded } from '../body.js';
+import type { OAuthEnv } from "../env.js";
+import {
+  isIndieToken,
+  mintIndieAccessToken,
+  mintIndieRefreshToken,
+} from "../codec.js";
+import { safeFormUrlEncoded } from "../body.js";
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   OAUTH_ACTOR,
   REFRESH_FAMILY_TTL_SECONDS,
   REFRESH_TOKEN_TTL_SECONDS,
-} from '../policy.js';
-import { getAllowedResources, getSingleResource } from '../origin.js';
-import { oauthJsonError, oauthTokenJson } from '../responses.js';
+} from "../policy.js";
+import { getAllowedResources, getSingleResource } from "../origin.js";
+import { oauthJsonError, oauthTokenJson } from "../responses.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -45,18 +49,18 @@ export async function handleToken(
 ): Promise<Response> {
   const form = await safeFormUrlEncoded(request, env, requestId);
   if (form instanceof Response) return form;
-  if (!form) return oauthJsonError(400, 'invalid_request');
+  if (!form) return oauthJsonError(400, "invalid_request");
 
-  const grantType = form.get('grant_type');
-  const clientId = form.get('client_id');
-  if (typeof grantType !== 'string' || typeof clientId !== 'string') {
-    return oauthJsonError(400, 'invalid_request');
+  const grantType = form.get("grant_type");
+  const clientId = form.get("client_id");
+  if (typeof grantType !== "string" || typeof clientId !== "string") {
+    return oauthJsonError(400, "invalid_request");
   }
 
   const db = drizzle(env.DB);
   const clientRow = await oauthClientsRepo.findByClientId(db, clientId);
-  if (!clientRow || clientRow.tokenEndpointAuthMethod !== 'none') {
-    return oauthJsonError(401, 'invalid_client');
+  if (!clientRow || clientRow.tokenEndpointAuthMethod !== "none") {
+    return oauthJsonError(401, "invalid_client");
   }
   const client: ParsedClient = {
     clientId: clientRow.clientId,
@@ -65,13 +69,13 @@ export async function handleToken(
     tokenEndpointAuthMethod: clientRow.tokenEndpointAuthMethod,
   };
 
-  if (grantType === 'authorization_code') {
+  if (grantType === "authorization_code") {
     return exchangeAuthorizationCode(request, env, db, client, form);
   }
-  if (grantType === 'refresh_token') {
+  if (grantType === "refresh_token") {
     return exchangeRefreshToken(request, env, db, client, form);
   }
-  return oauthJsonError(400, 'unsupported_grant_type');
+  return oauthJsonError(400, "unsupported_grant_type");
 }
 
 async function exchangeAuthorizationCode(
@@ -81,57 +85,60 @@ async function exchangeAuthorizationCode(
   client: ParsedClient,
   form: FormData,
 ): Promise<Response> {
-  const code = form.get('code');
-  const verifier = form.get('code_verifier');
-  const redirectUri = form.get('redirect_uri');
+  const code = form.get("code");
+  const verifier = form.get("code_verifier");
+  const redirectUri = form.get("redirect_uri");
 
   const allowedResources = getAllowedResources(env, request);
   const resourceResult = getSingleResource(
-    form.getAll('resource').filter((v): v is string => typeof v === 'string'),
+    form.getAll("resource").filter((v): v is string => typeof v === "string"),
     allowedResources,
   );
 
   if (
-    typeof code !== 'string' ||
-    typeof verifier !== 'string' ||
-    typeof redirectUri !== 'string' ||
+    typeof code !== "string" ||
+    typeof verifier !== "string" ||
+    typeof redirectUri !== "string" ||
     !resourceResult.ok
   ) {
     return oauthJsonError(
       400,
-      resourceResult.ok ? 'invalid_request' : resourceResult.error,
+      resourceResult.ok ? "invalid_request" : resourceResult.error,
     );
   }
   if (!isValidPkceVerifier(verifier)) {
-    return oauthJsonError(400, 'invalid_request', 'invalid_code_verifier');
+    return oauthJsonError(400, "invalid_request", "invalid_code_verifier");
   }
   if (!client.redirectUris.some((u) => redirectUriMatches(redirectUri, [u]))) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   const codeHash = await sha256Hex(code);
   const codeRow = await oauthCodesRepo.findByHash(db, codeHash);
   if (!codeRow || codeRow.clientId !== client.clientId) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
-  if (codeRow.redirectUri !== redirectUri || codeRow.resource !== resourceResult.resource) {
-    return oauthJsonError(400, 'invalid_grant');
+  if (
+    codeRow.redirectUri !== redirectUri ||
+    codeRow.resource !== resourceResult.resource
+  ) {
+    return oauthJsonError(400, "invalid_grant");
   }
   if (codeRow.usedAt || isExpired(codeRow.expiresAt)) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   const computedChallenge = await pkceChallengeForVerifier(verifier);
   if (
-    codeRow.codeChallengeMethod !== 'S256' ||
+    codeRow.codeChallengeMethod !== "S256" ||
     computedChallenge !== codeRow.codeChallenge
   ) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   // Atomic single-use consumption — closes replay race.
   const consumed = await oauthCodesRepo.consume(db, codeHash, isoNow());
-  if (!consumed) return oauthJsonError(400, 'invalid_grant');
+  if (!consumed) return oauthJsonError(400, "invalid_grant");
 
   const tokens = await issueTokenPair(db, {
     clientId: client.clientId,
@@ -141,11 +148,13 @@ async function exchangeAuthorizationCode(
   });
 
   // Touch last-used on the client row (stale-GC tracking).
-  await oauthClientsRepo.touchLastUsed(db, client.clientId, isoNow()).catch(() => {});
+  await oauthClientsRepo
+    .touchLastUsed(db, client.clientId, isoNow())
+    .catch(() => {});
 
   return oauthTokenJson({
     access_token: tokens.accessToken,
-    token_type: 'Bearer',
+    token_type: "Bearer",
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
     refresh_token: tokens.refreshToken,
     scope: codeRow.scope,
@@ -159,43 +168,43 @@ async function exchangeRefreshToken(
   client: ParsedClient,
   form: FormData,
 ): Promise<Response> {
-  const refreshToken = form.get('refresh_token');
+  const refreshToken = form.get("refresh_token");
   const allowedResources = getAllowedResources(env, request);
   const resourceResult = getSingleResource(
-    form.getAll('resource').filter((v): v is string => typeof v === 'string'),
+    form.getAll("resource").filter((v): v is string => typeof v === "string"),
     allowedResources,
   );
 
-  if (typeof refreshToken !== 'string' || !resourceResult.ok) {
+  if (typeof refreshToken !== "string" || !resourceResult.ok) {
     return oauthJsonError(
       400,
-      resourceResult.ok ? 'invalid_request' : resourceResult.error,
+      resourceResult.ok ? "invalid_request" : resourceResult.error,
     );
   }
-  if (!client.grantTypes.includes('refresh_token')) {
-    return oauthJsonError(400, 'unauthorized_client');
+  if (!client.grantTypes.includes("refresh_token")) {
+    return oauthJsonError(400, "unauthorized_client");
   }
   if (!isIndieToken(refreshToken)) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   const refreshHash = await sha256Hex(refreshToken);
   const row = await oauthTokensRepo.findByHash(db, refreshHash);
-  if (!row || row.tokenType !== 'refresh' || row.clientId !== client.clientId) {
-    return oauthJsonError(400, 'invalid_grant');
+  if (!row || row.tokenType !== "refresh" || row.clientId !== client.clientId) {
+    return oauthJsonError(400, "invalid_grant");
   }
   if (row.audience !== resourceResult.resource) {
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   if (row.revokedAt) {
     // Reuse detection — revoke the entire family.
     await oauthTokensRepo.revokeFamily(db, row.familyId, isoNow());
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
   if (isExpired(row.expiresAt)) {
     await oauthTokensRepo.revokeFamily(db, row.familyId, isoNow());
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   const familyCreatedMs = Date.parse(row.familyCreatedAt);
@@ -204,7 +213,7 @@ async function exchangeRefreshToken(
     familyCreatedMs + REFRESH_FAMILY_TTL_SECONDS * 1000 <= Date.now()
   ) {
     await oauthTokensRepo.revokeFamily(db, row.familyId, isoNow());
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   // Atomic revoke of consumed refresh row.
@@ -216,7 +225,7 @@ async function exchangeRefreshToken(
   `);
   if (!getChanges(revokeResult)) {
     await oauthTokensRepo.revokeFamily(db, row.familyId, isoNow());
-    return oauthJsonError(400, 'invalid_grant');
+    return oauthJsonError(400, "invalid_grant");
   }
 
   const tokens = await issueTokenPair(db, {
@@ -229,11 +238,13 @@ async function exchangeRefreshToken(
     parentTokenId: row.id,
   });
 
-  await oauthClientsRepo.touchLastUsed(db, client.clientId, isoNow()).catch(() => {});
+  await oauthClientsRepo
+    .touchLastUsed(db, client.clientId, isoNow())
+    .catch(() => {});
 
   return oauthTokenJson({
     access_token: tokens.accessToken,
-    token_type: 'Bearer',
+    token_type: "Bearer",
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
     refresh_token: tokens.refreshToken,
     scope: row.scope,
@@ -267,7 +278,7 @@ async function issueTokenPair(
     {
       id: randomOpaqueId(),
       tokenHash: accessHash,
-      tokenType: 'access',
+      tokenType: "access",
       familyId,
       familyCreatedAt,
       parentTokenId: options.parentTokenId ?? null,
@@ -285,7 +296,7 @@ async function issueTokenPair(
     {
       id: randomOpaqueId(),
       tokenHash: refreshHash,
-      tokenType: 'refresh',
+      tokenType: "refresh",
       familyId,
       familyCreatedAt,
       parentTokenId: options.parentTokenId ?? null,
@@ -309,7 +320,7 @@ function safeJsonArray(value: string): string[] {
   try {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === 'string')
+      ? parsed.filter((v): v is string => typeof v === "string")
       : [];
   } catch {
     return [];
@@ -321,9 +332,9 @@ interface RunResult {
   changes?: number;
 }
 function getChanges(result: unknown): number {
-  if (!result || typeof result !== 'object') return 0;
+  if (!result || typeof result !== "object") return 0;
   const r = result as RunResult;
-  if (typeof r.changes === 'number') return r.changes;
-  if (r.meta && typeof r.meta.changes === 'number') return r.meta.changes;
+  if (typeof r.changes === "number") return r.changes;
+  if (r.meta && typeof r.meta.changes === "number") return r.meta.changes;
   return 0;
 }

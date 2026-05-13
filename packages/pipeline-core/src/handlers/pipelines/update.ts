@@ -1,7 +1,12 @@
-import { pipelinesRepo, type UpdatePipelinePatch } from '@flowpunk-indie/db';
+import { pipelinesRepo, type UpdatePipelinePatch } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, requireJsonBody } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import {
+  getDb,
+  jsonResponse,
+  mapRepoError,
+  requireJsonBody,
+} from "../_shared.js";
 
 export async function handleUpdatePipeline(
   request: Request,
@@ -10,7 +15,7 @@ export async function handleUpdatePipeline(
   id: string,
 ): Promise<Response> {
   const body = await requireJsonBody<UpdatePipelinePatch>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);

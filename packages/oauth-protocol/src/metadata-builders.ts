@@ -29,12 +29,14 @@ export interface AuthorizationServerMetadataInput {
   resourceParameterSupported?: boolean;
 }
 
-export function buildProtectedResourceMetadata(input: ProtectedResourceMetadataInput): Record<string, unknown> {
+export function buildProtectedResourceMetadata(
+  input: ProtectedResourceMetadataInput,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {
     resource: input.resource,
     authorization_servers: [...input.authorizationServers],
     scopes_supported: [...input.scopesSupported],
-    bearer_methods_supported: ['header'],
+    bearer_methods_supported: ["header"],
   };
   if (input.resourceName) out.resource_name = input.resourceName;
   return out;
@@ -47,18 +49,23 @@ export function buildAuthorizationServerMetadata(
     issuer: input.issuer,
     authorization_endpoint: input.authorizationEndpoint,
     token_endpoint: input.tokenEndpoint,
-    response_types_supported: [...(input.responseTypesSupported ?? ['code'])],
-    grant_types_supported: [...(input.grantTypesSupported ?? ['authorization_code', 'refresh_token'])],
-    code_challenge_methods_supported: [...(input.codeChallengeMethodsSupported ?? ['S256'])],
+    response_types_supported: [...(input.responseTypesSupported ?? ["code"])],
+    grant_types_supported: [
+      ...(input.grantTypesSupported ?? ["authorization_code", "refresh_token"]),
+    ],
+    code_challenge_methods_supported: [
+      ...(input.codeChallengeMethodsSupported ?? ["S256"]),
+    ],
     token_endpoint_auth_methods_supported: [
-      ...(input.tokenEndpointAuthMethodsSupported ?? ['none']),
+      ...(input.tokenEndpointAuthMethodsSupported ?? ["none"]),
     ],
     scopes_supported: [...input.scopesSupported],
   };
-  if (input.registrationEndpoint) out.registration_endpoint = input.registrationEndpoint;
+  if (input.registrationEndpoint)
+    out.registration_endpoint = input.registrationEndpoint;
   if (input.revocationEndpoint) {
     out.revocation_endpoint = input.revocationEndpoint;
-    out.revocation_endpoint_auth_methods_supported = ['none'];
+    out.revocation_endpoint_auth_methods_supported = ["none"];
   }
   if (input.resourceParameterSupported !== undefined) {
     out.resource_parameter_supported = input.resourceParameterSupported;

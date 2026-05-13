@@ -1,13 +1,13 @@
-import { dealsRepo, type UpdateDealPatch } from '@flowpunk-indie/db';
+import { dealsRepo, type UpdateDealPatch } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
+import type { Actor, PipelineEnv } from "../../types.js";
 import {
   buildMutationCtx,
   getDb,
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from '../_shared.js';
+} from "../_shared.js";
 
 export async function handleUpdateDeal(
   request: Request,
@@ -16,7 +16,7 @@ export async function handleUpdateDeal(
   id: string,
 ): Promise<Response> {
   const body = await requireJsonBody<UpdateDealPatch>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);
