@@ -2,6 +2,7 @@ import type { AppContext, Middleware } from '../types.js';
 import { handleMcp } from '../mcp/index.js';
 import { handleDocs, handleOpenApi } from '../openapi/handler.js';
 import { handleRest } from '../rest/handler.js';
+import { handleBetterAuth } from '../auth-forward.js';
 import { route as oauthRoute } from '@flowpunk-indie/oauth';
 import { validateSession } from '../auth/validate-session.js';
 
@@ -70,6 +71,13 @@ export async function dispatchIndieRoute(
 
   if (pathname === '/mcp') return handleMcp(ctx);
   if (pathname.startsWith('/api/v1/')) return handleRest(ctx);
+  // Better-auth dashboard surface — forwarded to AUTH_SERVICE with the
+  // Cookie header preserved (REST forwarder strips Cookie). Indie always
+  // operates on `_system`; managed intercepts before this dispatcher
+  // and stamps a host-resolved tenant id (or `X-Console-Auth: 1`).
+  if (pathname.startsWith('/api/auth/')) {
+    return handleBetterAuth(ctx, { tenantIdStamp: '_system' });
+  }
 
   return new Response('Not Found', { status: 404 });
 }

@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./middleware": "./src/middleware/index.ts",
     "./rest": "./src/rest/handler.ts",
+    "./auth-forward": "./src/auth-forward.ts",
     "./mcp": "./src/mcp/index.ts",
     "./auth": "./src/auth/index.ts",
     "./body-size": "./src/body-size.ts",
