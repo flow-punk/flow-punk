@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Tokens lifted from ui-temp/styles.css will land here in a follow-up Phase 0
+   step. The @theme block defines design tokens for Tailwind v4. */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+}

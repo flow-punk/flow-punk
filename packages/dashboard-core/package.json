@@ -1,0 +1,34 @@
+{
+  "name": "@flowpunk-indie/dashboard-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./modules": "./src/modules/index.ts",
+    "./auth": "./src/auth/index.ts",
+    "./api": "./src/api/index.ts",
+    "./query": "./src/query/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@flowpunk-indie/dashboard-ui": "workspace:*",
+    "@tanstack/react-query": "5.100.10"
+  },
+  "peerDependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.6",
+    "@types/react-dom": "19.2.3",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tsx": "^4.21.0",
+    "typescript": "5.9.3"
+  }
+}
