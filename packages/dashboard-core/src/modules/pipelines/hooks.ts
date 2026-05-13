@@ -97,10 +97,30 @@ export interface DealsFilter {
   /** Optional client-side text filter applied on top of the server list. */
   search?: string;
 }
+export interface DealsQueryParams {
+  cursor?: string | null;
+  limit?: number | null;
+  filter?: DealsFilter;
+}
+/**
+ * Cursor + limit are included so paginated variants don't collide in
+ * the cache. Optimistic update + invalidation use the
+ * `["deals", pipelineId]` prefix so every variant is reconciled in
+ * one shot (see `applyOptimisticDealPatch`).
+ */
 export const dealsForPipelineQueryKey = (
   pipelineId: string,
-  filter?: DealsFilter,
-) => ["deals", pipelineId, filter ?? {}] as const;
+  params?: DealsQueryParams,
+) =>
+  [
+    "deals",
+    pipelineId,
+    {
+      cursor: params?.cursor ?? null,
+      limit: params?.limit ?? null,
+      filter: params?.filter ?? {},
+    },
+  ] as const;
 export const dealQueryKey = (id: string) => ["deals", "id", id] as const;
 
 // ─── Pipelines ────────────────────────────────────────────────────────
@@ -194,7 +214,11 @@ export function useDealsForPipeline(
   return useQuery({
     enabled: !!pipelineId,
     queryKey: pipelineId
-      ? dealsForPipelineQueryKey(pipelineId, options.filter)
+      ? dealsForPipelineQueryKey(pipelineId, {
+          cursor: options.cursor ?? null,
+          limit: options.limit ?? null,
+          filter: options.filter,
+        })
       : ["deals", "_disabled"],
     queryFn: async () => {
       const search = new URLSearchParams({ pipelineId: pipelineId! });

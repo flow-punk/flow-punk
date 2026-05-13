@@ -9,7 +9,6 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 
 /**
  * DnD wrapper for the pipelines kanban board. Provides:
@@ -67,11 +66,15 @@ export function KanbanBoardDnd({
   onMoveDeal,
   children,
 }: KanbanBoardDndProps) {
+  // KeyboardSensor uses its built-in coordinate-getter (25px arrow
+  // steps + Space to pick up/drop). `sortableKeyboardCoordinates`
+  // would require a SortableContext, which this board intentionally
+  // does NOT use — deals are plain draggables, stages plain
+  // droppables, since the scope is cross-stage move (not in-column
+  // reorder).
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    useSensor(KeyboardSensor),
   );
 
   const announcements = useMemo(

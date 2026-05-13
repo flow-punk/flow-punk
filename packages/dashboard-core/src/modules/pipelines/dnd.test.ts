@@ -82,25 +82,35 @@ test("patch touches every cached deals query for the pipeline", () => {
   // Two distinct filter variants cached at different keys; both should
   // be reconciled by the optimistic patch so the user sees consistent
   // state across whatever view raised the mutation.
-  qc.setQueryData(dealsForPipelineQueryKey("pipe_test", { search: "" }), {
-    items: [d1],
-    nextCursor: null,
-  } satisfies DealsListResponse);
   qc.setQueryData(
-    dealsForPipelineQueryKey("pipe_test", { search: "deal" }),
+    dealsForPipelineQueryKey("pipe_test", { filter: { search: "" } }),
+    { items: [d1], nextCursor: null } satisfies DealsListResponse,
+  );
+  qc.setQueryData(
+    dealsForPipelineQueryKey("pipe_test", { filter: { search: "deal" } }),
+    { items: [d1], nextCursor: null } satisfies DealsListResponse,
+  );
+  // Variant with a different cursor must also reconcile so a paginated
+  // list stays consistent with the optimistic move.
+  qc.setQueryData(
+    dealsForPipelineQueryKey("pipe_test", { cursor: "next" }),
     { items: [d1], nextCursor: null } satisfies DealsListResponse,
   );
 
   applyOptimisticDealPatch(qc, "pipe_test", "deal_a", { stageId: "stag_X" });
 
   const a = qc.getQueryData<DealsListResponse>(
-    dealsForPipelineQueryKey("pipe_test", { search: "" }),
+    dealsForPipelineQueryKey("pipe_test", { filter: { search: "" } }),
   );
   const b = qc.getQueryData<DealsListResponse>(
-    dealsForPipelineQueryKey("pipe_test", { search: "deal" }),
+    dealsForPipelineQueryKey("pipe_test", { filter: { search: "deal" } }),
+  );
+  const c = qc.getQueryData<DealsListResponse>(
+    dealsForPipelineQueryKey("pipe_test", { cursor: "next" }),
   );
   assert.equal(a?.items[0]?.stageId, "stag_X");
   assert.equal(b?.items[0]?.stageId, "stag_X");
+  assert.equal(c?.items[0]?.stageId, "stag_X");
 });
 
 test("patch ignores other pipelines' caches", () => {
