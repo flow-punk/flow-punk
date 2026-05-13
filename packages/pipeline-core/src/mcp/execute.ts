@@ -13,7 +13,7 @@ import {
 import { createLogger } from '@flowpunk/service-utils';
 
 import type { Actor, PipelineEnv } from '../types.js';
-import { getDb, type Db } from '../handlers/_shared.js';
+import { buildMutationCtx, getDb, type Db } from '../handlers/_shared.js';
 import { buildPipelineToolState } from './tools.js';
 import {
   envelopeErr,
@@ -266,7 +266,8 @@ async function executeDealsCreate(
 ): Promise<DispatchOutcome> {
   const guard = await ensureAvailable('deals_create', env);
   if (guard) return guard;
-  const deal = await dealsRepo.create(db, args as unknown as CreateDealInput, actor.userId, now);
+  const ctx = buildMutationCtx(actor, env, now);
+  const deal = await dealsRepo.create(db, args as unknown as CreateDealInput, ctx);
   return {
     status: 200,
     envelope: envelopeOk({ deal }),
@@ -326,7 +327,8 @@ async function executeDealsUpdate(
   const id = stringArg(args, 'id');
   if (!id) return invalidArg('id is required');
   const fields = (args.fields ?? {}) as UpdateDealPatch;
-  const result = await dealsRepo.update(db, id, fields, actor.userId, now);
+  const ctx = buildMutationCtx(actor, env, now);
+  const result = await dealsRepo.update(db, id, fields, ctx);
   return {
     status: 200,
     envelope: envelopeOk({ deal: result.deal }),
@@ -349,7 +351,8 @@ async function executeDealsMoveStage(
   if (!stageId) return invalidArg('stageId is required');
   // Per-pipeline correctness (target stage in same pipeline as the deal) is
   // enforced atomically by dealsRepo.update via assertStageInActivePipeline.
-  const result = await dealsRepo.update(db, id, { stageId } as UpdateDealPatch, actor.userId, now);
+  const ctx = buildMutationCtx(actor, env, now);
+  const result = await dealsRepo.update(db, id, { stageId } as UpdateDealPatch, ctx);
   return {
     status: 200,
     envelope: envelopeOk({ deal: result.deal }),
@@ -374,20 +377,28 @@ function invalidArg(message: string): DispatchOutcome {
   };
 }
 
-function repoErrorStatus(code: 'not_found' | 'invalid_input' | 'wrong_state' | 'invariant_violation'): number {
+type RepoErrorCode =
+  | 'not_found'
+  | 'invalid_input'
+  | 'wrong_state'
+  | 'conflict'
+  | 'invariant_violation';
+
+function repoErrorStatus(code: RepoErrorCode): number {
   switch (code) {
     case 'not_found':
       return 404;
     case 'invalid_input':
       return 400;
     case 'wrong_state':
+    case 'conflict':
       return 409;
     case 'invariant_violation':
       return 500;
   }
 }
 
-function repoErrorCode(code: 'not_found' | 'invalid_input' | 'wrong_state' | 'invariant_violation'): string {
+function repoErrorCode(code: RepoErrorCode): string {
   switch (code) {
     case 'not_found':
       return 'NOT_FOUND';
@@ -395,6 +406,8 @@ function repoErrorCode(code: 'not_found' | 'invalid_input' | 'wrong_state' | 'in
       return 'INVALID_INPUT';
     case 'wrong_state':
       return 'WRONG_STATE';
+    case 'conflict':
+      return 'CONFLICT';
     case 'invariant_violation':
       return 'INTERNAL_ERROR';
   }

@@ -26,6 +26,11 @@ import {
   DEAL_CONTACT_ROLE_VALUES,
   dealContacts,
 } from '@flowpunk-indie/db/schema/deal-contacts';
+import {
+  DEAL_HISTORY_CREDENTIAL_TYPES,
+  DEAL_HISTORY_KINDS,
+  dealHistory,
+} from '@flowpunk-indie/db/schema/deal-history';
 
 const PIPELINE_STATUSES = ['active', 'deleted'] as const;
 const STAGE_STATUSES = ['active', 'deleted'] as const;
@@ -54,6 +59,18 @@ const dealContactSchemas = tableToSchemas(dealContacts, {
   name: 'DealContact',
   enums: { role: DEAL_CONTACT_ROLE_VALUES },
   audit: ['dealId', 'createdAt', 'createdBy'],
+});
+// `deal_history` is append-only — no Create or Patch surface. We only use
+// the generated `DealHistory` (entity) schema; `DealHistoryCreate` is
+// unreferenced. Per ADR-022 §4, `changes` is a JSON-stringified payload
+// (column type `text`); the Drizzle column type drives the OpenAPI string
+// type — clients parse the JSON themselves.
+const dealHistorySchemas = tableToSchemas(dealHistory, {
+  name: 'DealHistory',
+  enums: {
+    kind: DEAL_HISTORY_KINDS,
+    credentialType: DEAL_HISTORY_CREDENTIAL_TYPES,
+  },
 });
 
 const ERROR_REF = { $ref: '#/components/schemas/ErrorResponse' } as const;
@@ -186,6 +203,7 @@ export const pipelineSpec = {
     { name: 'Stages', description: 'Stages within a pipeline.' },
     { name: 'Deals', description: 'Deals (opportunities) flowing through stages.' },
     { name: 'Deal contacts', description: 'Persons associated with a deal (many-to-many).' },
+    { name: 'Deal history', description: 'Append-only timeline of deal mutations (per ADR-022).' },
   ],
   components: {
     schemas: {
@@ -193,6 +211,7 @@ export const pipelineSpec = {
       ...stageSchemas,
       ...dealSchemas,
       ...dealContactSchemas,
+      ...dealHistorySchemas,
     },
   },
   paths: {
@@ -263,6 +282,55 @@ export const pipelineSpec = {
           '401': stdErrors['401'],
           '404': stdErrors['404'],
           '409': stdErrors['409'],
+        },
+      },
+    },
+    '/api/v1/deals/{id}/history': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      get: {
+        operationId: 'listDealHistory',
+        summary: 'List deal history (append-only timeline)',
+        description:
+          'Returns the deal history timeline ordered by `created_at DESC, id DESC`. Cursor-paginated. Survives soft-delete of the parent deal.',
+        tags: ['Deal history'],
+        parameters: [
+          {
+            name: 'limit',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 200 },
+          },
+          {
+            name: 'cursor',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': listResponse('#/components/schemas/DealHistory'),
+          '400': stdErrors['400'],
+          '401': stdErrors['401'],
+        },
+      },
+    },
+    '/api/v1/deal-history/{id}': {
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+      ],
+      get: {
+        operationId: 'getDealHistory',
+        summary: 'Get a single deal-history row by id',
+        tags: ['Deal history'],
+        responses: {
+          '200': itemResponse(
+            'The requested deal-history row',
+            '#/components/schemas/DealHistory',
+          ),
+          '401': stdErrors['401'],
+          '404': stdErrors['404'],
         },
       },
     },

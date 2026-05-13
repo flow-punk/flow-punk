@@ -55,6 +55,15 @@ export {
   DEAL_CONTACT_ROLE_VALUES,
 } from './deal-contacts.js';
 export {
+  dealHistory,
+  type DealHistoryRow,
+  type DealHistoryKind,
+  type DealHistoryCredentialType,
+  type NewDealHistoryRow,
+  DEAL_HISTORY_KINDS,
+  DEAL_HISTORY_CREDENTIAL_TYPES,
+} from './deal-history.js';
+export {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,

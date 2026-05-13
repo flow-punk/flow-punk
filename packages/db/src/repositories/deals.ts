@@ -28,6 +28,10 @@ import { generateId } from '@flowpunk/service-utils';
 import { accounts } from '../schema/accounts.js';
 import { dealContacts } from '../schema/deal-contacts.js';
 import {
+  type DealHistoryCredentialType,
+  type DealHistoryKind,
+} from '../schema/deal-history.js';
+import {
   ALLOWED_PATCH_FIELDS,
   NULLABLE_PATCH_FIELDS,
   deals,
@@ -40,6 +44,30 @@ import {
 import { persons } from '../schema/persons.js';
 import { pipelines } from '../schema/pipelines.js';
 import { stages } from '../schema/stages.js';
+import {
+  buildHistoryInsert,
+  buildHistoryInsertUnconditional,
+  generateHistoryId,
+} from './deal-history.js';
+
+/**
+ * Per-mutation context. Bundles the actor identity + history toggle + the
+ * canonical `now` timestamp so handlers don't have to thread four params
+ * through every call. Per ADR-022 §5, `credentialType` aligns with the
+ * `audit-events` vocabulary (`actorCredentialType`); the `'system'` value
+ * is reserved for non-HTTP writes (provisioner / migration backfill).
+ */
+export interface MutationContext {
+  actorId: string;
+  credentialType: DealHistoryCredentialType;
+  /**
+   * When `false`, mutations skip the `deal_history` write but otherwise
+   * behave identically. Per ADR-022 §14, this is the edition-specific
+   * opt-out hook (default `true` from handlers).
+   */
+  recordHistory: boolean;
+  now: string;
+}
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -49,6 +77,7 @@ export class DealsRepoError extends Error {
       | 'not_found'
       | 'invalid_input'
       | 'wrong_state'
+      | 'conflict'
       | 'invariant_violation',
     message: string,
   ) {
@@ -115,9 +144,9 @@ export interface UpdateResult {
 export async function create(
   db: Db,
   input: CreateDealInput,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<Deal> {
+  const { actorId, now } = ctx;
   const normalized = validateCreate(input);
 
   // Pipeline + stage compatibility: one read covers both.
@@ -157,15 +186,58 @@ export async function create(
     updatedBy: actorId,
   };
 
+  // History row is co-inserted in the same `db.batch()` so a failed deal
+  // insert (e.g., FK violation, PK collision) rolls back the history row
+  // too. Per ADR-022 §7, `created` uses the unconditional helper — the
+  // mutation is itself an INSERT, so atomicity is provided by the batch
+  // transaction, no predicate-mirror needed.
+  if (ctx.recordHistory) {
+    const historyId = generateHistoryId();
+    const changesPayload = JSON.stringify(buildCreatedChangesPayload(row));
+    const batch: Array<unknown> = [
+      db.insert(deals).values(row).returning(),
+      db.run(
+        buildHistoryInsertUnconditional(historyId, {
+          dealId: row.id,
+          kind: 'created',
+          changes: changesPayload,
+          actorId: ctx.actorId,
+          credentialType: ctx.credentialType,
+          now: ctx.now,
+        }),
+      ),
+    ];
+    if (row.primaryPersonId) {
+      batch.push(
+        db
+          .insert(dealContacts)
+          .values({
+            dealId: row.id,
+            personId: row.primaryPersonId,
+            role: null,
+            createdAt: now,
+            createdBy: actorId,
+          })
+          .onConflictDoNothing({
+            target: [dealContacts.dealId, dealContacts.personId],
+          }),
+      );
+    }
+    const results = (await db.batch(batch as never)) as Array<unknown>;
+    const inserted = results[0] as Deal[];
+    const deal = inserted?.[0];
+    if (!deal) {
+      throw new DealsRepoError('invariant_violation', 'insert returned no row');
+    }
+    return deal;
+  }
+
+  // recordHistory=false branch — preserves legacy non-batched behavior.
   const inserted = await db.insert(deals).values(row).returning();
   const deal = inserted[0];
   if (!deal) {
     throw new DealsRepoError('invariant_violation', 'insert returned no row');
   }
-
-  // primaryPersonId ↔ deal_contacts consistency: a deal with a non-null
-  // primaryPersonId must have a matching deal_contacts row. Active pre-check
-  // already happened above; this is an idempotent upsert (no role).
   if (deal.primaryPersonId) {
     await db
       .insert(dealContacts)
@@ -180,8 +252,39 @@ export async function create(
         target: [dealContacts.dealId, dealContacts.personId],
       });
   }
-
   return deal;
+}
+
+/**
+ * Build the `changes` payload for a `created` history row. Per ADR-022 §4,
+ * `created` emits `[{field, from: null, to}, ...]` for every non-null
+ * initial field. The `id`, `status`, audit columns (`createdAt`/`createdBy`/
+ * `updatedAt`/`updatedBy`) are not included — they're recoverable from the
+ * deal row itself and not interesting on a timeline.
+ */
+function buildCreatedChangesPayload(
+  row: NewDeal,
+): Array<{ field: string; from: null; to: unknown }> {
+  const fields: Array<keyof NewDeal> = [
+    'name',
+    'pipelineId',
+    'stageId',
+    'accountId',
+    'primaryPersonId',
+    'amount',
+    'currency',
+    'expectedCloseDate',
+    'probability',
+    'ownerUserId',
+    'lostReason',
+  ];
+  const out: Array<{ field: string; from: null; to: unknown }> = [];
+  for (const field of fields) {
+    const value = row[field];
+    if (value === null || value === undefined) continue;
+    out.push({ field: String(field), from: null, to: value });
+  }
+  return out;
 }
 
 export async function findById(
@@ -280,20 +383,30 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
 }
 
 /**
- * Update a deal. Stage transitions are atomic: when the patch contains
- * `stageId` and it differs from the current stage, a single conditional
- * UPDATE asserts the target stage is active AND in the deal's current
- * pipeline; `stage_entered_at` is reset to `now` in the same statement.
+ * Update a deal. Per ADR-022:
  *
- * Other fields use the standard partial update; `pipelineId` is rejected
- * as immutable, `stageEnteredAt` cannot be patched directly.
+ * - **§7 atomicity**: the mutation and its history row are co-emitted in
+ *   a single `db.batch()`. The history INSERT mirrors the UPDATE's
+ *   predicate via `INSERT ... SELECT ... WHERE EXISTS (...)` so a
+ *   0-row-affected UPDATE does not land an orphan history row.
+ * - **§8 optimistic concurrency**: the UPDATE predicate includes
+ *   `updated_at = :seenUpdatedAt`. Concurrent modifications detected
+ *   between the pre-fetch and the write surface as `'conflict'` →
+ *   `409 CONFLICT` at the handler boundary.
+ *
+ * Stage transitions emit `kind = 'stage_moved'` with typed payload
+ * `{from_stage_id, to_stage_id, changes}`; other PATCHes emit
+ * `kind = 'updated'` with a `[{field, from, to}, ...]` payload. Per
+ * ADR-022 §2, multi-field PATCHes produce ONE history row, not N.
+ *
+ * `pipelineId` is rejected as immutable, `stageEnteredAt` cannot be
+ * patched directly.
  */
 export async function update(
   db: Db,
   id: string,
   patch: UpdateDealPatch,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<UpdateResult> {
   if (!DEAL_ID_REGEX.test(id)) {
     throw new DealsRepoError(
@@ -359,61 +472,179 @@ export async function update(
     await assertPersonActive(db, changes.primaryPersonId);
   }
 
-  // Stage transition path: handled atomically by a conditional UPDATE.
-  if ('stageId' in changes && typeof changes.stageId === 'string') {
-    return await applyStageTransition(
-      db,
-      id,
-      changes,
-      fieldsChanged,
-      actorId,
-      now,
-    );
-  }
-
-  // Non-transition path: standard active-row UPDATE.
-  const updated = await db
-    .update(deals)
-    .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-    .where(and(eq(deals.id, id), eq(deals.status, 'active')))
-    .returning();
-
-  const row = updated[0];
-  if (!row) {
-    const existing = await db
-      .select({ status: deals.status })
-      .from(deals)
-      .where(eq(deals.id, id))
-      .limit(1);
-    if (existing[0]) {
-      throw new DealsRepoError('wrong_state', `deal "${id}" is not active`);
-    }
+  // Pre-fetch for diff + optimistic-concurrency witness. The diff drives
+  // the history payload; `current.updatedAt` is the `:seenUpdatedAt`
+  // value mirrored into the conditional UPDATE's WHERE clause.
+  const current = await findById(db, id);
+  if (!current) {
     throw new DealsRepoError('not_found', `deal "${id}" not found`);
   }
 
-  await maybeUpsertPrimaryAsContact(db, row, changes, actorId, now);
+  // Compute the actual diff (filters from===to). If empty, the patch was
+  // a true no-op (e.g., user re-set the same stage, or PATCHed values
+  // matching current). Skip the UPDATE entirely — no `updated_at` bump,
+  // no history row, no misleading "fieldsChanged" claim. Matches the
+  // empty-patch early-return at the top of this function.
+  const diff = buildDiff(current, changes);
+  if (diff.length === 0) {
+    return { deal: current, fieldsChanged: [] };
+  }
+  // Re-derive fieldsChanged from the diff so the API response matches
+  // reality (a same-value PATCH that included `stageId` no longer reports
+  // it as changed).
+  const actualFieldsChanged = diff.map(
+    (d) => d.field as DealPatchableField,
+  );
+
+  // Real stage transition iff the diff shows stageId actually moved.
+  const isStageTransition = diff.some((d) => d.field === 'stageId');
+
+  if (isStageTransition) {
+    return await applyStageTransition(
+      db,
+      id,
+      current,
+      changes,
+      actualFieldsChanged,
+      ctx,
+    );
+  }
+
+  return await applyNonTransitionUpdate(
+    db,
+    id,
+    current,
+    changes,
+    diff,
+    actualFieldsChanged,
+    ctx,
+  );
+}
+
+/**
+ * Apply a non-stage-transition deal update with co-emitted history.
+ *
+ * Concurrency: `WHERE updated_at = current.updatedAt` enforces optimistic
+ * concurrency. 0-affected → disambiguate post-write: not-found / wrong-
+ * state / conflict.
+ */
+async function applyNonTransitionUpdate(
+  db: Db,
+  id: string,
+  current: Deal,
+  changes: Partial<Record<DealPatchableField, unknown>>,
+  diff: Array<{ field: string; from: unknown; to: unknown }>,
+  fieldsChanged: DealPatchableField[],
+  ctx: MutationContext,
+): Promise<UpdateResult> {
+  const { actorId, now } = ctx;
+  const updateSet = { ...changes, updatedAt: now, updatedBy: actorId } as Record<
+    string,
+    unknown
+  >;
+  const updateWhere = and(
+    eq(deals.id, id),
+    eq(deals.status, 'active'),
+    eq(deals.updatedAt, current.updatedAt),
+  );
+
+  let row: Deal | undefined;
+  if (ctx.recordHistory) {
+    const historyId = generateHistoryId();
+    // Witness mirrors the UPDATE predicate. After the UPDATE lands, the
+    // deal row has `updated_at = now AND updated_by = actorId`. Both are
+    // checked because `updated_at` alone has only millisecond precision —
+    // two writers from different actors could share `now`. Including
+    // `updated_by` in the witness narrows the residual race to
+    // same-actor-same-millisecond (vanishingly rare; documented in
+    // ADR-022 §7 as a known-limitation).
+    const witness = sql`SELECT 1 FROM ${deals} WHERE ${deals.id} = ${id} AND ${deals.updatedAt} = ${now} AND ${deals.updatedBy} = ${actorId}`;
+    const results = (await db.batch([
+      db.update(deals).set(updateSet as never).where(updateWhere).returning(),
+      db.run(
+        buildHistoryInsert(
+          historyId,
+          {
+            dealId: id,
+            kind: 'updated' as DealHistoryKind,
+            changes: JSON.stringify(diff),
+            actorId: ctx.actorId,
+            credentialType: ctx.credentialType,
+            now,
+          },
+          witness,
+        ),
+      ),
+    ] as never)) as Array<unknown>;
+    row = (results[0] as Deal[])[0];
+  } else {
+    const updated = await db
+      .update(deals)
+      .set(updateSet as never)
+      .where(updateWhere)
+      .returning();
+    row = updated[0];
+  }
+
+  if (!row) {
+    throw await disambiguateMissedUpdate(db, id, current.updatedAt);
+  }
+
+  await maybeUpsertPrimaryAsContact(db, row, changes, ctx);
   return { deal: row, fieldsChanged };
 }
 
 export async function softDelete(
   db: Db,
   id: string,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<Deal> {
-  const updated = await db
-    .update(deals)
-    .set({
-      status: 'deleted',
-      deletedAt: now,
-      deletedBy: actorId,
-      updatedAt: now,
-      updatedBy: actorId,
-    })
-    .where(and(eq(deals.id, id), eq(deals.status, 'active')))
-    .returning();
+  const { actorId, now } = ctx;
+  const updateSet = {
+    status: 'deleted' as const,
+    deletedAt: now,
+    deletedBy: actorId,
+    updatedAt: now,
+    updatedBy: actorId,
+  };
+  const updateWhere = and(eq(deals.id, id), eq(deals.status, 'active'));
 
-  const row = updated[0];
+  let row: Deal | undefined;
+  if (ctx.recordHistory) {
+    const historyId = generateHistoryId();
+    // Witness: deal now sits in `deleted` status with this exact deleted_at
+    // AND deleted_by. Including `deleted_by` narrows the residual collision
+    // race to same-actor-same-millisecond (see ADR-022 §7). `soft_deleted`
+    // payload is null per ADR-022 §4 — the act-of-deleting is the data; the
+    // prior row state is recoverable from the timeline.
+    const witness = sql`SELECT 1 FROM ${deals} WHERE ${deals.id} = ${id} AND ${deals.status} = 'deleted' AND ${deals.deletedAt} = ${now} AND ${deals.deletedBy} = ${actorId}`;
+    const results = (await db.batch([
+      db.update(deals).set(updateSet).where(updateWhere).returning(),
+      db.run(
+        buildHistoryInsert(
+          historyId,
+          {
+            dealId: id,
+            kind: 'soft_deleted' as DealHistoryKind,
+            changes: null,
+            actorId: ctx.actorId,
+            credentialType: ctx.credentialType,
+            now,
+          },
+          witness,
+        ),
+      ),
+    ] as never)) as Array<unknown>;
+    row = (results[0] as Deal[])[0];
+  } else {
+    const updated = await db
+      .update(deals)
+      .set(updateSet)
+      .where(updateWhere)
+      .returning();
+    row = updated[0];
+  }
+
   if (!row) {
     const existing = await db
       .select({ status: deals.status })
@@ -434,120 +665,189 @@ export async function softDelete(
 // ---------- stage transition ----------
 
 /**
- * Apply a deal update that includes a stage transition. The conditional
- * UPDATE asserts the target stage is active AND belongs to the deal's
- * current pipeline (matched via the deal's own `pipeline_id` column).
- * `stage_entered_at` is reset to `now` only when `stage_id` actually
- * differs from the current value (guarded by `stage_id != ?` in the
- * WHERE clause; if the patch sets the same stage, the UPDATE still runs
- * to apply other patch fields but `stage_entered_at` is preserved).
+ * Apply a deal update that includes a stage transition (target stage
+ * differs from current). The conditional UPDATE asserts:
  *
- * Two passes: first try the "stage actually changes" path with the
- * transition guard + new stage_entered_at; if zero affected and the deal
- * exists active, the transition guard failed (target stage not in same
- * pipeline / not active). If the deal exists but the target equals the
- * current, fall through to the no-op path which keeps stage_entered_at.
+ * - deal is active
+ * - `updated_at` matches the pre-fetched value (optimistic concurrency)
+ * - target stage is active AND in the deal's current pipeline
+ * - target stage differs from current
+ *
+ * Same-stage PATCHes are NOT routed here — they're handled by
+ * `applyNonTransitionUpdate` because the diff filter drops `stageId` from
+ * the change set when from === to. This simplifies disambiguation here.
+ *
+ * History row: `kind = 'stage_moved'` with payload
+ * `{from_stage_id, to_stage_id, changes: [...other diffs]}` per ADR-022 §3.
  */
 async function applyStageTransition(
   db: Db,
   id: string,
+  current: Deal,
   changes: Partial<Record<DealPatchableField, unknown>>,
   fieldsChanged: DealPatchableField[],
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<UpdateResult> {
+  const { actorId, now } = ctx;
   const targetStageId = changes.stageId as string;
 
-  // Atomic transition: requires deal active, target stage active and in
-  // deal's pipeline, AND target differs from current. Includes all other
-  // patch fields in the same SET to keep the update single-statement.
   const otherChanges = { ...changes };
   delete otherChanges.stageId;
 
-  const transitioned = await db
-    .update(deals)
-    .set({
-      ...otherChanges,
-      stageId: targetStageId,
-      stageEnteredAt: now,
-      updatedAt: now,
-      updatedBy: actorId,
-    } as any)
-    .where(
-      and(
-        eq(deals.id, id),
-        eq(deals.status, 'active'),
-        sql`${deals.stageId} != ${targetStageId}`,
-        sql`EXISTS (SELECT 1 FROM stages WHERE id = ${targetStageId} AND status = 'active' AND pipeline_id = ${deals.pipelineId})`,
-      ),
-    )
-    .returning();
+  // Compute the non-stage diff for the `stage_moved` payload.
+  const otherDiff = buildDiff(current, otherChanges);
 
-  if (transitioned[0]) {
-    await maybeUpsertPrimaryAsContact(
-      db,
-      transitioned[0],
-      changes,
-      actorId,
-      now,
-    );
-    return { deal: transitioned[0], fieldsChanged };
+  const updateSet = {
+    ...otherChanges,
+    stageId: targetStageId,
+    stageEnteredAt: now,
+    updatedAt: now,
+    updatedBy: actorId,
+  } as Record<string, unknown>;
+  const updateWhere = and(
+    eq(deals.id, id),
+    eq(deals.status, 'active'),
+    eq(deals.updatedAt, current.updatedAt),
+    sql`${deals.stageId} != ${targetStageId}`,
+    sql`EXISTS (SELECT 1 FROM stages WHERE id = ${targetStageId} AND status = 'active' AND pipeline_id = ${deals.pipelineId})`,
+  );
+
+  let transitioned: Deal | undefined;
+  if (ctx.recordHistory) {
+    const historyId = generateHistoryId();
+    const stageMovedPayload = JSON.stringify({
+      from_stage_id: current.stageId,
+      to_stage_id: targetStageId,
+      changes: otherDiff,
+    });
+    // Witness adds `updated_by = actorId` to narrow the residual
+    // same-millisecond collision race (see ADR-022 §7).
+    const witness = sql`SELECT 1 FROM ${deals} WHERE ${deals.id} = ${id} AND ${deals.stageId} = ${targetStageId} AND ${deals.updatedAt} = ${now} AND ${deals.updatedBy} = ${actorId}`;
+    const results = (await db.batch([
+      db.update(deals).set(updateSet as never).where(updateWhere).returning(),
+      db.run(
+        buildHistoryInsert(
+          historyId,
+          {
+            dealId: id,
+            kind: 'stage_moved' as DealHistoryKind,
+            changes: stageMovedPayload,
+            actorId: ctx.actorId,
+            credentialType: ctx.credentialType,
+            now,
+          },
+          witness,
+        ),
+      ),
+    ] as never)) as Array<unknown>;
+    transitioned = (results[0] as Deal[])[0];
+  } else {
+    const updated = await db
+      .update(deals)
+      .set(updateSet as never)
+      .where(updateWhere)
+      .returning();
+    transitioned = updated[0];
   }
 
-  // The transition UPDATE matched zero rows. Disambiguate.
-  const current = await db
-    .select({ status: deals.status, stageId: deals.stageId })
+  if (transitioned) {
+    await maybeUpsertPrimaryAsContact(db, transitioned, changes, ctx);
+    return { deal: transitioned, fieldsChanged };
+  }
+
+  // Disambiguate: not_found / wrong_state / conflict / invalid_input.
+  // Since the same-stage case is filtered out at the top level, an
+  // updated_at match with no UPDATE landing means the EXISTS-stages
+  // guard failed (target not active / wrong pipeline).
+  throw await disambiguateMissedTransition(
+    db,
+    id,
+    current.updatedAt,
+    targetStageId,
+  );
+}
+
+// ---------- diff + disambiguation helpers ----------
+
+/**
+ * Compute the per-field diff between a pre-fetched deal and a patch.
+ * Skips fields where `from === to` (no actual change). Used by both the
+ * `updated` and `stage_moved` history payloads.
+ */
+function buildDiff(
+  current: Deal,
+  changes: Partial<Record<DealPatchableField, unknown>>,
+): Array<{ field: string; from: unknown; to: unknown }> {
+  const out: Array<{ field: string; from: unknown; to: unknown }> = [];
+  for (const field of Object.keys(changes) as DealPatchableField[]) {
+    const newValue = changes[field];
+    const oldValue = (current as unknown as Record<string, unknown>)[field];
+    if (newValue === oldValue) continue;
+    out.push({ field, from: oldValue ?? null, to: newValue ?? null });
+  }
+  return out;
+}
+
+/**
+ * The batched UPDATE matched zero rows on a non-transition write. The deal
+ * either no longer exists, is no longer active, or was modified between
+ * our pre-fetch and the write (optimistic-concurrency miss).
+ */
+async function disambiguateMissedUpdate(
+  db: Db,
+  id: string,
+  seenUpdatedAt: string,
+): Promise<DealsRepoError> {
+  const rows = await db
+    .select({ status: deals.status, updatedAt: deals.updatedAt })
     .from(deals)
     .where(eq(deals.id, id))
     .limit(1);
-
-  const currentRow = current[0];
-  if (!currentRow) {
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+  const post = rows[0];
+  if (!post) return new DealsRepoError('not_found', `deal "${id}" not found`);
+  if (post.status !== 'active') {
+    return new DealsRepoError('wrong_state', `deal "${id}" is not active`);
   }
-  if (currentRow.status !== 'active') {
-    throw new DealsRepoError('wrong_state', `deal "${id}" is not active`);
+  if (post.updatedAt !== seenUpdatedAt) {
+    return new DealsRepoError(
+      'conflict',
+      `deal "${id}" was modified concurrently — re-read and retry`,
+    );
   }
+  return new DealsRepoError(
+    'invariant_violation',
+    `update did not land for deal "${id}"`,
+  );
+}
 
-  if (currentRow.stageId === targetStageId) {
-    // Same-stage update — preserve stage_entered_at, apply remaining patch.
-    // Guard `stage_id = targetStageId` so a concurrent transition between
-    // the disambiguation read and this write cannot land otherChanges on a
-    // moved deal while we report `fieldsChanged: []` for stageId.
-    const updated = await db
-      .update(deals)
-      .set({
-        ...otherChanges,
-        updatedAt: now,
-        updatedBy: actorId,
-      } as any)
-      .where(
-        and(
-          eq(deals.id, id),
-          eq(deals.status, 'active'),
-          eq(deals.stageId, targetStageId),
-        ),
-      )
-      .returning();
-    const row = updated[0];
-    if (!row) {
-      // The deal's stage changed between our read and write (or it was
-      // soft-deleted). Surface as wrong_state so the caller retries — a
-      // retry runs the transition guard cleanly.
-      throw new DealsRepoError(
-        'wrong_state',
-        `deal "${id}" stage changed concurrently — retry`,
-      );
-    }
-    // Drop stageId from fieldsChanged since it didn't actually change.
-    const filtered = fieldsChanged.filter((f) => f !== 'stageId');
-    await maybeUpsertPrimaryAsContact(db, row, changes, actorId, now);
-    return { deal: row, fieldsChanged: filtered };
+/**
+ * The batched stage-transition UPDATE matched zero rows. Disambiguate
+ * between the four possible causes. Same-stage cases are filtered out at
+ * the top of `update()` so we don't have to handle them here.
+ */
+async function disambiguateMissedTransition(
+  db: Db,
+  id: string,
+  seenUpdatedAt: string,
+  targetStageId: string,
+): Promise<DealsRepoError> {
+  const rows = await db
+    .select({ status: deals.status, updatedAt: deals.updatedAt })
+    .from(deals)
+    .where(eq(deals.id, id))
+    .limit(1);
+  const post = rows[0];
+  if (!post) return new DealsRepoError('not_found', `deal "${id}" not found`);
+  if (post.status !== 'active') {
+    return new DealsRepoError('wrong_state', `deal "${id}" is not active`);
   }
-
-  // Different stage but the EXISTS guard failed: stage missing/deleted/
-  // wrong pipeline. Surface as invalid_input.
-  throw new DealsRepoError(
+  if (post.updatedAt !== seenUpdatedAt) {
+    return new DealsRepoError(
+      'conflict',
+      `deal "${id}" was modified concurrently — re-read and retry`,
+    );
+  }
+  return new DealsRepoError(
     'invalid_input',
     `stage "${targetStageId}" is not active or does not belong to deal's pipeline`,
   );
@@ -563,14 +863,15 @@ async function applyStageTransition(
  *
  * This mirrors the auto-upsert in `create()`. Together they preserve the
  * invariant: every deal with a non-null `primaryPersonId` has a row in
- * `deal_contacts`.
+ * `deal_contacts`. Per ADR-022 §E, this implicit upsert does NOT emit a
+ * `contact_added` history row — the parent `updated` row's `changes`
+ * payload already records the `primaryPersonId` field change.
  */
 async function maybeUpsertPrimaryAsContact(
   db: Db,
   deal: Deal,
   changes: Partial<Record<DealPatchableField, unknown>>,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<void> {
   if (!('primaryPersonId' in changes)) return;
   const newPrimary = changes.primaryPersonId;
@@ -581,8 +882,8 @@ async function maybeUpsertPrimaryAsContact(
       dealId: deal.id,
       personId: newPrimary,
       role: null,
-      createdAt: now,
-      createdBy: actorId,
+      createdAt: ctx.now,
+      createdBy: ctx.actorId,
     })
     .onConflictDoNothing({
       target: [dealContacts.dealId, dealContacts.personId],

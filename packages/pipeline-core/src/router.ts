@@ -4,6 +4,8 @@ import { withIdempotency } from '@flowpunk/service-utils';
 import { handleAddDealContact } from './handlers/deal-contacts/add.js';
 import { handleListDealContacts } from './handlers/deal-contacts/list.js';
 import { handleRemoveDealContact } from './handlers/deal-contacts/remove.js';
+import { handleGetDealHistory } from './handlers/deal-history/get.js';
+import { handleListDealHistoryByDeal } from './handlers/deal-history/listByDeal.js';
 import { handleCreateDeal } from './handlers/deals/create.js';
 import { handleGetDeal } from './handlers/deals/get.js';
 import { handleListDeals } from './handlers/deals/list.js';
@@ -30,6 +32,7 @@ const STAGES_COLLECTION_PATH = '/api/v1/stages';
 const STAGES_ITEM_PREFIX = '/api/v1/stages/';
 const DEALS_COLLECTION_PATH = '/api/v1/deals';
 const DEALS_ITEM_PREFIX = '/api/v1/deals/';
+const DEAL_HISTORY_ITEM_PREFIX = '/api/v1/deal-history/';
 const MCP_TOOLS_PATH = '/mcp/tools';
 const MCP_EXECUTE_PATH = '/mcp/execute';
 
@@ -147,9 +150,21 @@ export async function route(
     return methodNotAllowed(['GET', 'HEAD', 'POST']);
   }
   if (pathname.startsWith(DEALS_ITEM_PREFIX)) {
-    // Sub-resource: /api/v1/deals/:id/contacts(/:personId)?
+    // Sub-resource: /api/v1/deals/:id/history
     // Matched BEFORE the generic `:id` branch — `id.includes('/')` would
     // otherwise return 404 for any path containing a sub-resource.
+    const historyMatch = matchDealHistoryPath(
+      pathname.slice(DEALS_ITEM_PREFIX.length),
+    );
+    if (historyMatch) {
+      const { dealId } = historyMatch;
+      if (method === 'GET' || method === 'HEAD') {
+        return handleListDealHistoryByDeal(request, env, actor, dealId);
+      }
+      return methodNotAllowed(['GET', 'HEAD']);
+    }
+
+    // Sub-resource: /api/v1/deals/:id/contacts(/:personId)?
     const dealContactsMatch = matchDealContactsPath(
       pathname.slice(DEALS_ITEM_PREFIX.length),
     );
@@ -192,6 +207,16 @@ export async function route(
       );
     }
     return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+  }
+
+  // Top-level deal-history item read.
+  if (pathname.startsWith(DEAL_HISTORY_ITEM_PREFIX)) {
+    const id = pathname.slice(DEAL_HISTORY_ITEM_PREFIX.length);
+    if (id.length === 0 || id.includes('/')) return notFound();
+    if (method === 'GET' || method === 'HEAD') {
+      return handleGetDealHistory(request, env, actor, id);
+    }
+    return methodNotAllowed(['GET', 'HEAD']);
   }
 
   return notFound();
@@ -261,6 +286,19 @@ function matchDealContactsPath(
   const personId = parts[2];
   if (!personId || personId.length === 0) return null;
   return { dealId, personId };
+}
+
+/**
+ * Match `<dealId>/history` tail of `/api/v1/deals/`. Returns `{ dealId }`
+ * or null when the tail is not the history sub-resource.
+ */
+function matchDealHistoryPath(tail: string): { dealId: string } | null {
+  const parts = tail.split('/');
+  if (parts.length !== 2) return null;
+  const dealId = parts[0];
+  if (!dealId || dealId.length === 0) return null;
+  if (parts[1] !== 'history') return null;
+  return { dealId };
 }
 
 function notFound(): Response {

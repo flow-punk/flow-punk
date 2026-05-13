@@ -24,15 +24,34 @@
  *     row when `primaryPersonId` is set.
  */
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { dealContacts, type DealContact } from '../schema/deal-contacts.js';
 import { deals } from '../schema/deals.js';
+import {
+  type DealHistoryCredentialType,
+  type DealHistoryKind,
+} from '../schema/deal-history.js';
 import { persons } from '../schema/persons.js';
 import {
   DEAL_CONTACT_ROLE_VALUES,
   type DealContactRole,
 } from '../schema/deal-contacts.js';
+import {
+  buildHistoryInsertUnconditional,
+  generateHistoryId,
+} from './deal-history.js';
+
+/**
+ * Per-mutation context. Same shape as in `repositories/deals.ts`. See
+ * ADR-022 §5 for the actor model + `recordHistory` opt-out.
+ */
+export interface MutationContext {
+  actorId: string;
+  credentialType: DealHistoryCredentialType;
+  recordHistory: boolean;
+  now: string;
+}
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -79,9 +98,9 @@ export interface ListResult {
 export async function add(
   db: Db,
   input: AddDealContactInput,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<DealContact> {
+  const { actorId, now } = ctx;
   if (!DEAL_ID_REGEX.test(input.dealId)) {
     throw new DealContactsRepoError(
       'invalid_input',
@@ -106,16 +125,48 @@ export async function add(
   await assertDealActive(db, input.dealId);
   await assertPersonActive(db, input.personId);
 
+  const role = input.role ?? null;
+  const insertValues = {
+    dealId: input.dealId,
+    personId: input.personId,
+    role,
+    createdAt: now,
+    createdBy: actorId,
+  };
+
   try {
+    if (ctx.recordHistory) {
+      // Co-emit history. The dealContacts INSERT is itself a write — if it
+      // fails (PK collision → already_exists), the batch rolls back and
+      // the history INSERT is rolled back with it. No witness needed.
+      const historyId = generateHistoryId();
+      const payload = JSON.stringify({ person_id: input.personId, role });
+      const results = (await db.batch([
+        db.insert(dealContacts).values(insertValues).returning(),
+        db.run(
+          buildHistoryInsertUnconditional(historyId, {
+            dealId: input.dealId,
+            kind: 'contact_added' as DealHistoryKind,
+            changes: payload,
+            actorId: ctx.actorId,
+            credentialType: ctx.credentialType,
+            now,
+          }),
+        ),
+      ] as never)) as Array<unknown>;
+      const row = (results[0] as DealContact[])[0];
+      if (!row) {
+        throw new DealContactsRepoError(
+          'invariant_violation',
+          'insert returned no row',
+        );
+      }
+      return row;
+    }
+
     const inserted = await db
       .insert(dealContacts)
-      .values({
-        dealId: input.dealId,
-        personId: input.personId,
-        role: input.role ?? null,
-        createdAt: now,
-        createdBy: actorId,
-      })
+      .values(insertValues)
       .returning();
     const row = inserted[0];
     if (!row) {
@@ -154,9 +205,9 @@ export async function remove(
   db: Db,
   dealId: string,
   personId: string,
-  actorId: string,
-  now: string,
+  ctx: MutationContext,
 ): Promise<void> {
+  const { actorId, now } = ctx;
   if (!DEAL_ID_REGEX.test(dealId)) {
     throw new DealContactsRepoError(
       'invalid_input',
@@ -175,35 +226,94 @@ export async function remove(
   // Clear primaryPersonId on the parent deal if-and-only-if it currently
   // points at this contact, AND in the same transaction delete the
   // deal_contacts row. D1 `db.batch()` is transactional — both succeed
-  // or both fail. Matches the pattern in
-  // managed/packages/db/src/repositories/tenants.ts.
-  const results = await db.batch([
-    db
-      .update(deals)
-      .set({
-        primaryPersonId: null,
-        updatedAt: now,
-        updatedBy: actorId,
-      })
-      .where(
-        and(
-          eq(deals.id, dealId),
-          eq(deals.status, 'active'),
-          eq(deals.primaryPersonId, personId),
+  // or both fail.
+  //
+  // History (per ADR-022): the `contact_removed` row is co-emitted in the
+  // SAME batch but the INSERT runs FIRST, BEFORE the DELETE, sourcing
+  // person_id + role from the deal_contacts row via SELECT FROM
+  // deal_contacts WHERE deal_id=? AND person_id=?. This pattern (per
+  // ADR-022 §C) has two correctness properties the prior NOT-EXISTS
+  // witness lacked:
+  //   (1) If the row doesn't exist at the start of the transaction, the
+  //       INSERT's source SELECT yields zero rows and the INSERT is a
+  //       no-op — no false `contact_removed` history is committed for
+  //       a 404'd remove.
+  //   (2) The role on the history payload is the actual stored role,
+  //       not `null` hardcoded.
+  // Concurrent-remove races are also correctly handled: D1 batches are
+  // serializable transactions — whichever batch commits second sees the
+  // post-first-commit state (no row), INSERT no-ops, DELETE no-ops,
+  // post-batch length=0 throws `not_found`. No phantom history.
+  let results: Array<unknown>;
+  if (ctx.recordHistory) {
+    const historyId = generateHistoryId();
+    results = (await db.batch([
+      // INSERT runs BEFORE DELETE — sources role from the row pre-delete.
+      db.run(sql`
+        INSERT INTO deal_history (id, deal_id, kind, changes, actor_id, credential_type, created_at)
+        SELECT ${historyId}, ${dealId}, 'contact_removed',
+               json_object('person_id', person_id, 'role', role),
+               ${ctx.actorId}, ${ctx.credentialType}, ${now}
+        FROM deal_contacts
+        WHERE deal_id = ${dealId} AND person_id = ${personId}
+      `),
+      db
+        .update(deals)
+        .set({
+          primaryPersonId: null,
+          updatedAt: now,
+          updatedBy: actorId,
+        })
+        .where(
+          and(
+            eq(deals.id, dealId),
+            eq(deals.status, 'active'),
+            eq(deals.primaryPersonId, personId),
+          ),
         ),
-      ),
-    db
-      .delete(dealContacts)
-      .where(
-        and(
-          eq(dealContacts.dealId, dealId),
-          eq(dealContacts.personId, personId),
+      db
+        .delete(dealContacts)
+        .where(
+          and(
+            eq(dealContacts.dealId, dealId),
+            eq(dealContacts.personId, personId),
+          ),
+        )
+        .returning(),
+    ] as never)) as Array<unknown>;
+  } else {
+    results = (await db.batch([
+      db
+        .update(deals)
+        .set({
+          primaryPersonId: null,
+          updatedAt: now,
+          updatedBy: actorId,
+        })
+        .where(
+          and(
+            eq(deals.id, dealId),
+            eq(deals.status, 'active'),
+            eq(deals.primaryPersonId, personId),
+          ),
         ),
-      )
-      .returning(),
-  ]);
+      db
+        .delete(dealContacts)
+        .where(
+          and(
+            eq(dealContacts.dealId, dealId),
+            eq(dealContacts.personId, personId),
+          ),
+        )
+        .returning(),
+    ] as never)) as Array<unknown>;
+  }
 
-  const deletedRows = results[1] as ReadonlyArray<DealContact> | undefined;
+  // The DELETE result is the last item in either batch; index varies.
+  const deleteResultIndex = ctx.recordHistory ? 2 : 1;
+  const deletedRows = results[deleteResultIndex] as
+    | ReadonlyArray<DealContact>
+    | undefined;
   if (!deletedRows || deletedRows.length === 0) {
     throw new DealContactsRepoError(
       'not_found',

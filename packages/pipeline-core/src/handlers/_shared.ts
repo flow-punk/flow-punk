@@ -2,12 +2,43 @@ import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { createLogger } from '@flowpunk/service-utils';
 import {
   DealContactsRepoError,
+  DealHistoryRepoError,
   DealsRepoError,
   PipelinesRepoError,
   StagesRepoError,
 } from '@flowpunk-indie/db';
 
-import type { PipelineEnv } from '../types.js';
+import type { Actor, PipelineEnv } from '../types.js';
+
+/**
+ * Per-mutation context shared by deals/deal-contacts repo writes.
+ * Same shape as `MutationContext` in those repos. Constructed once per
+ * handler call from the request actor + env + a fresh `now`.
+ */
+export interface MutationContext {
+  actorId: string;
+  credentialType: 'apikey' | 'oauth' | 'session' | 'system';
+  recordHistory: boolean;
+  now: string;
+}
+
+/**
+ * Build the mutation context for a request. `recordHistory` defaults
+ * `true` when the wrapper has not supplied `PIPELINE_OPTIONS` (per
+ * ADR-022 §14).
+ */
+export function buildMutationCtx(
+  actor: Actor,
+  env: PipelineEnv,
+  now: string,
+): MutationContext {
+  return {
+    actorId: actor.userId,
+    credentialType: actor.credentialType,
+    recordHistory: env.PIPELINE_OPTIONS?.recordHistory ?? true,
+    now,
+  };
+}
 
 export type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -89,7 +120,8 @@ export function mapRepoError(err: unknown): Response {
     !(err instanceof PipelinesRepoError) &&
     !(err instanceof StagesRepoError) &&
     !(err instanceof DealsRepoError) &&
-    !(err instanceof DealContactsRepoError)
+    !(err instanceof DealContactsRepoError) &&
+    !(err instanceof DealHistoryRepoError)
   ) {
     throw err;
   }
@@ -100,7 +132,9 @@ export function mapRepoError(err: unknown): Response {
         ? 'stages'
         : err instanceof DealsRepoError
           ? 'deals'
-          : 'deal_contacts';
+          : err instanceof DealContactsRepoError
+            ? 'deal_contacts'
+            : 'deal_history';
   switch (err.code) {
     case 'not_found':
       return errorResponse(404, 'NOT_FOUND', err.message);
@@ -109,6 +143,10 @@ export function mapRepoError(err: unknown): Response {
     case 'wrong_state':
       return errorResponse(409, 'WRONG_STATE', err.message);
     case 'already_exists':
+      return errorResponse(409, 'CONFLICT', err.message);
+    case 'conflict':
+      // Per ADR-022 §8: optimistic-concurrency miss on a deal write.
+      // Caller should re-read and retry.
       return errorResponse(409, 'CONFLICT', err.message);
     case 'invariant_violation': {
       const logger = createLogger({ service: 'pipeline' });

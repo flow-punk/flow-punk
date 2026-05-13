@@ -1,7 +1,7 @@
 import { dealContactsRepo } from '@flowpunk-indie/db';
 
 import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError } from '../_shared.js';
+import { buildMutationCtx, getDb, jsonResponse, mapRepoError } from '../_shared.js';
 
 /**
  * DELETE /api/v1/deals/:id/contacts/:personId
@@ -21,7 +21,8 @@ export async function handleRemoveDealContact(
   try {
     const db = getDb(env);
     const now = new Date().toISOString();
-    await dealContactsRepo.remove(db, dealId, personId, actor.userId, now);
+    const ctx = buildMutationCtx(actor, env, now);
+    await dealContactsRepo.remove(db, dealId, personId, ctx);
     return jsonResponse(200, { success: true });
   } catch (err) {
     return mapRepoError(err);

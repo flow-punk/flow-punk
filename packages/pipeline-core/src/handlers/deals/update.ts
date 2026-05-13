@@ -1,7 +1,13 @@
 import { dealsRepo, type UpdateDealPatch } from '@flowpunk-indie/db';
 
 import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, requireJsonBody } from '../_shared.js';
+import {
+  buildMutationCtx,
+  getDb,
+  jsonResponse,
+  mapRepoError,
+  requireJsonBody,
+} from '../_shared.js';
 
 export async function handleUpdateDeal(
   request: Request,
@@ -15,7 +21,8 @@ export async function handleUpdateDeal(
   try {
     const db = getDb(env);
     const now = new Date().toISOString();
-    const result = await dealsRepo.update(db, id, body.value, actor.userId, now);
+    const ctx = buildMutationCtx(actor, env, now);
+    const result = await dealsRepo.update(db, id, body.value, ctx);
     // audit emission deferred — see plan §Out of scope
     return jsonResponse(200, { deal: result.deal });
   } catch (err) {

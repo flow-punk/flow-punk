@@ -2,6 +2,7 @@ import { dealContactsRepo, type DealContactRole } from '@flowpunk-indie/db';
 
 import type { Actor, PipelineEnv } from '../../types.js';
 import {
+  buildMutationCtx,
   getDb,
   jsonResponse,
   mapRepoError,
@@ -33,6 +34,7 @@ export async function handleAddDealContact(
   try {
     const db = getDb(env);
     const now = new Date().toISOString();
+    const ctx = buildMutationCtx(actor, env, now);
     const contact = await dealContactsRepo.add(
       db,
       {
@@ -40,8 +42,7 @@ export async function handleAddDealContact(
         personId: body.value.personId,
         role: body.value.role ?? null,
       },
-      actor.userId,
-      now,
+      ctx,
     );
     return jsonResponse(201, { dealContact: contact });
   } catch (err) {
