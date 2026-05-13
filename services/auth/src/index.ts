@@ -8,6 +8,7 @@ import {
   createAuthHandler,
   indieDefaultConfig,
   listEnabledProviders,
+  validateDashboardSession,
   type AuthFactoryConfig,
 } from '@flowpunk-indie/auth-better';
 
@@ -58,6 +59,45 @@ export default {
       .withTenantId(tenantId);
 
     const url = new URL(request.url);
+
+    // Gateway-internal session validation (Phase 1.2 — ADR-021 §4). The
+    // gateway forwards the inbound Cookie header here; we resolve the
+    // better-auth session and the linked domain `users` row, then return
+    // a stable identity body. 401 on any failure — the gateway falls
+    // through to its other credential paths.
+    if (
+      url.pathname === '/auth/session-identity' &&
+      request.method === 'POST'
+    ) {
+      try {
+        const config = resolveConfig(env);
+        const identity = await validateDashboardSession({
+          d1: env.DB,
+          config,
+          request,
+        });
+        if (!identity) {
+          return jsonResponse(401, {
+            success: false,
+            error: { code: 'INVALID_SESSION' },
+          });
+        }
+        return jsonResponse(200, {
+          userId: identity.userId,
+          sessionId: identity.sessionId,
+          expiresAt: identity.expiresAt,
+          email: identity.email,
+          role: identity.role,
+        });
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error('session-identity check failed', { error: err });
+        return jsonResponse(500, {
+          success: false,
+          error: { code: 'AUTH_INTERNAL_ERROR' },
+        });
+      }
+    }
 
     // Better-auth surface — dashboard sign-in / sign-up / sessions / OAuth.
     if (url.pathname.startsWith('/api/auth/')) {

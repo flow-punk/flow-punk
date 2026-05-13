@@ -30,7 +30,13 @@ export interface AuthHandler {
   handler: (request: Request) => Promise<Response>;
 }
 
-export function createAuthHandler(input: CreateAuthHandlerInput): AuthHandler {
+/**
+ * Internal: build the underlying better-auth instance. Same arguments
+ * as `createAuthHandler`. Exposed via `createAuthInstance` so the
+ * gateway-side session validator (Phase 1.2) can call
+ * `instance.api.getSession({ headers })` without going through HTTP.
+ */
+export function createAuthInstance(input: CreateAuthHandlerInput) {
   const db = drizzle(input.d1);
 
   const socialProviders: Record<string, unknown> = {};
@@ -51,7 +57,7 @@ export function createAuthHandler(input: CreateAuthHandlerInput): AuthHandler {
     };
   }
 
-  const instance = betterAuth({
+  return betterAuth({
     baseURL: input.config.publicOrigin,
     basePath: '/api/auth',
     secret: input.config.secret,
@@ -96,7 +102,10 @@ export function createAuthHandler(input: CreateAuthHandlerInput): AuthHandler {
         : {}),
     },
   });
+}
 
+export function createAuthHandler(input: CreateAuthHandlerInput): AuthHandler {
+  const instance = createAuthInstance(input);
   return {
     handler: (request) => instance.handler(request),
   };

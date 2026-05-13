@@ -9,6 +9,10 @@ import {
 import { unauthorized } from '../auth/unauthorized.js';
 import { validateSession } from '../auth/validate-session.js';
 import {
+  hasBetterAuthCookie,
+  validateBetterAuthSession,
+} from '../auth/validate-better-auth-session.js';
+import {
   getPublicPaths,
   isPublicPath,
   INDIE_PUBLIC_PATHS,
@@ -73,6 +77,38 @@ export const authMiddleware: Middleware = async (
   // session-only. On validation failure we fall through so a stale cookie
   // alongside a valid API key still authenticates.
   if (isSessionAllowedPath(url.pathname)) {
+    // Better-auth dashboard session (Phase 1.2 — ADR-021). Preferred over
+    // the legacy `fp_session` path so the dashboard cookie short-circuits
+    // when both are presented. Path-scoped here mirrors ADR-013: sessions
+    // never reach `/mcp`.
+    if (hasBetterAuthCookie(ctx.request)) {
+      const dashSession = await validateBetterAuthSession({
+        authService: ctx.env.AUTH_SERVICE,
+        request: ctx.request,
+        serviceTimeoutMs: ctx.env.SERVICE_TIMEOUT_MS,
+        tenantId: '_system',
+      });
+      if (dashSession) {
+        ctx.tenantId = dashSession.tenantId;
+        ctx.userId = dashSession.userId;
+        ctx.credentialId = dashSession.credentialId;
+        ctx.credentialType = 'session';
+        ctx.scope = dashSession.scope;
+
+        ctx.request = new Request(ctx.request, {
+          headers: withIdentityHeaders(ctx.request.headers, {
+            tenantId: dashSession.tenantId,
+            userId: dashSession.userId,
+            scope: dashSession.scope,
+            credentialType: 'session',
+            credentialId: dashSession.credentialId,
+          }),
+        });
+
+        return next();
+      }
+    }
+
     const session = await validateSession(ctx.env, ctx.request);
     if (session) {
       ctx.tenantId = session.tenantId;

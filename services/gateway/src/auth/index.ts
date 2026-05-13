@@ -17,6 +17,14 @@ export { sha256Hex } from './sha256.js';
 export { validateApiKey } from './validate-apikey.js';
 export type { ValidatedIdentity } from './validate-apikey.js';
 export {
+  hasBetterAuthCookie,
+  validateBetterAuthSession,
+} from './validate-better-auth-session.js';
+export type {
+  BetterAuthSessionIdentity,
+  ValidateBetterAuthSessionInput,
+} from './validate-better-auth-session.js';
+export {
   copyIdentityHeaders,
   extractIdentityHeaders,
   IDENTITY_HEADER_NAMES,

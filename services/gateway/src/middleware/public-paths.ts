@@ -23,6 +23,11 @@ export const INDIE_PUBLIC_PATHS = [
   '/oauth/*',
   '/api/v1/auth/login',
   '/api/v1/auth/logout',
+  // Better-auth dashboard surface (ADR-021). Sign-in / sign-up / OAuth
+  // callback / `/get-session` all live under `/api/auth/*` and must reach
+  // AUTH_SERVICE without an Authorization header (cookie-only). Each
+  // sub-route enforces its own CSRF/credential check inside better-auth.
+  '/api/auth/*',
 ] as const;
 
 /**
