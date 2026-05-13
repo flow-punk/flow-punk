@@ -3,6 +3,19 @@ export * from './mcp-sessions.js';
 export * from './auth-login-tokens.js';
 export * from './api-keys.js';
 
+// Better-auth tables (ADR-021 §3). See `auth-better.ts` for the
+// bidirectional FK relationship with `users`.
+export {
+  authUser,
+  authSession,
+  authAccount,
+  authVerification,
+  type AuthUser,
+  type AuthSession,
+  type AuthAccount,
+  type AuthVerification,
+} from './auth-better.js';
+
 // Per-table modules each export their own `ALLOWED_PATCH_FIELDS`,
 // `IMMUTABLE_PATCH_FIELDS`, `NULLABLE_PATCH_FIELDS`, etc. — names collide
 // across tables. Re-export only the table object and its row/status types

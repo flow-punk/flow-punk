@@ -1,27 +1,28 @@
 {
-  "name": "@flowpunk-indie/auth-core",
+  "name": "@flowpunk-indie/auth-better",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./router": "./src/router.ts",
-    "./types": "./src/types.ts"
+    "./config": "./src/config/index.ts",
+    "./handler": "./src/handler.ts",
+    "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@flowpunk-indie/db": "workspace:*",
-    "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",
+    "better-auth": "1.6.11",
     "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250620.0",
-    "tsx": "^4.19.2",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   }
 }

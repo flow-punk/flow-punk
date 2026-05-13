@@ -60,6 +60,16 @@ export const users = sqliteTable(
     role: text('role').notNull().$type<Role>().default('member'),
     status: text('status').notNull().$type<UserStatus>(),
     lastLoginAt: text('last_login_at'),
+    /**
+     * FK to `auth_user.id` (the better-auth user row, per ADR-021 §3).
+     * Nullable for two reasons: (1) rows created before the better-auth
+     * migration backfill have nothing to point at; (2) the sign-up
+     * transaction creates the better-auth row first, then this row, so
+     * a brief window exists where the value is unset. The reverse
+     * `auth_user.domain_user_id` column is the other half of the
+     * bidirectional FK.
+     */
+    authUserId: text('auth_user_id'),
     deletedAt: text('deleted_at'),
     deletedBy: text('deleted_by'),
     createdAt: text('created_at').notNull(),
@@ -71,6 +81,9 @@ export const users = sqliteTable(
     emailActiveUnique: uniqueIndex('idx_users_email_active_unique')
       .on(t.email)
       .where(sql`status = 'active'`),
+    authUserIdUnique: uniqueIndex('idx_users_auth_user_id_unique')
+      .on(t.authUserId)
+      .where(sql`auth_user_id IS NOT NULL`),
     statusIdx: index('idx_users_status').on(t.status),
     roleIdx: index('idx_users_role').on(t.role),
     createdAtIdx: index('idx_users_created_at').on(t.createdAt, t.id),
