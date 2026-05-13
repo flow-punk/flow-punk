@@ -1,6 +1,8 @@
 import type { DashboardModule } from "./types.js";
 import { apiKeysModule } from "./api-keys/index.js";
 import { settingsModule } from "./settings/index.js";
+import { accountsModule } from "./accounts/index.js";
+import { peopleModule } from "./people/index.js";
 
 /**
  * Edition-agnostic base modules. The users module is NOT included here:
@@ -13,8 +15,14 @@ import { settingsModule } from "./settings/index.js";
  * server-side `maxActiveKeys` cap (indie 1, managed 5) is enforced
  * inside auth-core, and the settings module exposes a slot
  * (`settings.sections`) for managed to extend.
+ *
+ * accounts + people (Phase 3) are also edition-agnostic — managed
+ * extends them via the `accounts.detail.tabs` slot (Billing) rather
+ * than replacing the module.
  */
 export const baseModules: ReadonlyArray<DashboardModule> = [
   apiKeysModule,
   settingsModule,
+  accountsModule,
+  peopleModule,
 ];

@@ -117,13 +117,16 @@ test("makeUsersModule produces a module with a list + detail route", () => {
   assert.deepEqual(paths.sort(), ["/users", "/users/$id"].sort());
 });
 
-test("indie compose registers users + api-keys + settings cleanly", () => {
+test("indie compose registers all base modules + users cleanly", () => {
   const out = composeModules({
     base: baseModules,
     add: [makeUsersModule({ enforceSingleOwner: true })],
   });
   const ids = out.modules.map((m) => m.id).sort();
-  assert.deepEqual(ids, ["api-keys", "settings", "users"]);
+  assert.deepEqual(
+    ids,
+    ["accounts", "api-keys", "people", "settings", "users"],
+  );
 });
 
 test("managed compose replaces the users module with a multi-seat variant", () => {
@@ -191,6 +194,175 @@ test("duplicate {slot,id} pair in settings.sections is rejected", () => {
       }),
     ComposeError,
   );
+});
+
+// ── Phase 3 — accounts.detail.tabs + accounts.list.columns slots ──
+
+test("base modules include accounts and people", () => {
+  const ids = baseModules.map((m) => m.id);
+  assert.ok(ids.includes("accounts"), "accounts module not registered");
+  assert.ok(ids.includes("people"), "people module not registered");
+});
+
+test("accounts module defines accounts.detail.tabs + accounts.list.columns slots", () => {
+  const accounts = baseModules.find((m) => m.id === "accounts");
+  assert.ok(accounts, "accounts module missing");
+  const slotIds = accounts!.slots?.map((s) => s.id) ?? [];
+  assert.ok(slotIds.includes("accounts.detail.tabs"));
+  assert.ok(slotIds.includes("accounts.list.columns"));
+});
+
+test("accounts module ships a built-in Overview tab filler", () => {
+  const accounts = baseModules.find((m) => m.id === "accounts");
+  assert.ok(accounts);
+  const overview = accounts!.slotFillers?.find(
+    (f) => f.slot === "accounts.detail.tabs" && f.id === "overview",
+  );
+  assert.ok(overview, "overview tab filler must be registered by the module");
+  assert.equal(overview!.order, 10);
+});
+
+test("accounts compose registers built-in Overview without collision", () => {
+  const out = composeModules({ base: baseModules });
+  const detailTabs = out.fillers.filter(
+    (f) => f.slot === "accounts.detail.tabs",
+  );
+  assert.equal(detailTabs.length, 1);
+  assert.equal(detailTabs[0]!.id, "overview");
+});
+
+test("accounts.detail.tabs fillers compose in explicit order", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  const out = composeModules({
+    base: baseModules,
+    slots: [
+      {
+        slot: "accounts.detail.tabs",
+        id: "billing",
+        order: 20,
+        component: stub,
+      },
+      { slot: "accounts.detail.tabs", id: "audit", order: 30, component: stub },
+    ],
+  });
+  const ids = out.fillers
+    .filter((f) => f.slot === "accounts.detail.tabs")
+    .map((f) => f.id);
+  assert.deepEqual(ids, ["overview", "billing", "audit"]);
+});
+
+test("duplicate {slot,id} pair in accounts.detail.tabs is rejected", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  assert.throws(
+    () =>
+      composeModules({
+        base: baseModules,
+        slots: [
+          {
+            slot: "accounts.detail.tabs",
+            id: "billing",
+            component: stub,
+          },
+          {
+            slot: "accounts.detail.tabs",
+            id: "billing",
+            component: stub,
+          },
+        ],
+      }),
+    ComposeError,
+  );
+});
+
+test("accounts.detail.tabs filler accepts a requires gate", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  const out = composeModules({
+    base: baseModules,
+    slots: [
+      {
+        slot: "accounts.detail.tabs",
+        id: "billing",
+        order: 20,
+        component: stub,
+        requires: { role: "tenant-admin" },
+      },
+    ],
+  });
+  const filler = out.fillers.find(
+    (f) => f.slot === "accounts.detail.tabs" && f.id === "billing",
+  );
+  assert.ok(filler);
+  assert.deepEqual(filler!.requires, { role: "tenant-admin" });
+});
+
+test("accounts.list.columns fillers compose without collision", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  const out = composeModules({
+    base: baseModules,
+    slots: [
+      { slot: "accounts.list.columns", id: "mrr:MRR", component: stub },
+      {
+        slot: "accounts.list.columns",
+        id: "health",
+        order: 20,
+        component: stub,
+      },
+    ],
+  });
+  const ids = out.fillers
+    .filter((f) => f.slot === "accounts.list.columns")
+    .map((f) => f.id);
+  assert.deepEqual(ids.sort(), ["health", "mrr:MRR"].sort());
+});
+
+test("duplicate {slot,id} pair in accounts.list.columns is rejected", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  assert.throws(
+    () =>
+      composeModules({
+        base: baseModules,
+        slots: [
+          { slot: "accounts.list.columns", id: "mrr", component: stub },
+          { slot: "accounts.list.columns", id: "mrr", component: stub },
+        ],
+      }),
+    ComposeError,
+  );
+});
+
+test("accounts.list.columns filler accepts a requires gate (managed-only column)", () => {
+  const stub = (() => null) as unknown as SlotFiller["component"];
+  const out = composeModules({
+    base: baseModules,
+    slots: [
+      {
+        slot: "accounts.list.columns",
+        id: "billing-status",
+        component: stub,
+        requires: { features: ["billing"] },
+      },
+    ],
+  });
+  const filler = out.fillers.find(
+    (f) =>
+      f.slot === "accounts.list.columns" && f.id === "billing-status",
+  );
+  assert.ok(filler);
+  assert.deepEqual(filler!.requires, { features: ["billing"] });
+});
+
+test("people module exposes list + detail routes", () => {
+  const people = baseModules.find((m) => m.id === "people");
+  assert.ok(people);
+  const paths = (people!.routes ?? []).map((r) => r.path).sort();
+  assert.deepEqual(paths, ["/people", "/people/$id"].sort());
+});
+
+test("accounts module exposes list + detail routes", () => {
+  const accounts = baseModules.find((m) => m.id === "accounts");
+  assert.ok(accounts);
+  const paths = (accounts!.routes ?? []).map((r) => r.path).sort();
+  assert.deepEqual(paths, ["/accounts", "/accounts/$id"].sort());
 });
 
 test("fillers are sorted by order ascending", () => {
