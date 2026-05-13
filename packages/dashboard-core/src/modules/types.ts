@@ -49,6 +49,12 @@ export interface DashboardModule {
   nav?: NavGroup[];
   /** Routes contributed by this module. Wired up by the app shell. */
   routes?: ReadonlyArray<DashboardRoute>;
+  /**
+   * Public routes contributed by this module — mounted OUTSIDE the
+   * protected `_app` layout (no session required, no redirect-to-login).
+   * Used for sign-up + future invite-acceptance flows (Phase 1.3 — ADR-021).
+   */
+  publicRoutes?: ReadonlyArray<DashboardRoute>;
   /** Slot extension points this module defines. */
   slots?: ReadonlyArray<SlotDefinition>;
   /** Slot contributions this module makes to other modules' slots. */

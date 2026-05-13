@@ -275,10 +275,25 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
       ),
   );
 
+  // Public module-contributed routes — mounted outside `_app`, no
+  // session gate. Used for sign-up and similar pre-auth surfaces
+  // (Phase 1.3 — ADR-021). Indie modules don't contribute any today;
+  // managed's signup module is the first.
+  const publicModuleRoutes = modules.flatMap((mod) =>
+    (mod.publicRoutes ?? []).map((r) =>
+      createRoute({
+        getParentRoute: () => rootRoute,
+        path: r.path,
+        component: r.component,
+      }),
+    ),
+  );
+
   return rootRoute.addChildren([
     loginRoute,
     forgotRoute,
     resetConfirmRoute,
+    ...publicModuleRoutes,
     protectedShell.addChildren([indexRoute, ...moduleRoutes]),
   ]);
 }

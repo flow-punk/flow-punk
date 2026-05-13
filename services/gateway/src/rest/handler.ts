@@ -161,7 +161,9 @@ export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | nul
   }
   if (
     pathname === '/api/v1/tenants' ||
-    pathname.startsWith('/api/v1/tenants/')
+    pathname.startsWith('/api/v1/tenants/') ||
+    pathname === '/api/v1/signup' ||
+    pathname.startsWith('/api/v1/signup/')
   ) {
     return managedEnv.TENANTS_SERVICE ?? null;
   }
