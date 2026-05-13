@@ -330,7 +330,13 @@ test("duplicate {slot,id} pair in accounts.list.columns is rejected", () => {
   );
 });
 
-test("accounts.list.columns filler accepts a requires gate (managed-only column)", () => {
+test("accounts.list.columns filler accepts a requires gate (composition only)", () => {
+  // Composition surface: `requires` survives compose so the runtime can
+  // gate. NOTE: as of Phase 3, the runtime `useSlotFillers` only enforces
+  // `requires.role` — `requires.features` is preserved on the filler but
+  // not yet checked at render time. Modules that need feature-gating
+  // today must do their own check in the host component. See Phase 2.5
+  // follow-up to extend `requirementsSatisfied` in slots.tsx.
   const stub = (() => null) as unknown as SlotFiller["component"];
   const out = composeModules({
     base: baseModules,
@@ -339,16 +345,15 @@ test("accounts.list.columns filler accepts a requires gate (managed-only column)
         slot: "accounts.list.columns",
         id: "billing-status",
         component: stub,
-        requires: { features: ["billing"] },
+        requires: { role: "tenant-admin" },
       },
     ],
   });
   const filler = out.fillers.find(
-    (f) =>
-      f.slot === "accounts.list.columns" && f.id === "billing-status",
+    (f) => f.slot === "accounts.list.columns" && f.id === "billing-status",
   );
   assert.ok(filler);
-  assert.deepEqual(filler!.requires, { features: ["billing"] });
+  assert.deepEqual(filler!.requires, { role: "tenant-admin" });
 });
 
 test("people module exposes list + detail routes", () => {

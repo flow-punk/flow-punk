@@ -6,11 +6,13 @@
  * dashboard surface is named "People". The hook names and query keys
  * here follow the UI vocabulary.
  *
+ * Field names mirror `indie/packages/db/src/schema/persons.ts` exactly
+ * — the contacts handlers return Drizzle's `$inferSelect` rows over the
+ * wire, and the PATCH whitelist (`ALLOWED_PATCH_FIELDS` in that same
+ * schema) is what the patch builder in the detail view targets.
+ *
  * Pagination is cursor-based (opaque base64url `{createdAt,id}` cursor —
- * see `managed/docs/services/contacts.md`). The list hook returns the
- * current page only; the calling view advances `cursor` state on
- * "Next". Switching to `useInfiniteQuery` is straightforward when an
- * infinite-scroll UX lands.
+ * see `managed/docs/services/contacts.md`).
  */
 import {
   useMutation,
@@ -22,25 +24,31 @@ import {
 import { useApiOrigin } from "../../auth/api-origin.js";
 import { gatewayFetch } from "../../api/index.js";
 
+export type Phone1Type = "mobile" | "landline" | "voip" | "fax" | "other";
+export type EmailConsent = "subscribed" | "unsubscribed" | "no_consent";
+
 export interface Person {
   id: string;
+  accountId: string | null;
   displayName: string;
   firstName: string | null;
   lastName: string | null;
   emailPrimary: string | null;
+  phone1CountryCode: string | null;
+  phone1Number: string | null;
+  phone1Ext: string | null;
+  phone1Type: Phone1Type | null;
   title: string | null;
-  phone1: string | null;
-  phone1Type: "mobile" | "landline" | "voip" | "fax" | "other" | null;
-  accountId: string | null;
-  consentEmail: "subscribed" | "unsubscribed" | "no_consent";
-  addressLine1: string | null;
-  addressLine2: string | null;
+  streetLine1: string | null;
+  streetLine2: string | null;
   city: string | null;
   region: string | null;
   postalCode: string | null;
   country: string | null;
-  timezone: string | null;
-  language: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  imageAvatar: string | null;
+  consentEmail: EmailConsent;
   status: "active" | "deleted";
   createdAt: string;
   updatedAt: string;
@@ -57,12 +65,8 @@ export const personQueryKey = (id: string) => ["people", id] as const;
 export interface UsePeopleOptions {
   cursor?: string | null;
   limit?: number;
+  /** Filter to persons linked to a single account (server-side). */
   accountId?: string;
-  /**
-   * Free-text client-side filter applied to the current page.
-   * Server-side search lands when ADR-005 search wiring ships.
-   */
-  search?: string;
 }
 
 export function usePeople(
@@ -110,32 +114,43 @@ export function usePerson(id: string | null): UseQueryResult<Person> {
           res.status,
         );
       }
-      const body = (await res.json()) as { person: Person } | Person;
-      return ("person" in body ? body.person : body) as Person;
+      const body = (await res.json()) as { person: Person };
+      return body.person;
     },
   });
 }
 
+/**
+ * PATCH input. Keys here are a strict subset of `ALLOWED_PATCH_FIELDS`
+ * in `indie/packages/db/src/schema/persons.ts`. Any column outside that
+ * whitelist is rejected by contacts-core as `400 INVALID_INPUT`.
+ *
+ * `consentEmail` is **not nullable** — to clear, send the literal
+ * `"no_consent"` (the schema's default). See `contacts.md` §Validation.
+ */
 export interface UpdatePersonInput {
   id: string;
   patch: Partial<{
+    accountId: string | null;
     displayName: string;
     firstName: string | null;
     lastName: string | null;
     emailPrimary: string | null;
+    phone1CountryCode: string | null;
+    phone1Number: string | null;
+    phone1Ext: string | null;
+    phone1Type: Phone1Type | null;
     title: string | null;
-    phone1: string | null;
-    phone1Type: Person["phone1Type"];
-    accountId: string | null;
-    consentEmail: Person["consentEmail"];
-    addressLine1: string | null;
-    addressLine2: string | null;
+    streetLine1: string | null;
+    streetLine2: string | null;
     city: string | null;
     region: string | null;
     postalCode: string | null;
     country: string | null;
-    timezone: string | null;
-    language: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    imageAvatar: string | null;
+    consentEmail: EmailConsent;
   }>;
 }
 
@@ -165,8 +180,8 @@ export function useUpdatePerson(): UseMutationResult<
           res.status,
         );
       }
-      const body = (await res.json()) as { person: Person } | Person;
-      return ("person" in body ? body.person : body) as Person;
+      const body = (await res.json()) as { person: Person };
+      return body.person;
     },
     onSuccess: (person) => {
       qc.invalidateQueries({ queryKey: PEOPLE_QUERY_KEY });

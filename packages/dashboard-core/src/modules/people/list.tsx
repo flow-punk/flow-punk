@@ -22,7 +22,11 @@ import {
   PageHeader,
   Toolbar,
 } from "@flowpunk-indie/dashboard-ui";
-import { usePeople, type Person } from "./hooks.js";
+import {
+  usePeople,
+  type EmailConsent,
+  type Person,
+} from "./hooks.js";
 import { usePersistedColumns } from "../use-persisted-columns.js";
 
 interface PeopleColumn {
@@ -89,13 +93,17 @@ const BUILTIN_COLUMNS: PeopleColumn[] = [
       ),
   },
   {
+    // `consentEmail` is GDPR Art. 7 PII (per `contacts.md` and
+    // `persons.ts`). It's never written to audit logs or analytics; the
+    // visibility toggle persists in localStorage but only the boolean
+    // visibility — not the value itself.
     id: "consent",
     label: "Consent",
     defaultVisible: false,
     render: (p) => <Badge tone={consentTone(p.consentEmail)}>{p.consentEmail}</Badge>,
   },
   {
-    id: "city",
+    id: "location",
     label: "Location",
     defaultVisible: false,
     render: (p) =>
@@ -118,13 +126,13 @@ const BUILTIN_COLUMNS: PeopleColumn[] = [
   },
 ];
 
-function consentTone(c: Person["consentEmail"]): "success" | "warn" | "neutral" {
+function consentTone(c: EmailConsent): "success" | "warn" | "neutral" {
   if (c === "subscribed") return "success";
   if (c === "unsubscribed") return "warn";
   return "neutral";
 }
 
-type ConsentFilter = "all" | Person["consentEmail"];
+type ConsentFilter = "all" | EmailConsent;
 
 export function PeopleList() {
   const [cursorStack, setCursorStack] = useState<string[]>([]);

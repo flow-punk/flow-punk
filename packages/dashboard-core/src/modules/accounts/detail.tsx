@@ -19,6 +19,7 @@ import {
   useDeleteAccount,
   useUpdateAccount,
   type Account,
+  type UpdateAccountInput,
 } from "./hooks.js";
 import { useSlotFillers } from "../slots.js";
 import {
@@ -26,13 +27,27 @@ import {
   AccountTabProvider,
 } from "./tabs/context.js";
 
+/**
+ * Editable shape mirrors the canonical column names in
+ * `indie/packages/db/src/schema/accounts.ts` (and its
+ * `ALLOWED_PATCH_FIELDS` whitelist). Address columns are
+ * `streetLine1/2` — there is no `addressLine*` on the schema. Phones
+ * split into country code / number / extension.
+ */
 interface EditableForm {
   displayName: string;
   domain: string;
   website: string;
   industry: string;
   ownerUserId: string;
+  phone1CountryCode: string;
+  phone1Number: string;
+  phone1Ext: string;
+  streetLine1: string;
+  streetLine2: string;
   city: string;
+  region: string;
+  postalCode: string;
   country: string;
 }
 
@@ -43,7 +58,14 @@ function emptyForm(): EditableForm {
     website: "",
     industry: "",
     ownerUserId: "",
+    phone1CountryCode: "",
+    phone1Number: "",
+    phone1Ext: "",
+    streetLine1: "",
+    streetLine2: "",
     city: "",
+    region: "",
+    postalCode: "",
     country: "",
   };
 }
@@ -55,33 +77,51 @@ function formFrom(a: Account): EditableForm {
     website: a.website ?? "",
     industry: a.industry ?? "",
     ownerUserId: a.ownerUserId ?? "",
+    phone1CountryCode: a.phone1CountryCode ?? "",
+    phone1Number: a.phone1Number ?? "",
+    phone1Ext: a.phone1Ext ?? "",
+    streetLine1: a.streetLine1 ?? "",
+    streetLine2: a.streetLine2 ?? "",
     city: a.city ?? "",
+    region: a.region ?? "",
+    postalCode: a.postalCode ?? "",
     country: a.country ?? "",
   };
 }
 
-function buildPatch(a: Account, f: EditableForm) {
+/** PATCH columns that are nullable on the schema. */
+const NULLABLE_PATCH_FIELDS = [
+  "domain",
+  "website",
+  "industry",
+  "ownerUserId",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+] as const satisfies ReadonlyArray<keyof EditableForm>;
+
+function buildPatch(a: Account, f: EditableForm): UpdateAccountInput["patch"] {
   const patch: Record<string, unknown> = {};
-  const setIfChanged = (
-    key: keyof EditableForm,
-    current: string | null,
-    treatEmptyAsNull = true,
-  ) => {
+
+  // displayName is non-nullable — only emit on change, ignore empty.
+  if (f.displayName.trim() && f.displayName.trim() !== a.displayName) {
+    patch.displayName = f.displayName.trim();
+  }
+
+  for (const key of NULLABLE_PATCH_FIELDS) {
     const next = f[key].trim();
-    if (next === "" && treatEmptyAsNull) {
-      if (current !== null && current !== "") patch[key] = null;
-      return;
-    }
-    if (next !== (current ?? "")) patch[key] = next;
-  };
-  setIfChanged("displayName", a.displayName, false);
-  setIfChanged("domain", a.domain);
-  setIfChanged("website", a.website);
-  setIfChanged("industry", a.industry);
-  setIfChanged("ownerUserId", a.ownerUserId);
-  setIfChanged("city", a.city);
-  setIfChanged("country", a.country);
-  return patch;
+    const current = (a[key] ?? "") as string;
+    if (next === current) continue;
+    patch[key] = next === "" ? null : next;
+  }
+
+  return patch as UpdateAccountInput["patch"];
 }
 
 export function AccountDetail() {
@@ -95,10 +135,6 @@ export function AccountDetail() {
 
   const tabFillers = useSlotFillers(ACCOUNTS_DETAIL_TABS_SLOT);
 
-  // Tabs come entirely from the slot. The list is stable per
-  // `useSlotFillers`, already sorted by `order`. We use each filler's
-  // id as the tab value; a duplicate {slot,id} pair is rejected at
-  // compose time, so ids here are guaranteed unique.
   const tabIds = useMemo(() => tabFillers.map((f) => f.id), [tabFillers]);
   const defaultTab = tabIds[0] ?? "overview";
   const activeTab =
@@ -241,6 +277,34 @@ export function AccountDetail() {
               value={form.ownerUserId}
               onChange={(v) => setForm({ ...form, ownerUserId: v })}
             />
+            <div className="grid grid-cols-[110px_1fr_90px] gap-2">
+              <Field
+                label="Country code"
+                value={form.phone1CountryCode}
+                onChange={(v) => setForm({ ...form, phone1CountryCode: v })}
+                hint="e.g. +1"
+              />
+              <Field
+                label="Phone"
+                value={form.phone1Number}
+                onChange={(v) => setForm({ ...form, phone1Number: v })}
+              />
+              <Field
+                label="Ext"
+                value={form.phone1Ext}
+                onChange={(v) => setForm({ ...form, phone1Ext: v })}
+              />
+            </div>
+            <Field
+              label="Street line 1"
+              value={form.streetLine1}
+              onChange={(v) => setForm({ ...form, streetLine1: v })}
+            />
+            <Field
+              label="Street line 2"
+              value={form.streetLine2}
+              onChange={(v) => setForm({ ...form, streetLine2: v })}
+            />
             <div className="grid grid-cols-2 gap-3">
               <Field
                 label="City"
@@ -248,9 +312,22 @@ export function AccountDetail() {
                 onChange={(v) => setForm({ ...form, city: v })}
               />
               <Field
+                label="Region"
+                value={form.region}
+                onChange={(v) => setForm({ ...form, region: v })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Postal code"
+                value={form.postalCode}
+                onChange={(v) => setForm({ ...form, postalCode: v })}
+              />
+              <Field
                 label="Country"
                 value={form.country}
                 onChange={(v) => setForm({ ...form, country: v })}
+                hint="ISO 3166-1 alpha-2 (US, DE, JP)."
               />
             </div>
           </div>

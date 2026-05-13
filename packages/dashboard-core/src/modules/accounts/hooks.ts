@@ -2,6 +2,11 @@
  * Data hooks for the accounts module. Wire to contacts-core's
  * `/api/v1/accounts/*` surface through the gateway.
  *
+ * Field names mirror `indie/packages/db/src/schema/accounts.ts` exactly
+ * — the contacts handlers return Drizzle's `$inferSelect` rows over the
+ * wire, and the PATCH whitelist (`ALLOWED_PATCH_FIELDS` in that same
+ * schema) is what the patch builder in the detail view targets.
+ *
  * Cursor pagination follows the same opaque-cursor pattern as persons
  * (see `managed/docs/services/contacts.md`).
  */
@@ -20,19 +25,23 @@ export interface Account {
   displayName: string;
   domain: string | null;
   website: string | null;
-  imageLogo: string | null;
   industry: string | null;
-  ownerUserId: string | null;
-  phoneN: string | null;
-  phoneNCountryCode: string | null;
-  addressLine1: string | null;
-  addressLine2: string | null;
+  streetLine1: string | null;
+  streetLine2: string | null;
   city: string | null;
   region: string | null;
   postalCode: string | null;
   country: string | null;
   latitude: number | null;
   longitude: number | null;
+  phone1CountryCode: string | null;
+  phone1Number: string | null;
+  phone1Ext: string | null;
+  phone2CountryCode: string | null;
+  phone2Number: string | null;
+  phone2Ext: string | null;
+  imageLogo: string | null;
+  ownerUserId: string | null;
   status: "active" | "deleted";
   createdAt: string;
   updatedAt: string;
@@ -49,8 +58,6 @@ export const accountQueryKey = (id: string) => ["accounts", id] as const;
 export interface UseAccountsOptions {
   cursor?: string | null;
   limit?: number;
-  /** Client-side free-text filter applied to the current page only. */
-  search?: string;
 }
 
 export function useAccounts(
@@ -97,29 +104,42 @@ export function useAccount(id: string | null): UseQueryResult<Account> {
           res.status,
         );
       }
-      const body = (await res.json()) as { account: Account } | Account;
-      return ("account" in body ? body.account : body) as Account;
+      const body = (await res.json()) as { account: Account };
+      return body.account;
     },
   });
 }
 
+/**
+ * PATCH input. Keys are a strict subset of `ALLOWED_PATCH_FIELDS` in
+ * `indie/packages/db/src/schema/accounts.ts`; anything outside is
+ * rejected by contacts-core as `400 INVALID_INPUT`. Immutable columns
+ * (id, createdAt, createdBy, status, deletedAt, deletedBy) are also
+ * rejected if present — keep them out of the patch.
+ */
 export interface UpdateAccountInput {
   id: string;
   patch: Partial<{
     displayName: string;
     domain: string | null;
     website: string | null;
-    imageLogo: string | null;
     industry: string | null;
-    ownerUserId: string | null;
-    phoneN: string | null;
-    phoneNCountryCode: string | null;
-    addressLine1: string | null;
-    addressLine2: string | null;
+    streetLine1: string | null;
+    streetLine2: string | null;
     city: string | null;
     region: string | null;
     postalCode: string | null;
     country: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    phone1CountryCode: string | null;
+    phone1Number: string | null;
+    phone1Ext: string | null;
+    phone2CountryCode: string | null;
+    phone2Number: string | null;
+    phone2Ext: string | null;
+    imageLogo: string | null;
+    ownerUserId: string | null;
   }>;
 }
 
@@ -149,8 +169,8 @@ export function useUpdateAccount(): UseMutationResult<
           res.status,
         );
       }
-      const body = (await res.json()) as { account: Account } | Account;
-      return ("account" in body ? body.account : body) as Account;
+      const body = (await res.json()) as { account: Account };
+      return body.account;
     },
     onSuccess: (account) => {
       qc.invalidateQueries({ queryKey: ACCOUNTS_QUERY_KEY });

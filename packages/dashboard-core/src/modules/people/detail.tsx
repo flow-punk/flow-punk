@@ -19,14 +19,46 @@ import {
   useDeletePerson,
   usePerson,
   useUpdatePerson,
+  type EmailConsent,
   type Person,
+  type UpdatePersonInput,
 } from "./hooks.js";
 
-const CONSENT_OPTIONS: Person["consentEmail"][] = [
+const CONSENT_OPTIONS: EmailConsent[] = [
   "subscribed",
   "unsubscribed",
   "no_consent",
 ];
+
+/**
+ * Editable shape mirrors the column names from
+ * `indie/packages/db/src/schema/persons.ts` (and its
+ * `ALLOWED_PATCH_FIELDS` whitelist). Address fields use `streetLine1/2`
+ * — there is no `addressLine*` on the schema. Phone is split into
+ * country code / number / extension per the canonical columns.
+ *
+ * `consentEmail` is NOT nullable; the form keeps it as a non-empty
+ * value at all times. To "clear" consent the user picks `no_consent`
+ * (the schema default).
+ */
+interface EditableForm {
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  emailPrimary: string;
+  title: string;
+  phone1CountryCode: string;
+  phone1Number: string;
+  phone1Ext: string;
+  accountId: string;
+  consentEmail: EmailConsent;
+  streetLine1: string;
+  streetLine2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+}
 
 function emptyForm(): EditableForm {
   return {
@@ -35,25 +67,18 @@ function emptyForm(): EditableForm {
     lastName: "",
     emailPrimary: "",
     title: "",
-    phone1: "",
+    phone1CountryCode: "",
+    phone1Number: "",
+    phone1Ext: "",
     accountId: "",
     consentEmail: "no_consent",
+    streetLine1: "",
+    streetLine2: "",
     city: "",
+    region: "",
+    postalCode: "",
     country: "",
   };
-}
-
-interface EditableForm {
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  emailPrimary: string;
-  title: string;
-  phone1: string;
-  accountId: string;
-  consentEmail: Person["consentEmail"];
-  city: string;
-  country: string;
 }
 
 function formFrom(p: Person): EditableForm {
@@ -63,40 +88,62 @@ function formFrom(p: Person): EditableForm {
     lastName: p.lastName ?? "",
     emailPrimary: p.emailPrimary ?? "",
     title: p.title ?? "",
-    phone1: p.phone1 ?? "",
+    phone1CountryCode: p.phone1CountryCode ?? "",
+    phone1Number: p.phone1Number ?? "",
+    phone1Ext: p.phone1Ext ?? "",
     accountId: p.accountId ?? "",
     consentEmail: p.consentEmail,
+    streetLine1: p.streetLine1 ?? "",
+    streetLine2: p.streetLine2 ?? "",
     city: p.city ?? "",
+    region: p.region ?? "",
+    postalCode: p.postalCode ?? "",
     country: p.country ?? "",
   };
 }
 
-function buildPatch(p: Person, f: EditableForm) {
+/** PATCH columns that are nullable on the schema (empty = explicit null). */
+const NULLABLE_PATCH_FIELDS = [
+  "firstName",
+  "lastName",
+  "emailPrimary",
+  "title",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "accountId",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+] as const satisfies ReadonlyArray<keyof EditableForm>;
+
+function buildPatch(p: Person, f: EditableForm): UpdatePersonInput["patch"] {
   const patch: Record<string, unknown> = {};
-  const setIfChanged = <K extends keyof EditableForm>(
-    key: K,
-    current: string | Person["consentEmail"] | null,
-    treatEmptyAsNull = true,
-  ) => {
-    const next =
-      key === "consentEmail" ? f[key] : (f[key] as string).trim();
-    if (next === "" && treatEmptyAsNull) {
-      if (current !== null && current !== "") patch[key] = null;
-      return;
-    }
-    if (next !== (current ?? "")) patch[key] = next;
-  };
-  setIfChanged("displayName", p.displayName, false);
-  setIfChanged("firstName", p.firstName);
-  setIfChanged("lastName", p.lastName);
-  setIfChanged("emailPrimary", p.emailPrimary);
-  setIfChanged("title", p.title);
-  setIfChanged("phone1", p.phone1);
-  setIfChanged("accountId", p.accountId);
-  if (f.consentEmail !== p.consentEmail) patch.consentEmail = f.consentEmail;
-  setIfChanged("city", p.city);
-  setIfChanged("country", p.country);
-  return patch;
+
+  // displayName is non-nullable — only emit on change, ignore the empty
+  // string (the validator would 400 anyway).
+  if (f.displayName.trim() && f.displayName.trim() !== p.displayName) {
+    patch.displayName = f.displayName.trim();
+  }
+
+  for (const key of NULLABLE_PATCH_FIELDS) {
+    const next = f[key].trim();
+    const current = (p[key] ?? "") as string;
+    if (next === current) continue;
+    patch[key] = next === "" ? null : next;
+  }
+
+  // consentEmail is non-nullable; emit any change, including switches
+  // back to `no_consent`. PII per GDPR Art. 7 — never logged as a
+  // value (contacts-core audit emits only the column name).
+  if (f.consentEmail !== p.consentEmail) {
+    patch.consentEmail = f.consentEmail;
+  }
+
+  return patch as UpdatePersonInput["patch"];
 }
 
 export function PersonDetail() {
@@ -253,16 +300,29 @@ export function PersonDetail() {
               value={form.emailPrimary}
               onChange={(v) => setForm({ ...form, emailPrimary: v })}
             />
-            <Field
-              label="Phone"
-              value={form.phone1}
-              onChange={(v) => setForm({ ...form, phone1: v })}
-            />
+            <div className="grid grid-cols-[110px_1fr_90px] gap-2">
+              <Field
+                label="Country code"
+                value={form.phone1CountryCode}
+                onChange={(v) => setForm({ ...form, phone1CountryCode: v })}
+                hint="e.g. +1"
+              />
+              <Field
+                label="Phone"
+                value={form.phone1Number}
+                onChange={(v) => setForm({ ...form, phone1Number: v })}
+              />
+              <Field
+                label="Ext"
+                value={form.phone1Ext}
+                onChange={(v) => setForm({ ...form, phone1Ext: v })}
+              />
+            </div>
             <Field
               label="Account ID"
               value={form.accountId}
               onChange={(v) => setForm({ ...form, accountId: v })}
-              hint="Send an empty value to detach this person from their account."
+              hint="Empty detaches this person from their account."
             />
           </div>
         </div>
@@ -279,10 +339,7 @@ export function PersonDetail() {
               <Select
                 value={form.consentEmail}
                 onValueChange={(v) =>
-                  setForm({
-                    ...form,
-                    consentEmail: v as Person["consentEmail"],
-                  })
+                  setForm({ ...form, consentEmail: v as EmailConsent })
                 }
               >
                 <SelectTrigger>
@@ -298,16 +355,40 @@ export function PersonDetail() {
               </Select>
             </div>
             <Field
-              label="City"
-              value={form.city}
-              onChange={(v) => setForm({ ...form, city: v })}
+              label="Street line 1"
+              value={form.streetLine1}
+              onChange={(v) => setForm({ ...form, streetLine1: v })}
             />
             <Field
-              label="Country"
-              value={form.country}
-              onChange={(v) => setForm({ ...form, country: v })}
-              hint="ISO 3166-1 alpha-2, e.g. US, DE, JP."
+              label="Street line 2"
+              value={form.streetLine2}
+              onChange={(v) => setForm({ ...form, streetLine2: v })}
             />
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="City"
+                value={form.city}
+                onChange={(v) => setForm({ ...form, city: v })}
+              />
+              <Field
+                label="Region"
+                value={form.region}
+                onChange={(v) => setForm({ ...form, region: v })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Postal code"
+                value={form.postalCode}
+                onChange={(v) => setForm({ ...form, postalCode: v })}
+              />
+              <Field
+                label="Country"
+                value={form.country}
+                onChange={(v) => setForm({ ...form, country: v })}
+                hint="ISO 3166-1 alpha-2 (US, DE, JP)."
+              />
+            </div>
           </div>
 
           <button
@@ -319,18 +400,14 @@ export function PersonDetail() {
           </button>
           {showMore && (
             <dl className="mt-4 grid grid-cols-[120px_1fr] gap-y-2 text-[13px]">
-              <dt className="text-foreground-subtle">Address 1</dt>
-              <dd>{person.addressLine1 ?? "—"}</dd>
-              <dt className="text-foreground-subtle">Address 2</dt>
-              <dd>{person.addressLine2 ?? "—"}</dd>
-              <dt className="text-foreground-subtle">Postal code</dt>
-              <dd>{person.postalCode ?? "—"}</dd>
-              <dt className="text-foreground-subtle">Region</dt>
-              <dd>{person.region ?? "—"}</dd>
-              <dt className="text-foreground-subtle">Timezone</dt>
-              <dd>{person.timezone ?? "—"}</dd>
-              <dt className="text-foreground-subtle">Language</dt>
-              <dd>{person.language ?? "—"}</dd>
+              <dt className="text-foreground-subtle">Latitude</dt>
+              <dd>{person.latitude ?? "—"}</dd>
+              <dt className="text-foreground-subtle">Longitude</dt>
+              <dd>{person.longitude ?? "—"}</dd>
+              <dt className="text-foreground-subtle">Phone type</dt>
+              <dd>{person.phone1Type ?? "—"}</dd>
+              <dt className="text-foreground-subtle">Avatar</dt>
+              <dd className="truncate">{person.imageAvatar ?? "—"}</dd>
             </dl>
           )}
         </div>

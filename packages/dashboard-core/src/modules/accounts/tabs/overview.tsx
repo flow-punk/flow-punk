@@ -84,8 +84,8 @@ export function AccountOverviewTab() {
         </h3>
         <p className="whitespace-pre-line text-[13px] text-foreground">
           {[
-            account.addressLine1,
-            account.addressLine2,
+            account.streetLine1,
+            account.streetLine2,
             [account.city, account.region, account.postalCode]
               .filter(Boolean)
               .join(" "),
