@@ -1,11 +1,10 @@
-import { customFieldDefsRepo, type CustomFieldBaseModel } from '@flowpunk-indie/db';
-
 import {
-  getCache,
-  invalidateCache,
-  setCache,
-} from '../cache.js';
-import type { Actor, CustomFieldsEnv } from '../types.js';
+  customFieldDefsRepo,
+  type CustomFieldBaseModel,
+} from "@flowpunk-indie/db";
+
+import { getCache, invalidateCache, setCache } from "../cache.js";
+import type { Actor, CustomFieldsEnv } from "../types.js";
 import {
   badRequest,
   getDb,
@@ -14,7 +13,7 @@ import {
   parseBaseModelParam,
   isBaseModelAllowed,
   serializeDef,
-} from './_shared.js';
+} from "./_shared.js";
 
 /**
  * GET /custom-fields/defs?baseModel=person|account|deal&includeArchived=1
@@ -35,14 +34,14 @@ export async function handleListCustomFieldDefs(
 ): Promise<Response> {
   const url = new URL(request.url);
   const parsed = parseBaseModelParam(url);
-  if (parsed.kind === 'err') return parsed.response;
+  if (parsed.kind === "err") return parsed.response;
   if (!isBaseModelAllowed(parsed.baseModel, allowedBaseModels)) {
     return badRequest(
-      'BASE_MODEL_NOT_OWNED',
+      "BASE_MODEL_NOT_OWNED",
       `this service does not own baseModel "${parsed.baseModel}"`,
     );
   }
-  const includeArchived = url.searchParams.get('includeArchived') === '1';
+  const includeArchived = url.searchParams.get("includeArchived") === "1";
 
   // Cache hit path: when KV is bound AND the caller is not requesting
   // archived rows (the cache stores active-only data per §11), try the

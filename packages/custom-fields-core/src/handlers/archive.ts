@@ -1,7 +1,10 @@
-import { customFieldDefsRepo, type CustomFieldBaseModel } from '@flowpunk-indie/db';
+import {
+  customFieldDefsRepo,
+  type CustomFieldBaseModel,
+} from "@flowpunk-indie/db";
 
-import { invalidateCache } from '../cache.js';
-import type { Actor, CustomFieldsEnv } from '../types.js';
+import { invalidateCache } from "../cache.js";
+import type { Actor, CustomFieldsEnv } from "../types.js";
 import {
   badRequest,
   conflict,
@@ -14,7 +17,7 @@ import {
   notFound,
   parseIfMatchVersion,
   serializeDef,
-} from './_shared.js';
+} from "./_shared.js";
 
 /**
  * DELETE /custom-fields/defs/:id
@@ -35,23 +38,24 @@ export async function handleArchiveCustomFieldDef(
   id: string,
   allowedBaseModels: readonly CustomFieldBaseModel[],
 ): Promise<Response> {
-  if (id.length === 0 || id.includes('/')) {
-    return badRequest('INVALID_INPUT', 'id is required');
+  if (id.length === 0 || id.includes("/")) {
+    return badRequest("INVALID_INPUT", "id is required");
   }
 
   const expectedVersion = parseIfMatchVersion(request);
   if (expectedVersion === null) {
     return errorResponse(
       428,
-      'PRECONDITION_REQUIRED',
-      'If-Match: <version> header is required',
+      "PRECONDITION_REQUIRED",
+      "If-Match: <version> header is required",
     );
   }
 
   const db = getDb(env);
   const existing = await customFieldDefsRepo.findById(db, id);
   if (!existing) return notFound();
-  if (!isBaseModelAllowed(existing.baseModel, allowedBaseModels)) return notFound();
+  if (!isBaseModelAllowed(existing.baseModel, allowedBaseModels))
+    return notFound();
 
   try {
     const now = new Date().toISOString();
@@ -65,8 +69,8 @@ export async function handleArchiveCustomFieldDef(
 
     if (result.conflict) {
       return conflict(
-        'VERSION_CONFLICT',
-        'expected If-Match version does not match current row',
+        "VERSION_CONFLICT",
+        "expected If-Match version does not match current row",
         { current: serializeDef(result.current) },
       );
     }
@@ -84,8 +88,8 @@ export async function handleArchiveCustomFieldDef(
     }
 
     emitCustomFieldsAudit(actor, {
-      action: 'custom_fields.def.archived',
-      resourceType: 'custom_field_def',
+      action: "custom_fields.def.archived",
+      resourceType: "custom_field_def",
       resourceId: result.def.id,
       detail: { baseModel: result.def.baseModel },
     });

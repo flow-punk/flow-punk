@@ -2,10 +2,10 @@ import {
   customFieldDefsRepo,
   type CreateCustomFieldDefInput,
   type CustomFieldBaseModel,
-} from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
 
-import { invalidateCache } from '../cache.js';
-import type { Actor, CustomFieldsEnv } from '../types.js';
+import { invalidateCache } from "../cache.js";
+import type { Actor, CustomFieldsEnv } from "../types.js";
 import {
   badRequest,
   emitCustomFieldsAudit,
@@ -15,7 +15,7 @@ import {
   mapRepoError,
   requireJsonBody,
   serializeDef,
-} from './_shared.js';
+} from "./_shared.js";
 
 interface CreateBody {
   baseModel?: unknown;
@@ -25,10 +25,10 @@ interface CreateBody {
 }
 
 const ALLOWED_CREATE_FIELDS = new Set([
-  'baseModel',
-  'name',
-  'description',
-  'pii',
+  "baseModel",
+  "name",
+  "description",
+  "pii",
 ]);
 
 /**
@@ -45,35 +45,41 @@ export async function handleCreateCustomFieldDef(
   allowedBaseModels: readonly CustomFieldBaseModel[],
 ): Promise<Response> {
   const body = await requireJsonBody<CreateBody>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   // Mirror the PATCH posture: reject unknown fields so the OpenAPI
   // `additionalProperties: false` contract matches server behavior.
   for (const k of Object.keys(body.value)) {
     if (!ALLOWED_CREATE_FIELDS.has(k)) {
-      return badRequest('INVALID_INPUT', `unknown create field: ${k}`);
+      return badRequest("INVALID_INPUT", `unknown create field: ${k}`);
     }
   }
 
   const { baseModel, name, description, pii } = body.value;
 
-  if (typeof baseModel !== 'string') {
-    return badRequest('INVALID_INPUT', 'baseModel is required');
+  if (typeof baseModel !== "string") {
+    return badRequest("INVALID_INPUT", "baseModel is required");
   }
-  if (!isBaseModelAllowed(baseModel as CustomFieldBaseModel, allowedBaseModels)) {
+  if (
+    !isBaseModelAllowed(baseModel as CustomFieldBaseModel, allowedBaseModels)
+  ) {
     return badRequest(
-      'BASE_MODEL_NOT_OWNED',
+      "BASE_MODEL_NOT_OWNED",
       `this service does not own baseModel "${baseModel}"`,
     );
   }
-  if (typeof name !== 'string') {
-    return badRequest('INVALID_INPUT', 'name is required');
+  if (typeof name !== "string") {
+    return badRequest("INVALID_INPUT", "name is required");
   }
-  if (description !== undefined && description !== null && typeof description !== 'string') {
-    return badRequest('INVALID_INPUT', 'description must be a string or null');
+  if (
+    description !== undefined &&
+    description !== null &&
+    typeof description !== "string"
+  ) {
+    return badRequest("INVALID_INPUT", "description must be a string or null");
   }
-  if (pii !== undefined && typeof pii !== 'boolean') {
-    return badRequest('INVALID_INPUT', 'pii must be a boolean');
+  if (pii !== undefined && typeof pii !== "boolean") {
+    return badRequest("INVALID_INPUT", "pii must be a boolean");
   }
 
   const input: CreateCustomFieldDefInput = {
@@ -90,15 +96,19 @@ export async function handleCreateCustomFieldDef(
 
     if (env.CUSTOM_FIELDS_KV) {
       try {
-        await invalidateCache(env.CUSTOM_FIELDS_KV, actor.tenantId, def.baseModel);
+        await invalidateCache(
+          env.CUSTOM_FIELDS_KV,
+          actor.tenantId,
+          def.baseModel,
+        );
       } catch {
         // swallow — invalidate is best-effort
       }
     }
 
     emitCustomFieldsAudit(actor, {
-      action: 'custom_fields.def.created',
-      resourceType: 'custom_field_def',
+      action: "custom_fields.def.created",
+      resourceType: "custom_field_def",
       resourceId: def.id,
       detail: {
         baseModel: def.baseModel,

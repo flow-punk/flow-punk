@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
 import {
   check,
   index,
@@ -6,23 +6,22 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
-} from 'drizzle-orm/sqlite-core';
+} from "drizzle-orm/sqlite-core";
 
-const BASE_MODELS = ['person', 'account', 'deal'] as const;
+const BASE_MODELS = ["person", "account", "deal"] as const;
 export type CustomFieldBaseModel = (typeof BASE_MODELS)[number];
 
 const FILTERABLE_STATUSES = [
-  'disabled',
-  'pending',
-  'ready',
-  'failed',
-  'dropping',
+  "disabled",
+  "pending",
+  "ready",
+  "failed",
+  "dropping",
 ] as const;
-export type CustomFieldFilterableStatus =
-  (typeof FILTERABLE_STATUSES)[number];
+export type CustomFieldFilterableStatus = (typeof FILTERABLE_STATUSES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Tenant-defined custom fields on built-in entities (persons / accounts /
@@ -54,44 +53,41 @@ const inList = (values: readonly string[]): string =>
  * lives on the entity rows under `custom_data` which IS marked `pii()`.
  */
 export const customFieldDefs = sqliteTable(
-  'custom_field_defs',
+  "custom_field_defs",
   {
-    id: text('id').primaryKey(),
-    baseModel: text('base_model').notNull().$type<CustomFieldBaseModel>(),
-    name: text('name').notNull(),
-    description: text('description'),
-    pii: integer('pii').notNull().default(1),
-    filterableStatus: text('filterable_status')
+    id: text("id").primaryKey(),
+    baseModel: text("base_model").notNull().$type<CustomFieldBaseModel>(),
+    name: text("name").notNull(),
+    description: text("description"),
+    pii: integer("pii").notNull().default(1),
+    filterableStatus: text("filterable_status")
       .notNull()
-      .default('disabled')
+      .default("disabled")
       .$type<CustomFieldFilterableStatus>(),
-    filterableError: text('filterable_error'),
-    version: integer('version').notNull().default(1),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    createdBy: text('created_by').notNull(),
-    updatedBy: text('updated_by').notNull(),
-    archivedAt: text('archived_at'),
+    filterableError: text("filterable_error"),
+    version: integer("version").notNull().default(1),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedBy: text("updated_by").notNull(),
+    archivedAt: text("archived_at"),
   },
   (t) => ({
-    activeNameUq: uniqueIndex('cfd_active_name_uq')
+    activeNameUq: uniqueIndex("cfd_active_name_uq")
       .on(t.baseModel, t.name)
       .where(sql`archived_at IS NULL`),
-    byModelIdx: index('idx_cfd_by_model')
+    byModelIdx: index("idx_cfd_by_model")
       .on(t.baseModel)
       .where(sql`archived_at IS NULL`),
     baseModelCheck: check(
-      'custom_field_defs_base_model_check',
+      "custom_field_defs_base_model_check",
       sql.raw(`base_model IN (${inList(BASE_MODELS)})`),
     ),
     filterableStatusCheck: check(
-      'custom_field_defs_filterable_status_check',
+      "custom_field_defs_filterable_status_check",
       sql.raw(`filterable_status IN (${inList(FILTERABLE_STATUSES)})`),
     ),
-    piiCheck: check(
-      'custom_field_defs_pii_check',
-      sql.raw(`pii IN (0, 1)`),
-    ),
+    piiCheck: check("custom_field_defs_pii_check", sql.raw(`pii IN (0, 1)`)),
   }),
 );
 
@@ -121,11 +117,11 @@ export const CUSTOM_FIELD_CAPS = {
 export const FILTERABLE_TRANSITIONS: Readonly<
   Record<CustomFieldFilterableStatus, readonly CustomFieldFilterableStatus[]>
 > = {
-  disabled: ['pending'],
-  pending: ['ready', 'failed'],
-  ready: ['dropping'],
-  failed: ['disabled', 'pending'],
-  dropping: ['disabled'],
+  disabled: ["pending"],
+  pending: ["ready", "failed"],
+  ready: ["dropping"],
+  failed: ["disabled", "pending"],
+  dropping: ["disabled"],
 };
 
 export function isAllowedFilterableTransition(

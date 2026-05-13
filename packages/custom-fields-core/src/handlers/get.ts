@@ -1,6 +1,9 @@
-import { customFieldDefsRepo, type CustomFieldBaseModel } from '@flowpunk-indie/db';
+import {
+  customFieldDefsRepo,
+  type CustomFieldBaseModel,
+} from "@flowpunk-indie/db";
 
-import type { Actor, CustomFieldsEnv } from '../types.js';
+import type { Actor, CustomFieldsEnv } from "../types.js";
 import {
   badRequest,
   getDb,
@@ -9,7 +12,7 @@ import {
   notFound,
   isBaseModelAllowed,
   serializeDef,
-} from './_shared.js';
+} from "./_shared.js";
 
 /**
  * GET /custom-fields/defs/:id
@@ -25,8 +28,8 @@ export async function handleGetCustomFieldDef(
   id: string,
   allowedBaseModels: readonly CustomFieldBaseModel[],
 ): Promise<Response> {
-  if (id.length === 0 || id.includes('/')) {
-    return badRequest('INVALID_INPUT', 'id is required');
+  if (id.length === 0 || id.includes("/")) {
+    return badRequest("INVALID_INPUT", "id is required");
   }
   try {
     const db = getDb(env);

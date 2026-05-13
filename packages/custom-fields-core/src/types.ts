@@ -1,5 +1,5 @@
-import type { IdentityHeaderValues } from '@flowpunk/gateway/auth';
-import type { CustomFieldBaseModel } from '@flowpunk-indie/db';
+import type { IdentityHeaderValues } from "@flowpunk/gateway/auth";
+import type { CustomFieldBaseModel } from "@flowpunk-indie/db";
 
 /**
  * Edition-agnostic options handed in by the wrapper. PR-α has no
@@ -33,7 +33,7 @@ export interface Actor {
   userId: string;
   tenantId: string;
   scope: string;
-  credentialType: IdentityHeaderValues['credentialType'];
+  credentialType: IdentityHeaderValues["credentialType"];
   credentialId?: string;
   clientId?: string;
 }

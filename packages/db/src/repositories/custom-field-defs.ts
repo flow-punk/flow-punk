@@ -22,9 +22,9 @@
  * Row id prefix: `cfd_<21>` per ADR-023 §4 and matching the project's
  * 4-char + 21-nano-id convention validated by `id-prefix.test.ts`.
  */
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq, isNull, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
 import {
   CUSTOM_FIELD_CAPS,
@@ -34,24 +34,24 @@ import {
   type CustomFieldBaseModel,
   type CustomFieldDef,
   type CustomFieldFilterableStatus,
-} from '../schema/custom-field-defs.js';
+} from "../schema/custom-field-defs.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class CustomFieldDefsRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'version_mismatch'
-      | 'duplicate_name'
-      | 'cap_exceeded'
-      | 'invalid_transition'
-      | 'wrong_state',
+      | "not_found"
+      | "invalid_input"
+      | "version_mismatch"
+      | "duplicate_name"
+      | "cap_exceeded"
+      | "invalid_transition"
+      | "wrong_state",
     message: string,
   ) {
     super(message);
-    this.name = 'CustomFieldDefsRepoError';
+    this.name = "CustomFieldDefsRepoError";
   }
 }
 
@@ -60,9 +60,9 @@ const DESCRIPTION_MAX = 512;
 const USER_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 
 const VALID_BASE_MODELS = new Set<CustomFieldBaseModel>([
-  'person',
-  'account',
-  'deal',
+  "person",
+  "account",
+  "deal",
 ]);
 
 export interface CreateInput {
@@ -100,7 +100,7 @@ export async function list(
 ): Promise<CustomFieldDef[]> {
   if (!VALID_BASE_MODELS.has(baseModel)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       `baseModel must be one of: person, account, deal`,
     );
   }
@@ -122,7 +122,7 @@ export async function findById(
 ): Promise<CustomFieldDef | null> {
   if (!ID_REGEX.test(id)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       'id must match "cfd_<21 lowercase alphanumeric>"',
     );
   }
@@ -141,15 +141,12 @@ export async function findActiveByName(
   name: string,
 ): Promise<CustomFieldDef | null> {
   if (!VALID_BASE_MODELS.has(baseModel)) {
-    throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'invalid baseModel',
-    );
+    throw new CustomFieldDefsRepoError("invalid_input", "invalid baseModel");
   }
   if (!CUSTOM_FIELD_NAME_REGEX.test(name)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'name must match ^[a-z][a-z0-9_]{0,30}$',
+      "invalid_input",
+      "name must match ^[a-z][a-z0-9_]{0,30}$",
     );
   }
   const rows = await db
@@ -187,10 +184,7 @@ export async function getMaxVersion(
   baseModel: CustomFieldBaseModel,
 ): Promise<number> {
   if (!VALID_BASE_MODELS.has(baseModel)) {
-    throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'invalid baseModel',
-    );
+    throw new CustomFieldDefsRepoError("invalid_input", "invalid baseModel");
   }
   const rows = await db
     .select({
@@ -253,14 +247,14 @@ export async function create(
   validateActorId(actorId);
   if (!VALID_BASE_MODELS.has(input.baseModel)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'baseModel must be one of: person, account, deal',
+      "invalid_input",
+      "baseModel must be one of: person, account, deal",
     );
   }
   if (!CUSTOM_FIELD_NAME_REGEX.test(input.name)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'name must match ^[a-z][a-z0-9_]{0,30}$',
+      "invalid_input",
+      "name must match ^[a-z][a-z0-9_]{0,30}$",
     );
   }
   const description = normalizeDescription(input.description);
@@ -269,12 +263,12 @@ export async function create(
   const counts = await countActive(db, input.baseModel);
   if (counts.total >= CUSTOM_FIELD_CAPS.maxDefsPerBaseModel) {
     throw new CustomFieldDefsRepoError(
-      'cap_exceeded',
+      "cap_exceeded",
       `max ${CUSTOM_FIELD_CAPS.maxDefsPerBaseModel} active custom fields per baseModel`,
     );
   }
 
-  const id = generateId('cfd');
+  const id = generateId("cfd");
   try {
     await db.insert(customFieldDefs).values({
       id,
@@ -282,7 +276,7 @@ export async function create(
       name: input.name,
       description,
       pii: pii ? 1 : 0,
-      filterableStatus: 'disabled',
+      filterableStatus: "disabled",
       filterableError: null,
       version: 1,
       createdAt: now,
@@ -294,7 +288,7 @@ export async function create(
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw new CustomFieldDefsRepoError(
-        'duplicate_name',
+        "duplicate_name",
         `a custom field named "${input.name}" already exists for baseModel ${input.baseModel}`,
       );
     }
@@ -304,8 +298,8 @@ export async function create(
   const created = await findById(db, id);
   if (!created) {
     throw new CustomFieldDefsRepoError(
-      'wrong_state',
-      'newly created def disappeared mid-insert',
+      "wrong_state",
+      "newly created def disappeared mid-insert",
     );
   }
   return created;
@@ -329,28 +323,28 @@ export async function update(
   validateActorId(actorId);
   if (!ID_REGEX.test(id)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       'id must match "cfd_<21 lowercase alphanumeric>"',
     );
   }
   if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'expectedVersion must be a positive integer',
+      "invalid_input",
+      "expectedVersion must be a positive integer",
     );
   }
 
   const current = await findById(db, id);
   if (!current) {
     throw new CustomFieldDefsRepoError(
-      'not_found',
-      'custom field def not found',
+      "not_found",
+      "custom field def not found",
     );
   }
   if (current.archivedAt !== null) {
     throw new CustomFieldDefsRepoError(
-      'wrong_state',
-      'archived defs cannot be updated; reactivate first',
+      "wrong_state",
+      "archived defs cannot be updated; reactivate first",
     );
   }
   if (current.version !== expectedVersion) {
@@ -358,7 +352,7 @@ export async function update(
   }
 
   const sets: Partial<typeof customFieldDefs.$inferInsert> = {};
-  if (Object.prototype.hasOwnProperty.call(patch, 'description')) {
+  if (Object.prototype.hasOwnProperty.call(patch, "description")) {
     sets.description = normalizeDescription(patch.description ?? null);
   }
   if (patch.pii !== undefined) {
@@ -386,10 +380,7 @@ export async function update(
     // Lost a race with another writer between findById and update.
     const refreshed = await findById(db, id);
     if (!refreshed) {
-      throw new CustomFieldDefsRepoError(
-        'not_found',
-        'def deleted mid-update',
-      );
+      throw new CustomFieldDefsRepoError("not_found", "def deleted mid-update");
     }
     return { conflict: true, current: refreshed };
   }
@@ -422,7 +413,7 @@ export async function transitionFilterable(
   validateActorId(actorId);
   if (!ID_REGEX.test(id)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       'id must match "cfd_<21 lowercase alphanumeric>"',
     );
   }
@@ -430,14 +421,14 @@ export async function transitionFilterable(
   const current = await findById(db, id);
   if (!current) {
     throw new CustomFieldDefsRepoError(
-      'not_found',
-      'custom field def not found',
+      "not_found",
+      "custom field def not found",
     );
   }
   if (current.archivedAt !== null) {
     throw new CustomFieldDefsRepoError(
-      'wrong_state',
-      'archived defs cannot transition filterable_status',
+      "wrong_state",
+      "archived defs cannot transition filterable_status",
     );
   }
   if (current.version !== expectedVersion) {
@@ -445,16 +436,16 @@ export async function transitionFilterable(
   }
   if (!isAllowedFilterableTransition(current.filterableStatus, to)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_transition',
+      "invalid_transition",
       `cannot transition filterable_status from "${current.filterableStatus}" to "${to}"`,
     );
   }
 
-  if (to === 'pending') {
+  if (to === "pending") {
     const counts = await countActive(db, current.baseModel);
     if (counts.filterable >= CUSTOM_FIELD_CAPS.maxFilterablePerBaseModel) {
       throw new CustomFieldDefsRepoError(
-        'cap_exceeded',
+        "cap_exceeded",
         `max ${CUSTOM_FIELD_CAPS.maxFilterablePerBaseModel} filterable custom fields per baseModel`,
       );
     }
@@ -481,8 +472,8 @@ export async function transitionFilterable(
     const refreshed = await findById(db, id);
     if (!refreshed) {
       throw new CustomFieldDefsRepoError(
-        'not_found',
-        'def deleted mid-transition',
+        "not_found",
+        "def deleted mid-transition",
       );
     }
     return { conflict: true, current: refreshed };
@@ -507,7 +498,7 @@ export async function archive(
   validateActorId(actorId);
   if (!ID_REGEX.test(id)) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       'id must match "cfd_<21 lowercase alphanumeric>"',
     );
   }
@@ -515,8 +506,8 @@ export async function archive(
   const current = await findById(db, id);
   if (!current) {
     throw new CustomFieldDefsRepoError(
-      'not_found',
-      'custom field def not found',
+      "not_found",
+      "custom field def not found",
     );
   }
   if (current.archivedAt !== null) {
@@ -546,8 +537,8 @@ export async function archive(
     const refreshed = await findById(db, id);
     if (!refreshed) {
       throw new CustomFieldDefsRepoError(
-        'not_found',
-        'def deleted mid-archive',
+        "not_found",
+        "def deleted mid-archive",
       );
     }
     return { conflict: true, current: refreshed };
@@ -563,7 +554,7 @@ function normalizeDescription(value: string | null | undefined): string | null {
   if (trimmed.length === 0) return null;
   if (trimmed.length > DESCRIPTION_MAX) {
     throw new CustomFieldDefsRepoError(
-      'invalid_input',
+      "invalid_input",
       `description must be ≤ ${DESCRIPTION_MAX} chars`,
     );
   }
@@ -572,10 +563,7 @@ function normalizeDescription(value: string | null | undefined): string | null {
 
 function validateActorId(actorId: string): void {
   if (!USER_ID_REGEX.test(actorId)) {
-    throw new CustomFieldDefsRepoError(
-      'invalid_input',
-      'actorId is malformed',
-    );
+    throw new CustomFieldDefsRepoError("invalid_input", "actorId is malformed");
   }
 }
 
@@ -584,11 +572,11 @@ function isUniqueViolation(err: unknown): boolean {
   // mentioning the index/constraint. Matches the pattern used by the
   // accounts and persons repos.
   const message =
-    typeof err === 'object' && err !== null && 'message' in err
+    typeof err === "object" && err !== null && "message" in err
       ? String((err as { message: unknown }).message)
-      : '';
+      : "";
   return (
-    message.includes('UNIQUE constraint failed') ||
-    message.includes('cfd_active_name_uq')
+    message.includes("UNIQUE constraint failed") ||
+    message.includes("cfd_active_name_uq")
   );
 }

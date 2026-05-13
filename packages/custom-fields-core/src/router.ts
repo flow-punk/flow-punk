@@ -1,14 +1,14 @@
-import type { CustomFieldBaseModel } from '@flowpunk-indie/db';
+import type { CustomFieldBaseModel } from "@flowpunk-indie/db";
 
-import { handleArchiveCustomFieldDef } from './handlers/archive.js';
-import { handleCreateCustomFieldDef } from './handlers/create.js';
-import { handleGetCustomFieldDef } from './handlers/get.js';
-import { handleListCustomFieldDefs } from './handlers/list.js';
-import { handleUpdateCustomFieldDef } from './handlers/update.js';
-import type { Actor, CustomFieldsEnv } from './types.js';
+import { handleArchiveCustomFieldDef } from "./handlers/archive.js";
+import { handleCreateCustomFieldDef } from "./handlers/create.js";
+import { handleGetCustomFieldDef } from "./handlers/get.js";
+import { handleListCustomFieldDefs } from "./handlers/list.js";
+import { handleUpdateCustomFieldDef } from "./handlers/update.js";
+import type { Actor, CustomFieldsEnv } from "./types.js";
 
-const COLLECTION_PATH = '/api/v1/custom-fields/defs';
-const ITEM_PREFIX = '/api/v1/custom-fields/defs/';
+const COLLECTION_PATH = "/api/v1/custom-fields/defs";
+const ITEM_PREFIX = "/api/v1/custom-fields/defs/";
 
 export interface RouteOptions {
   /**
@@ -41,26 +41,44 @@ export async function routeCustomFields(
   const { allowedBaseModels } = options;
 
   if (pathname === COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListCustomFieldDefs(request, env, actor, allowedBaseModels);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return handleCreateCustomFieldDef(request, env, actor, allowedBaseModels);
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
   if (pathname.startsWith(ITEM_PREFIX)) {
     const id = pathname.slice(ITEM_PREFIX.length);
-    if (method === 'GET' || method === 'HEAD') {
-      return handleGetCustomFieldDef(request, env, actor, id, allowedBaseModels);
+    if (method === "GET" || method === "HEAD") {
+      return handleGetCustomFieldDef(
+        request,
+        env,
+        actor,
+        id,
+        allowedBaseModels,
+      );
     }
-    if (method === 'PATCH') {
-      return handleUpdateCustomFieldDef(request, env, actor, id, allowedBaseModels);
+    if (method === "PATCH") {
+      return handleUpdateCustomFieldDef(
+        request,
+        env,
+        actor,
+        id,
+        allowedBaseModels,
+      );
     }
-    if (method === 'DELETE') {
-      return handleArchiveCustomFieldDef(request, env, actor, id, allowedBaseModels);
+    if (method === "DELETE") {
+      return handleArchiveCustomFieldDef(
+        request,
+        env,
+        actor,
+        id,
+        allowedBaseModels,
+      );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
   return null;
 }
@@ -69,13 +87,13 @@ function methodNotAllowed(allow: string[]): Response {
   return new Response(
     JSON.stringify({
       success: false,
-      error: { code: 'METHOD_NOT_ALLOWED' },
+      error: { code: "METHOD_NOT_ALLOWED" },
     }),
     {
       status: 405,
       headers: {
-        'Content-Type': 'application/json',
-        Allow: allow.join(', '),
+        "Content-Type": "application/json",
+        Allow: allow.join(", "),
       },
     },
   );

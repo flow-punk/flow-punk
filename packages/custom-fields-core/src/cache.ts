@@ -11,7 +11,7 @@
  * The KV namespace is optional in v1 — when absent, handlers fall back
  * to direct D1 reads. This keeps local-dev runnable without a KV binding.
  */
-import type { CustomFieldBaseModel, CustomFieldDef } from '@flowpunk-indie/db';
+import type { CustomFieldBaseModel, CustomFieldDef } from "@flowpunk-indie/db";
 
 const TTL_SECONDS = 300; // 5 min
 
@@ -36,10 +36,7 @@ export async function getCache(
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as CachePayload;
-    if (
-      typeof parsed.version !== 'number' ||
-      !Array.isArray(parsed.defs)
-    ) {
+    if (typeof parsed.version !== "number" || !Array.isArray(parsed.defs)) {
       return null;
     }
     return parsed;

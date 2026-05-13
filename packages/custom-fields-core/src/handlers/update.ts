@@ -2,10 +2,10 @@ import {
   customFieldDefsRepo,
   type CustomFieldBaseModel,
   type UpdateCustomFieldDefInput,
-} from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
 
-import { invalidateCache } from '../cache.js';
-import type { Actor, CustomFieldsEnv } from '../types.js';
+import { invalidateCache } from "../cache.js";
+import type { Actor, CustomFieldsEnv } from "../types.js";
 import {
   badRequest,
   conflict,
@@ -19,7 +19,7 @@ import {
   parseIfMatchVersion,
   requireJsonBody,
   serializeDef,
-} from './_shared.js';
+} from "./_shared.js";
 
 interface UpdateBody {
   description?: unknown;
@@ -28,7 +28,7 @@ interface UpdateBody {
   filterable?: unknown;
 }
 
-const ALLOWED_PATCH_FIELDS = new Set(['description', 'pii']);
+const ALLOWED_PATCH_FIELDS = new Set(["description", "pii"]);
 
 /**
  * PATCH /custom-fields/defs/:id
@@ -50,44 +50,48 @@ export async function handleUpdateCustomFieldDef(
   id: string,
   allowedBaseModels: readonly CustomFieldBaseModel[],
 ): Promise<Response> {
-  if (id.length === 0 || id.includes('/')) {
-    return badRequest('INVALID_INPUT', 'id is required');
+  if (id.length === 0 || id.includes("/")) {
+    return badRequest("INVALID_INPUT", "id is required");
   }
 
   const expectedVersion = parseIfMatchVersion(request);
   if (expectedVersion === null) {
     return errorResponse(
       428,
-      'PRECONDITION_REQUIRED',
-      'If-Match: <version> header is required',
+      "PRECONDITION_REQUIRED",
+      "If-Match: <version> header is required",
     );
   }
 
   const body = await requireJsonBody<UpdateBody>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   // Reject unknown fields to keep the contract honest. `filterable` is
   // intentionally listed separately so the error message points at
   // PR-β rather than a generic "unknown".
   const keys = Object.keys(body.value);
-  if (keys.includes('filterable')) {
+  if (keys.includes("filterable")) {
     return badRequest(
-      'UNSUPPORTED_FIELD',
-      'filterable transitions are not yet supported',
+      "UNSUPPORTED_FIELD",
+      "filterable transitions are not yet supported",
     );
   }
   for (const k of keys) {
     if (!ALLOWED_PATCH_FIELDS.has(k)) {
-      return badRequest('INVALID_INPUT', `unknown patch field: ${k}`);
+      return badRequest("INVALID_INPUT", `unknown patch field: ${k}`);
     }
   }
 
   const { description, pii } = body.value;
-  if (description !== undefined && description !== null && typeof description !== 'string') {
-    return badRequest('INVALID_INPUT', 'description must be a string or null');
+  if (
+    description !== undefined &&
+    description !== null &&
+    typeof description !== "string"
+  ) {
+    return badRequest("INVALID_INPUT", "description must be a string or null");
   }
-  if (pii !== undefined && typeof pii !== 'boolean') {
-    return badRequest('INVALID_INPUT', 'pii must be a boolean');
+  if (pii !== undefined && typeof pii !== "boolean") {
+    return badRequest("INVALID_INPUT", "pii must be a boolean");
   }
 
   // Pre-flight: confirm the def exists AND belongs to a base model owned
@@ -96,10 +100,11 @@ export async function handleUpdateCustomFieldDef(
   const db = getDb(env);
   const existing = await customFieldDefsRepo.findById(db, id);
   if (!existing) return notFound();
-  if (!isBaseModelAllowed(existing.baseModel, allowedBaseModels)) return notFound();
+  if (!isBaseModelAllowed(existing.baseModel, allowedBaseModels))
+    return notFound();
 
   const patch: UpdateCustomFieldDefInput = {};
-  if (Object.prototype.hasOwnProperty.call(body.value, 'description')) {
+  if (Object.prototype.hasOwnProperty.call(body.value, "description")) {
     patch.description = (description as string | null | undefined) ?? null;
   }
   if (pii !== undefined) patch.pii = pii as boolean;
@@ -117,8 +122,8 @@ export async function handleUpdateCustomFieldDef(
 
     if (result.conflict) {
       return conflict(
-        'VERSION_CONFLICT',
-        'expected If-Match version does not match current row',
+        "VERSION_CONFLICT",
+        "expected If-Match version does not match current row",
         { current: serializeDef(result.current) },
       );
     }
@@ -135,15 +140,15 @@ export async function handleUpdateCustomFieldDef(
       }
     }
 
-    const fieldsChanged: ('description' | 'pii')[] = [];
-    if (Object.prototype.hasOwnProperty.call(patch, 'description')) {
-      fieldsChanged.push('description');
+    const fieldsChanged: ("description" | "pii")[] = [];
+    if (Object.prototype.hasOwnProperty.call(patch, "description")) {
+      fieldsChanged.push("description");
     }
-    if (patch.pii !== undefined) fieldsChanged.push('pii');
+    if (patch.pii !== undefined) fieldsChanged.push("pii");
 
     emitCustomFieldsAudit(actor, {
-      action: 'custom_fields.def.updated',
-      resourceType: 'custom_field_def',
+      action: "custom_fields.def.updated",
+      resourceType: "custom_field_def",
       resourceId: result.def.id,
       detail: {
         baseModel: result.def.baseModel,
