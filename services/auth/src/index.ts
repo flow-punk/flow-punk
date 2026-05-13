@@ -1,4 +1,4 @@
-import { createLogger } from '@flowpunk/service-utils';
+import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
 import {
   route,
   type AuthCoreOptions,
@@ -118,7 +118,14 @@ export default {
           return jsonResponse(200, { providers: listEnabledProviders(config) });
         }
 
-        const { handler } = createAuthHandler({ d1: env.DB, config });
+        const { handler } = createAuthHandler({
+          d1: env.DB,
+          config,
+          audit: {
+            actorTenantId: '_system',
+            emit: (event) => emitAuditEvent(logger, event),
+          },
+        });
         return await handler(request);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));

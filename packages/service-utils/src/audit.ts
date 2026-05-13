@@ -130,6 +130,34 @@ export type AuditEvent =
   | (AuditEventCommon & {
       action: 'users.softDeleted';
       detail: Record<string, never>;
+    })
+  | (AuditEventCommon & {
+      // Dashboard sign-up — emitted by better-auth's user.create.after
+      // database hook. `actorId` is the new auth_user.id (self-action;
+      // the domain `users` row may not yet be linked). `provider` is the
+      // configured auth provider id (`emailPassword` / `google` / `apple`).
+      action: 'auth.sign-up.succeeded';
+      detail: { provider: string };
+    })
+  | (AuditEventCommon & {
+      // Dashboard sign-in — emitted by better-auth's session.create.after
+      // database hook. `actorId` is the auth_user.id; `provider` reflects
+      // which provider the session was minted from.
+      action: 'auth.sign-in.succeeded';
+      detail: { provider: string };
+    })
+  | (AuditEventCommon & {
+      // Sign-in attempts that better-auth could not satisfy. `actorId` is
+      // the literal string `anonymous` (no user identity established).
+      // `reason` is a closed enum so failure paths cannot leak PII.
+      action: 'auth.sign-in.failed';
+      detail: { provider: string; reason: 'invalid_credentials' | 'rate_limited' | 'unverified' | 'other' };
+    })
+  | (AuditEventCommon & {
+      // Dashboard sign-out — emitted by better-auth's session.delete.after
+      // database hook.
+      action: 'auth.sign-out';
+      detail: Record<string, never>;
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {
