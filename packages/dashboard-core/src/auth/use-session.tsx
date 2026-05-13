@@ -5,29 +5,37 @@ import {
   type GetSessionResponse,
 } from "./api.js";
 import { useApiOrigin } from "./api-origin.js";
+import { useHostStrategy, type HostStrategyHint } from "./host-strategy.js";
 import type { Session, SessionUser } from "./types.js";
 
 const SESSION_QUERY_KEY = ["auth", "session"] as const;
 
 /**
  * Map better-auth's `{user, session}` payload onto our domain Session
- * shape. The role mapping is intentionally narrow:
+ * shape. Role mapping is host-class driven:
  *
- *   - The domain join is owned by the gateway; better-auth surfaces only
- *     the auth_user row plus our additionalField `domainUserId`.
- *   - The dashboard needs the role for nav gating, so the wrapper apps
- *     extend the session fetch with the role separately (Phase 1.3
- *     follow-up); for now we default to `tenant-admin` for any signed-in
- *     user. ADR-021 §3 — the domain `users.role` is the source of truth;
- *     this stub is replaced when the gateway exposes a `/me` route.
+ *   - On the console host (`hostStrategy === "console"`), any signed-in
+ *     user is by definition a platform admin — the console better-auth
+ *     instance is bound to PARENT_DB and is gated to `platform_admins`
+ *     (ADR-013 §"Platform admin identity"). Cross-class session
+ *     exchange is rejected at the gateway, so the client can safely
+ *     trust the host class.
+ *   - On tenant hosts the role defaults to `tenant-admin` until the
+ *     gateway surfaces an authoritative `/me` route (ADR-021 §3 — the
+ *     domain `users.role` is the source of truth).
  */
-function toSession(response: GetSessionResponse | null): Session | null {
+function toSession(
+  response: GetSessionResponse | null,
+  hostStrategy: HostStrategyHint,
+): Session | null {
   if (!response) return null;
+  const role: SessionUser["role"] =
+    hostStrategy === "console" ? "platform-admin" : "tenant-admin";
   const sessionUser: SessionUser = {
     id: response.user.domainUserId ?? response.user.id,
     email: response.user.email,
     name: response.user.name,
-    role: "tenant-admin",
+    role,
   };
   return {
     user: sessionUser,
@@ -53,6 +61,7 @@ export interface UseSessionResult {
 
 export function useSession(): UseSessionResult {
   const apiOrigin = useApiOrigin();
+  const hostStrategy = useHostStrategy();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -70,7 +79,7 @@ export function useSession(): UseSessionResult {
   });
 
   return {
-    session: toSession(query.data ?? null),
+    session: toSession(query.data ?? null, hostStrategy),
     isLoading: query.isPending,
     isFetching: query.isFetching,
     refresh: async () => {

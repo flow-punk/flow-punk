@@ -26,17 +26,21 @@ import {
   SignInScreen,
   useSession,
   type DashboardModule,
+  type DashboardRoute,
   type ModuleRequirements,
   type NavItem,
   type SessionUser,
 } from "@flowpunk-indie/dashboard-core";
-import { type CreateDashboardAppInput } from "./types.js";
+import { type CreateDashboardAppInput, type HostStrategy } from "./types.js";
+import { ConsoleShellLayout } from "./console-shell.js";
 
 interface RouterContext {
   /** Modules resolved at build-time. */
   modules: ReadonlyArray<DashboardModule>;
   /** Gateway origin. */
   apiOrigin: string;
+  /** Host class — drives console vs tenant chrome. */
+  hostStrategy: HostStrategy;
 }
 
 function requirementsSatisfied(
@@ -113,7 +117,10 @@ function ShellLayout() {
           search={<TopbarSearch />}
           actions={
             <>
-              <TopbarIconButton icon={<Icon name="bell" />} label="Notifications" />
+              <TopbarIconButton
+                icon={<Icon name="bell" />}
+                label="Notifications"
+              />
               <TopbarIconButton icon={<Icon name="help" />} label="Help" />
             </>
           }
@@ -148,9 +155,7 @@ function LoginRoute() {
   const search = useSearch({ strict: false }) as LoginSearch;
   return (
     <SignInScreen
-      onSignedIn={() =>
-        navigate({ to: (search?.redirect ?? "/") as "/" })
-      }
+      onSignedIn={() => navigate({ to: (search?.redirect ?? "/") as "/" })}
       onForgotPassword={() => navigate({ to: "/login/reset" })}
     />
   );
@@ -198,7 +203,9 @@ function ResetPasswordConfirmRoute() {
 function ProtectedShellGate() {
   const { session, isLoading } = useSession();
   const navigate = useNavigate();
+  const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { hostStrategy } = router.options.context as RouterContext;
 
   if (isLoading) {
     return (
@@ -216,7 +223,52 @@ function ProtectedShellGate() {
     );
     return null;
   }
-  return <ShellLayout />;
+  return hostStrategy === "console" ? <ConsoleShellLayout /> : <ShellLayout />;
+}
+
+/**
+ * Forbidden splash rendered when a signed-in user opens a route whose
+ * `requires.role` doesn't match their session role. Redirect would
+ * conceal the access mismatch from platform admins who already navigated
+ * here intentionally, so we surface a non-blocking notice and link back
+ * to the index. Server is authoritative — every console module endpoint
+ * also enforces platform-admin authority via the gateway's host-class
+ * stamp (Phase 1.2 — ADR-021 §2). This client-side check is a UX hint.
+ */
+function ForbiddenSplash() {
+  const navigate = useNavigate();
+  return (
+    <div className="mx-auto max-w-2xl py-16 text-center">
+      <h1 className="m-0 text-2xl font-semibold tracking-tight">
+        You don't have access to this surface
+      </h1>
+      <p className="mt-2 text-sm text-foreground-muted">
+        This route is restricted to platform administrators. If you reached it
+        from a tenant session, please return to your workspace.
+      </p>
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/" })}
+        className="mt-6 rounded-[var(--radius)] border border-border px-3 py-1.5 text-[13px] font-medium hover:bg-background-hover"
+      >
+        Back to home
+      </button>
+    </div>
+  );
+}
+
+function withRequiresGuard(
+  Component: DashboardRoute["component"],
+  requires: ModuleRequirements | undefined,
+): DashboardRoute["component"] {
+  if (!requires) return Component;
+  return function GuardedRoute() {
+    const { session } = useSession();
+    if (!requirementsSatisfied(session?.user ?? null, requires)) {
+      return <ForbiddenSplash />;
+    }
+    return <Component />;
+  };
 }
 
 function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
@@ -260,19 +312,19 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
     component: NoModulesIndex,
   });
 
+  // Routes from a module inherit the module's `requires`; an explicit
+  // per-route `requires` overrides. Both are forwarded into the renderer
+  // so the route still mounts (cleaner URL semantics) but the component
+  // renders a forbidden splash when the current session can't satisfy.
   const moduleRoutes = modules.flatMap((mod) =>
-    (mod.routes ?? [])
-      .filter(
-        (r) =>
-          requirementsSatisfied(null, r.requires) || mod.requires,
-      )
-      .map((r) =>
-        createRoute({
-          getParentRoute: () => protectedShell,
-          path: r.path,
-          component: r.component,
-        }),
-      ),
+    (mod.routes ?? []).map((r) => {
+      const effective = r.requires ?? mod.requires;
+      return createRoute({
+        getParentRoute: () => protectedShell,
+        path: r.path,
+        component: withRequiresGuard(r.component, effective),
+      });
+    }),
   );
 
   // Public module-contributed routes — mounted outside `_app`, no
@@ -313,6 +365,7 @@ export function createAppRouter(input: CreateDashboardAppInput) {
     context: {
       modules: input.modules,
       apiOrigin: input.apiOrigin,
+      hostStrategy: input.hostStrategy,
     },
     defaultPreload: "intent",
   });
@@ -325,4 +378,3 @@ export function AppRouter({
 }) {
   return <RouterProvider router={router} />;
 }
-

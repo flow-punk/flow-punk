@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   ApiOriginProvider,
+  HostStrategyProvider,
   SlotsProvider,
   createQueryClient,
+  type HostStrategyHint,
 } from "@flowpunk-indie/dashboard-core";
 import { TooltipProvider, Toaster } from "@flowpunk-indie/dashboard-ui";
 import type { CreateDashboardAppInput } from "./types.js";
@@ -18,7 +20,9 @@ export interface DashboardApp {
   mount(target: Element): void;
 }
 
-export function createDashboardApp(input: CreateDashboardAppInput): DashboardApp {
+export function createDashboardApp(
+  input: CreateDashboardAppInput,
+): DashboardApp {
   return {
     mount(target: Element): void {
       // Session hydration runs inside the protected layout via
@@ -28,16 +32,24 @@ export function createDashboardApp(input: CreateDashboardAppInput): DashboardApp
       // exercised the moment a protected route renders).
       const router = createAppRouter(input);
       const queryClient = createQueryClient();
+      const hostHint: HostStrategyHint =
+        input.hostStrategy === "console"
+          ? "console"
+          : input.hostStrategy === "single"
+            ? "single"
+            : "tenant";
       createRoot(target).render(
         <StrictMode>
           <QueryClientProvider client={queryClient}>
             <ApiOriginProvider apiOrigin={input.apiOrigin}>
-              <SlotsProvider fillers={input.fillers ?? []}>
-                <TooltipProvider>
-                  <AppRouter router={router} />
-                  <Toaster />
-                </TooltipProvider>
-              </SlotsProvider>
+              <HostStrategyProvider hostStrategy={hostHint}>
+                <SlotsProvider fillers={input.fillers ?? []}>
+                  <TooltipProvider>
+                    <AppRouter router={router} />
+                    <Toaster />
+                  </TooltipProvider>
+                </SlotsProvider>
+              </HostStrategyProvider>
             </ApiOriginProvider>
           </QueryClientProvider>
         </StrictMode>,

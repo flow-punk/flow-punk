@@ -1,9 +1,10 @@
-export type {
-  AuthProviderDescriptor,
-  Session,
-  SessionUser,
-} from "./types.js";
+export type { AuthProviderDescriptor, Session, SessionUser } from "./types.js";
 export { ApiOriginProvider, useApiOrigin } from "./api-origin.js";
+export {
+  HostStrategyProvider,
+  useHostStrategy,
+  type HostStrategyHint,
+} from "./host-strategy.js";
 export { useSession, SESSION_QUERY_KEY } from "./use-session.js";
 export type { UseSessionResult } from "./use-session.js";
 export { useProviders } from "./use-providers.js";
