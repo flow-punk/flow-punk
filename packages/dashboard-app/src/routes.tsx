@@ -6,6 +6,8 @@ import {
   redirect,
   RouterProvider,
   useNavigate,
+  useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import {
   AppShell,
@@ -20,7 +22,13 @@ import {
   Input,
   Label,
 } from "@flowpunk-indie/dashboard-ui";
-import type { DashboardModule, Session } from "@flowpunk-indie/dashboard-core";
+import type {
+  DashboardModule,
+  ModuleRequirements,
+  NavItem,
+  Session,
+  SessionUser,
+} from "@flowpunk-indie/dashboard-core";
 import { type CreateDashboardAppInput } from "./types.js";
 
 interface RouterContext {
@@ -32,8 +40,25 @@ interface RouterContext {
   apiOrigin: string;
 }
 
+function requirementsSatisfied(
+  user: SessionUser | null,
+  requires: ModuleRequirements | undefined,
+): boolean {
+  if (!requires) return true;
+  if (requires.role && user?.role !== requires.role) return false;
+  return true;
+}
+
 function ShellLayout() {
   const navigate = useNavigate();
+  const router = useRouter();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { modules, session } = router.options.context as RouterContext;
+
+  const navSections = modules
+    .filter((mod) => requirementsSatisfied(session?.user ?? null, mod.requires))
+    .flatMap((mod) => mod.nav ?? []);
+
   return (
     <AppShell
       sidebar={
@@ -51,14 +76,36 @@ function ShellLayout() {
             </button>
           }
         >
-          <SidebarSection>
-            <SidebarItem
-              icon={<Icon name="home" />}
-              label="Home"
-              onClick={() => navigate({ to: "/" })}
-              active
-            />
-          </SidebarSection>
+          {navSections.length === 0 ? (
+            <SidebarSection>
+              <div className="px-2.5 py-2 text-xs text-foreground-subtle">
+                no modules registered
+              </div>
+            </SidebarSection>
+          ) : (
+            navSections.map((group) => {
+              const items = group.items.filter((item: NavItem) =>
+                requirementsSatisfied(session?.user ?? null, item.requires),
+              );
+              if (items.length === 0) return null;
+              return (
+                <SidebarSection key={group.id} label={group.label}>
+                  {items.map((item) => {
+                    const IconComp = item.icon;
+                    return (
+                      <SidebarItem
+                        key={item.id}
+                        icon={IconComp ? <IconComp /> : undefined}
+                        label={item.label}
+                        active={pathname === item.to}
+                        onClick={() => navigate({ to: item.to })}
+                      />
+                    );
+                  })}
+                </SidebarSection>
+              );
+            })
+          )}
         </Sidebar>
       }
       topbar={
@@ -129,16 +176,35 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
     component: Outlet,
   });
 
+  // Public routes — reachable without a session. The Phase-0 empty-shell
+  // index lives here so the "no modules registered" landing is visible
+  // before better-auth bootstrap exists; Phase 1 will move `/` under the
+  // protected layout once a real session can be hydrated.
   const loginRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/login",
     component: LoginPlaceholder,
   });
 
-  const protectedLayout = createRoute({
+  const shellRoute = createRoute({
     getParentRoute: () => rootRoute,
-    id: "_app",
+    id: "_shell",
     component: ShellLayout,
+  });
+
+  const indexRoute = createRoute({
+    getParentRoute: () => shellRoute,
+    path: "/",
+    component: NoModulesIndex,
+  });
+
+  // Protected layout — module routes mount here. beforeLoad redirects to
+  // /login when no session is present, so the auth-redirect path is
+  // exercised the moment a module-contributed route is hit.
+  const protectedLayout = createRoute({
+    getParentRoute: () => shellRoute,
+    id: "_app",
+    component: Outlet,
     beforeLoad: ({ context, location }) => {
       if (!context.session) {
         throw redirect({
@@ -149,25 +215,30 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
     },
   });
 
-  const indexRoute = createRoute({
-    getParentRoute: () => protectedLayout,
-    path: "/",
-    component: NoModulesIndex,
-  });
-
   const moduleRoutes = modules.flatMap((mod) =>
-    (mod.routes ?? []).map((r) =>
-      createRoute({
-        getParentRoute: () => protectedLayout,
-        path: r.path,
-        component: r.component,
-      }),
-    ),
+    (mod.routes ?? [])
+      .filter(
+        (r) =>
+          // Module-level requirements gate at compose time; route-level
+          // requirements are evaluated client-side. Hidden routes are
+          // omitted from the tree so unauthorized direct navigation 404s.
+          requirementsSatisfied(null, r.requires) || mod.requires,
+      )
+      .map((r) =>
+        createRoute({
+          getParentRoute: () => protectedLayout,
+          path: r.path,
+          component: r.component,
+        }),
+      ),
   );
 
   return rootRoute.addChildren([
     loginRoute,
-    protectedLayout.addChildren([indexRoute, ...moduleRoutes]),
+    shellRoute.addChildren([
+      indexRoute,
+      protectedLayout.addChildren(moduleRoutes),
+    ]),
   ]);
 }
 
