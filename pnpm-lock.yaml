@@ -115,6 +115,9 @@ importers:
 
   packages/contacts-core:
     dependencies:
+      '@flowpunk-indie/custom-fields-core':
+        specifier: workspace:*
+        version: link:../custom-fields-core
       '@flowpunk-indie/db':
         specifier: workspace:*
         version: link:../db
@@ -149,6 +152,44 @@ importers:
       '@flowpunk-indie/openapi-from-drizzle':
         specifier: workspace:*
         version: link:../openapi-from-drizzle
+    devDependencies:
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/custom-fields-core:
+    dependencies:
+      '@flowpunk-indie/db':
+        specifier: workspace:*
+        version: link:../db
+      '@flowpunk/gateway':
+        specifier: workspace:*
+        version: link:../../services/gateway
+      '@flowpunk/service-utils':
+        specifier: workspace:*
+        version: link:../service-utils
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(@cloudflare/workers-types@4.20260420.1)
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20250620.0
+        version: 4.20260420.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
+  packages/custom-fields-spec:
+    dependencies:
+      '@flowpunk-indie/db':
+        specifier: workspace:*
+        version: link:../db
     devDependencies:
       tsx:
         specifier: ^4.19.2
@@ -231,6 +272,9 @@ importers:
 
   packages/pipeline-core:
     dependencies:
+      '@flowpunk-indie/custom-fields-core':
+        specifier: workspace:*
+        version: link:../custom-fields-core
       '@flowpunk-indie/db':
         specifier: workspace:*
         version: link:../db
@@ -403,6 +447,9 @@ importers:
       '@flowpunk-indie/contacts-spec':
         specifier: workspace:*
         version: link:../../packages/contacts-spec
+      '@flowpunk-indie/custom-fields-spec':
+        specifier: workspace:*
+        version: link:../../packages/custom-fields-spec
       '@flowpunk-indie/db':
         specifier: workspace:*
         version: link:../../packages/db
