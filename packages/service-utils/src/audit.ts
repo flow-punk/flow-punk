@@ -130,6 +130,28 @@ export type AuditEvent =
   | (AuditEventCommon & {
       action: 'users.softDeleted';
       detail: Record<string, never>;
+    })
+  | (AuditEventCommon & {
+      action: 'custom_fields.def.created';
+      // `baseModel` is a fixed enum and `pii` is a boolean — both safe to
+      // log. `name` and `description` are deliberately excluded: the slug
+      // is admin-authored metadata but the convention here is
+      // names-only-no-values for any caller-supplied string.
+      detail: { baseModel: 'person' | 'account' | 'deal'; pii: boolean };
+    })
+  | (AuditEventCommon & {
+      action: 'custom_fields.def.updated';
+      // Column NAMES only — `description` is free text and could carry
+      // operator-controlled context, `pii` is a bool flag, lifecycle
+      // transitions emit their own dedicated arms (added in PR-β).
+      detail: {
+        baseModel: 'person' | 'account' | 'deal';
+        fieldsChanged: ('description' | 'pii')[];
+      };
+    })
+  | (AuditEventCommon & {
+      action: 'custom_fields.def.archived';
+      detail: { baseModel: 'person' | 'account' | 'deal' };
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {

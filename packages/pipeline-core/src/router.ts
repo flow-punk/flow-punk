@@ -1,5 +1,9 @@
 import type { Logger } from '@flowpunk/service-utils';
 import { withIdempotency } from '@flowpunk/service-utils';
+import {
+  CUSTOM_FIELDS_PATHS,
+  routeCustomFields,
+} from '@flowpunk-indie/custom-fields-core';
 
 import { handleAddDealContact } from './handlers/deal-contacts/add.js';
 import { handleListDealContacts } from './handlers/deal-contacts/list.js';
@@ -73,6 +77,20 @@ export async function route(
       );
     }
     return methodNotAllowed(['POST']);
+  }
+
+  // /api/v1/custom-fields/* — delegated to the shared core (ADR-023 §12).
+  // Pipeline owns the `deal` base model; contacts owns `person` and
+  // `account`. The allowlist is enforced inside `routeCustomFields`.
+  if (
+    pathname === CUSTOM_FIELDS_PATHS.COLLECTION ||
+    pathname.startsWith(CUSTOM_FIELDS_PATHS.ITEM_PREFIX)
+  ) {
+    const result = await routeCustomFields(request, env, actor, {
+      allowedBaseModels: ['deal'],
+    });
+    if (result) return result;
+    return notFound();
   }
 
   // /api/v1/pipelines collection

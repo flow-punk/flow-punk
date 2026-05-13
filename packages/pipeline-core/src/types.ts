@@ -32,6 +32,12 @@ export interface PipelineEnv {
    * absent, defaults apply (see `PipelineCoreOptions`).
    */
   PIPELINE_OPTIONS?: PipelineCoreOptions;
+  /**
+   * Custom-fields registry KV cache (ADR-023 §11). Optional in v1 — when
+   * unbound, the registry CRUD path falls back to direct D1 reads.
+   * Bound in PR-β when the dashboard hot-path needs the cache.
+   */
+  CUSTOM_FIELDS_KV?: KVNamespace;
 }
 
 /**

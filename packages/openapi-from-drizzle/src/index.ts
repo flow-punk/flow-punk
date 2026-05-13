@@ -181,7 +181,13 @@ function patchColumnSchema(
       ? { type: ['string', 'null'], enum: [...enumValues, null] }
       : { type: 'string', enum: [...enumValues] };
   }
-  return isNullable ? { type: [baseType, 'null'] } : { type: baseType };
+  const schema: Record<string, unknown> = isNullable
+    ? { type: [baseType, 'null'] }
+    : { type: baseType };
+  if (baseType === 'object') {
+    schema.additionalProperties = { type: 'string' };
+  }
+  return schema;
 }
 
 function columnSchema(
@@ -199,6 +205,13 @@ function columnSchema(
     : isNullable
       ? { type: [baseType, 'null'] }
       : { type: baseType };
+  // For `mode: 'json'` columns (text-only values per ADR-023 §5 in the
+  // custom-fields case), document the map shape as
+  // `additionalProperties: { type: 'string' }`. A v2 with typed fields
+  // would change this to a richer schema.
+  if (baseType === 'object') {
+    schema.additionalProperties = { type: 'string' };
+  }
   if (col.hasDefault) {
     const defaultValue = literalDefault(col);
     if (defaultValue !== undefined) {
@@ -208,15 +221,23 @@ function columnSchema(
   return schema;
 }
 
-function mapColumnType(col: DrizzleColumn): 'string' | 'integer' | 'number' {
+function mapColumnType(
+  col: DrizzleColumn,
+): 'string' | 'integer' | 'number' | 'object' {
   // SQLite-specific column types. We only support the dialect this codebase uses.
   const columnType = (col as unknown as { columnType: string }).columnType;
   if (columnType === 'SQLiteText') return 'string';
   if (columnType === 'SQLiteInteger') return 'integer';
   if (columnType === 'SQLiteReal') return 'number';
+  // `text('foo', { mode: 'json' })` — value is a free-form JSON object on
+  // the entity row (see ADR-023 for the custom-fields use case). OpenAPI
+  // surface is `type: 'object'`. Callers that need a tighter shape can
+  // override via `extraResponseProps`.
+  if (columnType === 'SQLiteTextJson') return 'object';
   // Fall back to dataType for any unrecognized SQLite column type.
   if (col.dataType === 'string') return 'string';
   if (col.dataType === 'number') return 'number';
+  if (col.dataType === 'json') return 'object';
   throw new Error(
     `openapi-from-drizzle: unsupported column type "${columnType}" / dataType "${col.dataType}"`,
   );

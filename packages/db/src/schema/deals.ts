@@ -60,6 +60,10 @@ export const deals = sqliteTable(
     probability: real('probability'),
     ownerUserId: text('owner_user_id'),
     lostReason: pii(text('lost_reason')),
+    // Tenant-defined custom fields (ADR-023). PII by default — operator-
+    // defined free-text values may carry anything; per-field redaction
+    // selectivity is governed by `custom_field_defs.pii` at the registry.
+    customData: pii(text('custom_data', { mode: 'json' })),
     status: text('status').notNull().$type<DealStatus>(),
     deletedAt: text('deleted_at'),
     deletedBy: text('deleted_by'),

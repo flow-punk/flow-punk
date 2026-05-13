@@ -16,6 +16,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@flowpunk-indie/custom-fields-core": "workspace:*",
     "@flowpunk-indie/db": "workspace:*",
     "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",

@@ -69,6 +69,11 @@ export const persons = sqliteTable(
     consentEmail: pii(
       text('consent_email').notNull().default('no_consent').$type<EmailConsent>(),
     ),
+    // Tenant-defined custom fields (ADR-023). PII by default — values are
+    // operator-defined free text and may carry anything (IDs, phone numbers,
+    // notes). Per-field redaction selectivity is governed by the
+    // `custom_field_defs.pii` flag at the registry layer.
+    customData: pii(text('custom_data', { mode: 'json' })),
     status: text('status').notNull().$type<PersonStatus>(),
     deletedAt: text('deleted_at'),
     deletedBy: text('deleted_by'),

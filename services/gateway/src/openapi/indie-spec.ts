@@ -8,6 +8,7 @@
 
 import { authSpec } from '@flowpunk-indie/auth-spec';
 import { contactsSpec } from '@flowpunk-indie/contacts-spec';
+import { customFieldsSpec } from '@flowpunk-indie/custom-fields-spec';
 import { pipelineSpec } from '@flowpunk-indie/pipeline-spec';
 import { usersSpec } from '@flowpunk-indie/users-spec';
 
@@ -27,6 +28,7 @@ export const INDIE_FRAGMENTS: ReadonlyArray<OpenAPIFragment> = [
   gatewaySpec,
   authSpec,
   contactsSpec,
+  customFieldsSpec,
   pipelineSpec,
   usersSpec,
 ];

@@ -64,6 +64,19 @@ export {
   DEAL_HISTORY_CREDENTIAL_TYPES,
 } from './deal-history.js';
 export {
+  customFieldDefs,
+  type CustomFieldDef,
+  type CustomFieldBaseModel,
+  type CustomFieldFilterableStatus,
+  type NewCustomFieldDef,
+  CUSTOM_FIELD_BASE_MODELS,
+  CUSTOM_FIELD_FILTERABLE_STATUSES,
+  CUSTOM_FIELD_NAME_REGEX,
+  CUSTOM_FIELD_CAPS,
+  FILTERABLE_TRANSITIONS,
+  isAllowedFilterableTransition,
+} from './custom-field-defs.js';
+export {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,

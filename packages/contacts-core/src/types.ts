@@ -12,6 +12,12 @@ export interface ContactsEnv {
    * unset → keys stay byte-identical.
    */
   IDEMPOTENCY_KEY_PREFIX?: string;
+  /**
+   * Custom-fields registry KV cache (ADR-023 §11). Optional in v1 — when
+   * unbound, the registry CRUD path falls back to direct D1 reads.
+   * Bound in PR-β when the dashboard hot-path needs the cache.
+   */
+  CUSTOM_FIELDS_KV?: KVNamespace;
 }
 
 /**

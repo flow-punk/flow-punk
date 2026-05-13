@@ -29,6 +29,7 @@
   "dependencies": {
     "@flowpunk-indie/auth-spec": "workspace:*",
     "@flowpunk-indie/contacts-spec": "workspace:*",
+    "@flowpunk-indie/custom-fields-spec": "workspace:*",
     "@flowpunk-indie/db": "workspace:*",
     "@flowpunk-indie/oauth": "workspace:*",
     "@flowpunk-indie/pipeline-spec": "workspace:*",

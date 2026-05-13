@@ -54,6 +54,10 @@ export const accounts = sqliteTable(
     // `deals.ownerUserId` posture (`schema/deals.ts:34-37`). Repo treats
     // this as a free-form user id; format-validated only.
     ownerUserId: text('owner_user_id'),
+    // Tenant-defined custom fields (ADR-023). PII by default — operator-
+    // defined free-text values may carry anything; per-field redaction
+    // selectivity is governed by `custom_field_defs.pii` at the registry.
+    customData: pii(text('custom_data', { mode: 'json' })),
     status: text('status').notNull().$type<AccountStatus>(),
     deletedAt: text('deleted_at'),
     deletedBy: text('deleted_by'),
