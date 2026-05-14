@@ -1,5 +1,15 @@
 # flowpunk
 
+## 0.2.0
+
+### Minor Changes
+
+- [`7105c38`](https://github.com/flow-punk/flow-punk/commit/7105c38d48b63b86b111c1cecf779f86682a3478) Thanks [@mjzuppe](https://github.com/mjzuppe)! - Add `accounts.ownerUserId` and a `deal_contacts` many-to-many join. Accounts gain account-level ownership (mirrors the existing `deals.ownerUserId`). The new `deal_contacts` table moves the deals model from a single-slot `primaryPersonId` toward HubSpot-style many-to-many; `primaryPersonId` stays as the denormalized "primary contact" pointer and is kept consistent with `deal_contacts` automatically (deal create/PATCH auto-upserts the row, and removing the primary contact clears the pointer atomically). New REST routes: `GET/POST /api/v1/deals/:id/contacts` and `DELETE /api/v1/deals/:id/contacts/:personId`.
+
+- [`82a314d`](https://github.com/flow-punk/flow-punk/commit/82a314dfd58aaed7baf993517b53da37cc80d461) Thanks [@mjzuppe](https://github.com/mjzuppe)! - Add custom-fields registry for persons, accounts, and deals (PR-α: CRUD only; filterable workflow in PR-β)
+
+- [`c9906ad`](https://github.com/flow-punk/flow-punk/commit/c9906ad54de12b84295c80cee215677db091f9ca) Thanks [@mjzuppe](https://github.com/mjzuppe)! - Add deal_history append-only timeline + GET /api/v1/deals/:id/history
+
 ## 0.1.0
 
 ### Minor Changes
