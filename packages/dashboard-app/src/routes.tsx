@@ -31,7 +31,11 @@ import {
   type NavItem,
   type SessionUser,
 } from "@flowpunk-indie/dashboard-core";
-import { type CreateDashboardAppInput, type HostStrategy } from "./types.js";
+import {
+  type CreateDashboardAppInput,
+  type DashboardFeatures,
+  type HostStrategy,
+} from "./types.js";
 import { ConsoleShellLayout } from "./console-shell.js";
 
 interface RouterContext {
@@ -41,6 +45,8 @@ interface RouterContext {
   apiOrigin: string;
   /** Host class — drives console vs tenant chrome. */
   hostStrategy: HostStrategy;
+  /** Build-time feature flags (Phase 6 — gates the workspace switcher). */
+  features?: DashboardFeatures;
 }
 
 function requirementsSatisfied(
@@ -56,8 +62,14 @@ function ShellLayout() {
   const navigate = useNavigate();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { modules } = router.options.context as RouterContext;
+  const { modules, features } = router.options.context as RouterContext;
   const { session } = useSession();
+  // Topbar workspace switcher (Phase 6 / ADR-020 §5). The component
+  // is injected by the host app via `features.topbarActionsComponent`
+  // — indie never supplies one, so the expression short-circuits to
+  // null and the indie bundle never references the switcher module
+  // (no managed-only marker strings here).
+  const SwitcherComponent = features?.topbarActionsComponent ?? null;
 
   const navSections = modules
     .filter((mod) => requirementsSatisfied(session?.user ?? null, mod.requires))
@@ -117,6 +129,7 @@ function ShellLayout() {
           search={<TopbarSearch />}
           actions={
             <>
+              {SwitcherComponent ? <SwitcherComponent /> : null}
               <TopbarIconButton
                 icon={<Icon name="bell" />}
                 label="Notifications"
@@ -271,7 +284,10 @@ function withRequiresGuard(
   };
 }
 
-function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
+function buildRoutes(
+  modules: ReadonlyArray<DashboardModule>,
+  features: DashboardFeatures | undefined,
+) {
   const rootRoute = createRootRouteWithContext<RouterContext>()({
     component: () => (
       <Suspense fallback={<SuspenseFallback />}>
@@ -341,11 +357,26 @@ function buildRoutes(modules: ReadonlyArray<DashboardModule>) {
     ),
   );
 
+  // Extra public routes contributed by the host app (Phase 6 /
+  // ADR-020 §5). Managed passes the redeem route here; indie passes
+  // nothing. The route path + component live entirely in the host
+  // app's bundle entry — dashboard-app never references either by
+  // name. That keeps the indie build free of redeem markers
+  // (verified by indie/apps/dashboard/scripts/verify-bundle-clean.mjs).
+  const extraPublicRoutes = (features?.extraPublicRoutes ?? []).map((r) =>
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path: r.path,
+      component: r.component,
+    }),
+  );
+
   return rootRoute.addChildren([
     loginRoute,
     forgotRoute,
     resetConfirmRoute,
     ...publicModuleRoutes,
+    ...extraPublicRoutes,
     protectedShell.addChildren([indexRoute, ...moduleRoutes]),
   ]);
 }
@@ -359,13 +390,14 @@ function SuspenseFallback() {
 }
 
 export function createAppRouter(input: CreateDashboardAppInput) {
-  const routeTree = buildRoutes(input.modules);
+  const routeTree = buildRoutes(input.modules, input.features);
   return createRouter({
     routeTree,
     context: {
       modules: input.modules,
       apiOrigin: input.apiOrigin,
       hostStrategy: input.hostStrategy,
+      features: input.features,
     },
     defaultPreload: "intent",
   });

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "verify-bundle-clean": "node scripts/verify-bundle-clean.mjs",
+    "build:verified": "vite build && node scripts/verify-bundle-clean.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
