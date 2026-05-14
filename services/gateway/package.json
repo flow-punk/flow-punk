@@ -21,7 +21,7 @@
     "dev": "wrangler dev --persist-to ../../.wrangler-state",
     "migrate:local": "wrangler d1 migrations apply DB --local --persist-to ../../.wrangler-state",
     "build": "wrangler deploy --dry-run --outdir=dist",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node ../../scripts/test-if-any.mjs",
     "typecheck": "tsc --noEmit",
     "spec:dump": "tsx scripts/dump-openapi.ts",
     "clean": "rm -rf dist"

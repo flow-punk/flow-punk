@@ -11,7 +11,7 @@
     "./cache": "./src/cache.ts"
   },
   "scripts": {
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node ../../scripts/test-if-any.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
