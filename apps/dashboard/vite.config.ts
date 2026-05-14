@@ -8,6 +8,12 @@ import tailwindcss from "@tailwindcss/vite";
 // touching modules or app composition).
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    dedupe: ["react", "react-dom"],
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react/jsx-runtime"],
+  },
   build: {
     target: "es2022",
     outDir: "dist",
