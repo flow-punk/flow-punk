@@ -1,7 +1,7 @@
-import { pipelinesRepo } from '@flowpunk-indie/db';
+import { pipelinesRepo } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import { getDb, jsonResponse, mapRepoError } from "../_shared.js";
 
 export async function handleSoftDeletePipeline(
   _request: Request,

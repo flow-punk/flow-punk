@@ -1,31 +1,27 @@
-import { drizzle } from 'drizzle-orm/d1';
-import {
-  hasAdminRights,
-  mcpSessionsRepo,
-  usersRepo,
-} from '@flowpunk-indie/db';
-import { parseCookies } from './cookies.js';
-import { sha256Hex } from './sha256.js';
-import type { Env } from '../types.js';
+import { drizzle } from "drizzle-orm/d1";
+import { hasAdminRights, mcpSessionsRepo, usersRepo } from "@flowpunk-indie/db";
+import { parseCookies } from "./cookies.js";
+import { sha256Hex } from "./sha256.js";
+import type { Env } from "../types.js";
 
-export const SESSION_COOKIE_NAME = 'fp_session';
-export const SESSION_SCOPE = 'admin';
+export const SESSION_COOKIE_NAME = "fp_session";
+export const SESSION_SCOPE = "admin";
 /**
  * Indie always stamps the `_system` scope per ADR-013. Cookie value
  * format: `_system.<sessionId>`. The full raw value (including the
  * scope prefix) is what gets hashed for cookie_hash.
  */
-const INDIE_TENANT_ID = '_system';
+const INDIE_TENANT_ID = "_system";
 
 const MAX_CACHE_TTL_SECONDS = 60;
-const SESSION_CACHE_PREFIX = 'session:';
-const SESSION_REVOKED_PREFIX = 'session:revoked:';
+const SESSION_CACHE_PREFIX = "session:";
+const SESSION_REVOKED_PREFIX = "session:revoked:";
 
 export interface SessionIdentity {
   tenantId: string;
   userId: string;
-  scope: 'admin';
-  credentialType: 'session';
+  scope: "admin";
+  credentialType: "session";
   credentialId: string;
   expiresAt: string;
 }
@@ -51,7 +47,7 @@ export async function validateSession(
 
   // Per ADR-013, valid indie cookies have the form `_system.<random>`.
   // Hash the FULL raw value (the same string that was stored as cookie_hash).
-  const dot = cookieValue.indexOf('.');
+  const dot = cookieValue.indexOf(".");
   if (dot < 1) return null;
   const scope = cookieValue.slice(0, dot);
   if (scope !== INDIE_TENANT_ID) return null;
@@ -61,13 +57,13 @@ export async function validateSession(
   const revocationKey = `${SESSION_REVOKED_PREFIX}${cookieHash}`;
 
   const revocationState = await readRevocationState(env, revocationKey);
-  if (revocationState === 'revoked') return null;
+  if (revocationState === "revoked") return null;
 
-  if (revocationState === 'clear') {
+  if (revocationState === "clear") {
     try {
       const cached = await env.MCP_SESSIONS_KV.get<SessionIdentity>(
         cacheKey,
-        'json',
+        "json",
       );
       if (cached && isStillValid(cached.expiresAt)) {
         return cached;
@@ -101,7 +97,7 @@ export async function validateSession(
   } catch {
     return null;
   }
-  if (!user || user.status !== 'active' || !hasAdminRights(user.role)) {
+  if (!user || user.status !== "active" || !hasAdminRights(user.role)) {
     return null;
   }
 
@@ -109,7 +105,7 @@ export async function validateSession(
     tenantId: INDIE_TENANT_ID,
     userId: row.userId,
     scope: SESSION_SCOPE,
-    credentialType: 'session',
+    credentialType: "session",
     credentialId: row.id,
     expiresAt: row.expiresAt,
   };
@@ -118,7 +114,7 @@ export async function validateSession(
   const secondsUntilExpiry = Math.floor((expiresAtMs - Date.now()) / 1000);
   if (secondsUntilExpiry >= MAX_CACHE_TTL_SECONDS) {
     const revocationBeforeWrite = await readRevocationState(env, revocationKey);
-    if (revocationBeforeWrite === 'clear') {
+    if (revocationBeforeWrite === "clear") {
       try {
         await env.MCP_SESSIONS_KV.put(cacheKey, JSON.stringify(identity), {
           expirationTtl: Math.min(MAX_CACHE_TTL_SECONDS, secondsUntilExpiry),
@@ -135,12 +131,12 @@ export async function validateSession(
 async function readRevocationState(
   env: Env,
   revocationKey: string,
-): Promise<'clear' | 'revoked' | 'unknown'> {
+): Promise<"clear" | "revoked" | "unknown"> {
   try {
     const tombstone = await env.MCP_SESSIONS_KV.get(revocationKey);
-    return tombstone ? 'revoked' : 'clear';
+    return tombstone ? "revoked" : "clear";
   } catch {
-    return 'unknown';
+    return "unknown";
   }
 }
 

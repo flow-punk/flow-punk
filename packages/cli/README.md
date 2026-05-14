@@ -27,16 +27,16 @@ After init, paste the printed config block into your MCP client (Claude Desktop,
 
 ## Commands
 
-| Command | What it does |
-| ------- | ------------ |
-| `flowpunk init`     | Interactive provision (first time) |
-| `flowpunk login`    | Cloudflare OAuth via wrangler |
-| `flowpunk logout`   | Clear stored credentials |
-| `flowpunk doctor`   | Health-check the deployment |
-| `flowpunk teardown` | Delete the deployed Workers + KVs (D1 retained) |
+| Command             | What it does                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| `flowpunk init`     | Interactive provision (first time)                            |
+| `flowpunk login`    | Cloudflare OAuth via wrangler                                 |
+| `flowpunk logout`   | Clear stored credentials                                      |
+| `flowpunk doctor`   | Health-check the deployment                                   |
+| `flowpunk teardown` | Delete the deployed Workers + KVs (D1 retained)               |
 | `flowpunk update`   | _(0.1.0)_ Apply pending migrations + redeploy changed workers |
-| `flowpunk admin`    | _(0.1.0)_ Mint a new admin session + API key |
-| `flowpunk logs`     | _(0.1.0)_ Tail Worker logs |
+| `flowpunk admin`    | _(0.1.0)_ Mint a new admin session + API key                  |
+| `flowpunk logs`     | _(0.1.0)_ Tail Worker logs                                    |
 
 ## How auth works
 

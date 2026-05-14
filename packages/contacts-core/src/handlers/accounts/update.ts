@@ -1,13 +1,13 @@
-import { accountsRepo, type UpdateAccountPatch } from '@flowpunk-indie/db';
+import { accountsRepo, type UpdateAccountPatch } from "@flowpunk-indie/db";
 
-import type { Actor, ContactsEnv } from '../../types.js';
+import type { Actor, ContactsEnv } from "../../types.js";
 import {
   emitContactsAudit,
   getDb,
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from '../_shared.js';
+} from "../_shared.js";
 
 export async function handleUpdateAccount(
   request: Request,
@@ -16,7 +16,7 @@ export async function handleUpdateAccount(
   id: string,
 ): Promise<Response> {
   const body = await requireJsonBody<UpdateAccountPatch>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);
@@ -31,8 +31,8 @@ export async function handleUpdateAccount(
 
     if (result.fieldsChanged.length > 0) {
       emitContactsAudit(actor, {
-        action: 'accounts.updated',
-        resourceType: 'account',
+        action: "accounts.updated",
+        resourceType: "account",
         resourceId: result.account.id,
         detail: { fieldsChanged: result.fieldsChanged },
       });

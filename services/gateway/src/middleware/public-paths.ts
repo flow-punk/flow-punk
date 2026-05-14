@@ -18,16 +18,16 @@
  *   - `/oauth/revoke`     — RFC 7009 (client-bound)
  */
 export const INDIE_PUBLIC_PATHS = [
-  '/health',
-  '/.well-known/*',
-  '/oauth/*',
-  '/api/v1/auth/login',
-  '/api/v1/auth/logout',
+  "/health",
+  "/.well-known/*",
+  "/oauth/*",
+  "/api/v1/auth/login",
+  "/api/v1/auth/logout",
   // Better-auth dashboard surface (ADR-021). Sign-in / sign-up / OAuth
   // callback / `/get-session` all live under `/api/auth/*` and must reach
   // AUTH_SERVICE without an Authorization header (cookie-only). Each
   // sub-route enforces its own CSRF/credential check inside better-auth.
-  '/api/auth/*',
+  "/api/auth/*",
 ] as const;
 
 /**
@@ -39,14 +39,14 @@ export const INDIE_PUBLIC_PATHS = [
  * Consumed only by `createIndieChain` via `indieAuthBootstrapMiddleware`.
  * Do NOT spread into `MANAGED_PUBLIC_PATHS`.
  */
-export const INDIE_BOOTSTRAP_PUBLIC_PATHS = ['/auth/login'] as const;
+export const INDIE_BOOTSTRAP_PUBLIC_PATHS = ["/auth/login"] as const;
 
 /**
  * Local-dev-only paths added to the public list when the gating env flag
  * `OPENAPI_ENABLED === '1'` is set (ADR-014). Production deploys leave the
  * flag undefined so these paths fall through to auth → 401.
  */
-export const OPENAPI_LOCAL_PATHS = ['/api/openapi.json', '/api/docs'] as const;
+export const OPENAPI_LOCAL_PATHS = ["/api/openapi.json", "/api/docs"] as const;
 
 /**
  * Returns true if `path` matches any pattern in `patterns`.
@@ -60,7 +60,7 @@ export function isPublicPath(
   patterns: readonly string[] = INDIE_PUBLIC_PATHS,
 ): boolean {
   return patterns.some((pattern) => {
-    if (pattern.endsWith('/*')) {
+    if (pattern.endsWith("/*")) {
       return path.startsWith(pattern.slice(0, -1));
     }
     return path === pattern;
@@ -77,7 +77,7 @@ export function getPublicPaths(
   env: { OPENAPI_ENABLED?: string },
   base: readonly string[],
 ): readonly string[] {
-  if (env.OPENAPI_ENABLED === '1') {
+  if (env.OPENAPI_ENABLED === "1") {
     return [...base, ...OPENAPI_LOCAL_PATHS];
   }
   return base;

@@ -1,13 +1,13 @@
-import { Buffer } from 'node:buffer';
-import { createHash, randomBytes } from 'node:crypto';
-import * as p from '@clack/prompts';
-import { queryD1 } from '@flowpunk/cf-admin';
-import { generateId } from '@flowpunk/service-utils';
+import { Buffer } from "node:buffer";
+import { createHash, randomBytes } from "node:crypto";
+import * as p from "@clack/prompts";
+import { queryD1 } from "@flowpunk/cf-admin";
+import { generateId } from "@flowpunk/service-utils";
 
-import { resolveAndVerify } from './helpers.js';
-import { readConfig } from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
+import { resolveAndVerify } from "./helpers.js";
+import { readConfig } from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
 
 export interface ConnectOpts {
   token?: string;
@@ -49,27 +49,26 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
   if (matching.length === 0) {
     throw new CliError(
       `No deployment recorded for account ${account.name}`,
-      'Run `flowpunk init` first.',
+      "Run `flowpunk init` first.",
     );
   }
   if (matching.length > 1 && !opts.prefix) {
     throw new CliError(
-      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(', ')}`,
-      'Pass --prefix <name>.',
+      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(", ")}`,
+      "Pass --prefix <name>.",
     );
   }
   const dep = matching[0]!;
   const gatewayUrl = dep.resources.workers.gateway.url;
   if (!gatewayUrl) {
     throw new CliError(
-      'Gateway URL missing from deployment record',
-      'Re-run `flowpunk init --resume` to fix the record, then retry.',
+      "Gateway URL missing from deployment record",
+      "Re-run `flowpunk init --resume` to fix the record, then retry.",
     );
   }
 
@@ -81,8 +80,8 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
   const ownerId = await findOwnerUserId(client, databaseId);
   if (!ownerId) {
     throw new CliError(
-      'No owner user found in the indie users table',
-      'Run `flowpunk admin reset` to seed a fresh owner, or check the deployment is reachable.',
+      "No owner user found in the indie users table",
+      "Run `flowpunk admin reset` to seed a fresh owner, or check the deployment is reachable.",
     );
   }
 
@@ -90,7 +89,7 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
   // chars (matches `seedAdmin.generateCookiePayload`).
   const token = base64UrlPayload();
   const tokenHash = sha256Hex(token);
-  const tokenId = generateId('logn');
+  const tokenId = generateId("logn");
   const nowIso = new Date().toISOString();
   const expiresIso = new Date(
     Date.now() + TOKEN_TTL_SECONDS * 1000,
@@ -100,28 +99,30 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
     databaseId,
     sql: `INSERT INTO auth_login_tokens (id, token_hash, user_id, expires_at, consumed_at, created_at, created_by)
           VALUES (?, ?, ?, ?, NULL, ?, ?);`,
-    params: [tokenId, tokenHash, ownerId, expiresIso, nowIso, 'flowpunk-cli'],
+    params: [tokenId, tokenHash, ownerId, expiresIso, nowIso, "flowpunk-cli"],
   });
 
-  const banner = '═'.repeat(72);
+  const banner = "═".repeat(72);
   process.stdout.write(
     [
-      '',
+      "",
       theme.brand(banner),
-      theme.bold('  Login token — valid for 30 minutes, single use'),
+      theme.bold("  Login token — valid for 30 minutes, single use"),
       theme.brand(banner),
-      '',
-      `${theme.bold('Token:')}  ${theme.accent(token)}`,
-      '',
-      theme.bold('Sign in:'),
+      "",
+      `${theme.bold("Token:")}  ${theme.accent(token)}`,
+      "",
+      theme.bold("Sign in:"),
       `  ${theme.accent(`${gatewayUrl}/auth/login`)}`,
-      `  ${theme.dim('Paste the token above into the form.')}`,
-      '',
-      theme.dim('  Re-run `flowpunk connect` to mint a fresh token if this one expires'),
-      theme.dim('  before you use it (or after consumption).'),
+      `  ${theme.dim("Paste the token above into the form.")}`,
+      "",
+      theme.dim(
+        "  Re-run `flowpunk connect` to mint a fresh token if this one expires",
+      ),
+      theme.dim("  before you use it (or after consumption)."),
       theme.brand(banner),
-      '',
-    ].join('\n'),
+      "",
+    ].join("\n"),
   );
 
   // Suppress unused-import warning for the shared p namespace (we may use it
@@ -131,12 +132,12 @@ export async function connectCommand(opts: ConnectOpts): Promise<void> {
 
 function base64UrlPayload(): string {
   const bytes = randomBytes(32);
-  const b64 = Buffer.from(bytes).toString('base64');
-  return b64.replace(/[=+/]/g, '').slice(0, 32);
+  const b64 = Buffer.from(bytes).toString("base64");
+  return b64.replace(/[=+/]/g, "").slice(0, 32);
 }
 
 function sha256Hex(input: string): string {
-  return createHash('sha256').update(input, 'utf8').digest('hex');
+  return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
 async function findOwnerUserId(
@@ -152,9 +153,9 @@ async function findOwnerUserId(
   for (const r of rows) {
     if (Array.isArray(r.results)) {
       for (const row of r.results) {
-        if (row && typeof row === 'object' && 'id' in row) {
+        if (row && typeof row === "object" && "id" in row) {
           const id = (row as { id: unknown }).id;
-          if (typeof id === 'string') return id;
+          if (typeof id === "string") return id;
         }
       }
     }

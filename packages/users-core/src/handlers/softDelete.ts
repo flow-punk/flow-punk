@@ -1,12 +1,12 @@
-import { usersRepo } from '@flowpunk-indie/db';
+import { usersRepo } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
+import type { Actor, UsersEnv } from "../types.js";
 import {
   emitUsersAudit,
   getDb,
   jsonResponse,
   mapRepoError,
-} from './_shared.js';
+} from "./_shared.js";
 
 /**
  * DELETE /api/v1/users/:id — admin only.
@@ -30,8 +30,8 @@ export async function handleSoftDelete(
     const user = await usersRepo.softDelete(getDb(env), id, actor.userId, now);
     await usersRepo.revokeAuthStateForUser(getDb(env), id, now);
     emitUsersAudit(actor, {
-      action: 'users.softDeleted',
-      resourceType: 'user',
+      action: "users.softDeleted",
+      resourceType: "user",
       resourceId: id,
       detail: {},
     });

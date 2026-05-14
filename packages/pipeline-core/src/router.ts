@@ -1,37 +1,44 @@
-import type { Logger } from '@flowpunk/service-utils';
-import { withIdempotency } from '@flowpunk/service-utils';
+import type { Logger } from "@flowpunk/service-utils";
+import { withIdempotency } from "@flowpunk/service-utils";
+import {
+  CUSTOM_FIELDS_PATHS,
+  routeCustomFields,
+} from "@flowpunk-indie/custom-fields-core";
 
-import { handleAddDealContact } from './handlers/deal-contacts/add.js';
-import { handleListDealContacts } from './handlers/deal-contacts/list.js';
-import { handleRemoveDealContact } from './handlers/deal-contacts/remove.js';
-import { handleCreateDeal } from './handlers/deals/create.js';
-import { handleGetDeal } from './handlers/deals/get.js';
-import { handleListDeals } from './handlers/deals/list.js';
-import { handleSoftDeleteDeal } from './handlers/deals/softDelete.js';
-import { handleUpdateDeal } from './handlers/deals/update.js';
-import { handleCreatePipeline } from './handlers/pipelines/create.js';
-import { handleGetPipeline } from './handlers/pipelines/get.js';
-import { handleListPipelines } from './handlers/pipelines/list.js';
-import { handleSoftDeletePipeline } from './handlers/pipelines/softDelete.js';
-import { handleUpdatePipeline } from './handlers/pipelines/update.js';
-import { handleCreateStage } from './handlers/stages/create.js';
-import { handleGetStage } from './handlers/stages/get.js';
-import { handleListStages } from './handlers/stages/list.js';
-import { handleSoftDeleteStage } from './handlers/stages/softDelete.js';
-import { handleUpdateStage } from './handlers/stages/update.js';
-import { handleMcpExecute } from './mcp/execute.js';
-import { handleMcpTools } from './mcp/tools.js';
-import { parseIdentity } from './middleware/identity.js';
-import type { Actor, PipelineEnv } from './types.js';
+import { handleAddDealContact } from "./handlers/deal-contacts/add.js";
+import { handleListDealContacts } from "./handlers/deal-contacts/list.js";
+import { handleRemoveDealContact } from "./handlers/deal-contacts/remove.js";
+import { handleGetDealHistory } from "./handlers/deal-history/get.js";
+import { handleListDealHistoryByDeal } from "./handlers/deal-history/listByDeal.js";
+import { handleCreateDeal } from "./handlers/deals/create.js";
+import { handleGetDeal } from "./handlers/deals/get.js";
+import { handleListDeals } from "./handlers/deals/list.js";
+import { handleSoftDeleteDeal } from "./handlers/deals/softDelete.js";
+import { handleUpdateDeal } from "./handlers/deals/update.js";
+import { handleCreatePipeline } from "./handlers/pipelines/create.js";
+import { handleGetPipeline } from "./handlers/pipelines/get.js";
+import { handleListPipelines } from "./handlers/pipelines/list.js";
+import { handleSoftDeletePipeline } from "./handlers/pipelines/softDelete.js";
+import { handleUpdatePipeline } from "./handlers/pipelines/update.js";
+import { handleCreateStage } from "./handlers/stages/create.js";
+import { handleGetStage } from "./handlers/stages/get.js";
+import { handleListStages } from "./handlers/stages/list.js";
+import { handleSoftDeleteStage } from "./handlers/stages/softDelete.js";
+import { handleUpdateStage } from "./handlers/stages/update.js";
+import { handleMcpExecute } from "./mcp/execute.js";
+import { handleMcpTools } from "./mcp/tools.js";
+import { parseIdentity } from "./middleware/identity.js";
+import type { Actor, PipelineEnv } from "./types.js";
 
-const PIPELINES_COLLECTION_PATH = '/api/v1/pipelines';
-const PIPELINES_ITEM_PREFIX = '/api/v1/pipelines/';
-const STAGES_COLLECTION_PATH = '/api/v1/stages';
-const STAGES_ITEM_PREFIX = '/api/v1/stages/';
-const DEALS_COLLECTION_PATH = '/api/v1/deals';
-const DEALS_ITEM_PREFIX = '/api/v1/deals/';
-const MCP_TOOLS_PATH = '/mcp/tools';
-const MCP_EXECUTE_PATH = '/mcp/execute';
+const PIPELINES_COLLECTION_PATH = "/api/v1/pipelines";
+const PIPELINES_ITEM_PREFIX = "/api/v1/pipelines/";
+const STAGES_COLLECTION_PATH = "/api/v1/stages";
+const STAGES_ITEM_PREFIX = "/api/v1/stages/";
+const DEALS_COLLECTION_PATH = "/api/v1/deals";
+const DEALS_ITEM_PREFIX = "/api/v1/deals/";
+const DEAL_HISTORY_ITEM_PREFIX = "/api/v1/deal-history/";
+const MCP_TOOLS_PATH = "/mcp/tools";
+const MCP_EXECUTE_PATH = "/mcp/execute";
 
 export async function route(
   request: Request,
@@ -44,11 +51,11 @@ export async function route(
 
   // Liveness probe — runs BEFORE the identity guard so the worker is
   // reachable without forging headers.
-  if (pathname === '/health') {
-    if (method === 'GET' || method === 'HEAD') {
-      return jsonResponse(200, { ok: true, service: 'pipeline' });
+  if (pathname === "/health") {
+    if (method === "GET" || method === "HEAD") {
+      return jsonResponse(200, { ok: true, service: "pipeline" });
     }
-    return methodNotAllowed(['GET', 'HEAD']);
+    return methodNotAllowed(["GET", "HEAD"]);
   }
 
   const actor = parseIdentity(request);
@@ -58,98 +65,124 @@ export async function route(
   // Trust model: identity headers + X-MCP-Session-Id + X-Idempotency-Key
   // (synthesized by the gateway for mutating tools).
   if (pathname === MCP_TOOLS_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleMcpTools(env);
     }
-    return methodNotAllowed(['GET', 'HEAD']);
+    return methodNotAllowed(["GET", "HEAD"]);
   }
   if (pathname === MCP_EXECUTE_PATH) {
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleMcpExecute(request, env, actor),
       );
     }
-    return methodNotAllowed(['POST']);
+    return methodNotAllowed(["POST"]);
+  }
+
+  // /api/v1/custom-fields/* — delegated to the shared core (ADR-023 §12).
+  // Pipeline owns the `deal` base model; contacts owns `person` and
+  // `account`. The allowlist is enforced inside `routeCustomFields`.
+  if (
+    pathname === CUSTOM_FIELDS_PATHS.COLLECTION ||
+    pathname.startsWith(CUSTOM_FIELDS_PATHS.ITEM_PREFIX)
+  ) {
+    const result = await routeCustomFields(request, env, actor, {
+      allowedBaseModels: ["deal"],
+    });
+    if (result) return result;
+    return notFound();
   }
 
   // /api/v1/pipelines collection
   if (pathname === PIPELINES_COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListPipelines(request, env, actor);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreatePipeline(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
   if (pathname.startsWith(PIPELINES_ITEM_PREFIX)) {
     const id = pathname.slice(PIPELINES_ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
-    if (method === 'GET' || method === 'HEAD') {
+    if (id.length === 0 || id.includes("/")) return notFound();
+    if (method === "GET" || method === "HEAD") {
       return handleGetPipeline(request, env, actor, id);
     }
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       return idempotent(request, env, actor, () =>
         handleUpdatePipeline(request, env, actor, id),
       );
     }
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       return idempotent(request, env, actor, () =>
         handleSoftDeletePipeline(request, env, actor, id),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
 
   // /api/v1/stages collection
   if (pathname === STAGES_COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListStages(request, env, actor);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreateStage(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
   if (pathname.startsWith(STAGES_ITEM_PREFIX)) {
     const id = pathname.slice(STAGES_ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
-    if (method === 'GET' || method === 'HEAD') {
+    if (id.length === 0 || id.includes("/")) return notFound();
+    if (method === "GET" || method === "HEAD") {
       return handleGetStage(request, env, actor, id);
     }
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       return idempotent(request, env, actor, () =>
         handleUpdateStage(request, env, actor, id),
       );
     }
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       return idempotent(request, env, actor, () =>
         handleSoftDeleteStage(request, env, actor, id),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
   }
 
   // /api/v1/deals collection
   if (pathname === DEALS_COLLECTION_PATH) {
-    if (method === 'GET' || method === 'HEAD') {
+    if (method === "GET" || method === "HEAD") {
       return handleListDeals(request, env, actor);
     }
-    if (method === 'POST') {
+    if (method === "POST") {
       return idempotent(request, env, actor, () =>
         handleCreateDeal(request, env, actor),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'POST']);
+    return methodNotAllowed(["GET", "HEAD", "POST"]);
   }
   if (pathname.startsWith(DEALS_ITEM_PREFIX)) {
-    // Sub-resource: /api/v1/deals/:id/contacts(/:personId)?
+    // Sub-resource: /api/v1/deals/:id/history
     // Matched BEFORE the generic `:id` branch — `id.includes('/')` would
     // otherwise return 404 for any path containing a sub-resource.
+    const historyMatch = matchDealHistoryPath(
+      pathname.slice(DEALS_ITEM_PREFIX.length),
+    );
+    if (historyMatch) {
+      const { dealId } = historyMatch;
+      if (method === "GET" || method === "HEAD") {
+        return handleListDealHistoryByDeal(request, env, actor, dealId);
+      }
+      return methodNotAllowed(["GET", "HEAD"]);
+    }
+
+    // Sub-resource: /api/v1/deals/:id/contacts(/:personId)?
     const dealContactsMatch = matchDealContactsPath(
       pathname.slice(DEALS_ITEM_PREFIX.length),
     );
@@ -157,41 +190,51 @@ export async function route(
       const { dealId, personId } = dealContactsMatch;
       if (personId === null) {
         // Collection: /api/v1/deals/:id/contacts
-        if (method === 'GET' || method === 'HEAD') {
+        if (method === "GET" || method === "HEAD") {
           return handleListDealContacts(request, env, actor, dealId);
         }
-        if (method === 'POST') {
+        if (method === "POST") {
           return idempotent(request, env, actor, () =>
             handleAddDealContact(request, env, actor, dealId),
           );
         }
-        return methodNotAllowed(['GET', 'HEAD', 'POST']);
+        return methodNotAllowed(["GET", "HEAD", "POST"]);
       }
       // Item: /api/v1/deals/:id/contacts/:personId
-      if (method === 'DELETE') {
+      if (method === "DELETE") {
         return idempotent(request, env, actor, () =>
           handleRemoveDealContact(request, env, actor, dealId, personId),
         );
       }
-      return methodNotAllowed(['DELETE']);
+      return methodNotAllowed(["DELETE"]);
     }
 
     const id = pathname.slice(DEALS_ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
-    if (method === 'GET' || method === 'HEAD') {
+    if (id.length === 0 || id.includes("/")) return notFound();
+    if (method === "GET" || method === "HEAD") {
       return handleGetDeal(request, env, actor, id);
     }
-    if (method === 'PATCH') {
+    if (method === "PATCH") {
       return idempotent(request, env, actor, () =>
         handleUpdateDeal(request, env, actor, id),
       );
     }
-    if (method === 'DELETE') {
+    if (method === "DELETE") {
       return idempotent(request, env, actor, () =>
         handleSoftDeleteDeal(request, env, actor, id),
       );
     }
-    return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+    return methodNotAllowed(["GET", "HEAD", "PATCH", "DELETE"]);
+  }
+
+  // Top-level deal-history item read.
+  if (pathname.startsWith(DEAL_HISTORY_ITEM_PREFIX)) {
+    const id = pathname.slice(DEAL_HISTORY_ITEM_PREFIX.length);
+    if (id.length === 0 || id.includes("/")) return notFound();
+    if (method === "GET" || method === "HEAD") {
+      return handleGetDealHistory(request, env, actor, id);
+    }
+    return methodNotAllowed(["GET", "HEAD"]);
   }
 
   return notFound();
@@ -212,16 +255,16 @@ export function idempotent(
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 function unauthenticated(): Response {
   return new Response(
-    JSON.stringify({ success: false, error: { code: 'UNAUTHENTICATED' } }),
+    JSON.stringify({ success: false, error: { code: "UNAUTHENTICATED" } }),
     {
       status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     },
   );
 }
@@ -230,13 +273,13 @@ function methodNotAllowed(allow: string[]): Response {
   return new Response(
     JSON.stringify({
       success: false,
-      error: { code: 'METHOD_NOT_ALLOWED' },
+      error: { code: "METHOD_NOT_ALLOWED" },
     }),
     {
       status: 405,
       headers: {
-        'Content-Type': 'application/json',
-        Allow: allow.join(', '),
+        "Content-Type": "application/json",
+        Allow: allow.join(", "),
       },
     },
   );
@@ -251,24 +294,37 @@ function methodNotAllowed(allow: string[]): Response {
 function matchDealContactsPath(
   tail: string,
 ): { dealId: string; personId: string | null } | null {
-  const parts = tail.split('/');
+  const parts = tail.split("/");
   // Expect: [dealId, 'contacts'] or [dealId, 'contacts', personId]
   if (parts.length < 2 || parts.length > 3) return null;
   const dealId = parts[0];
   if (!dealId || dealId.length === 0) return null;
-  if (parts[1] !== 'contacts') return null;
+  if (parts[1] !== "contacts") return null;
   if (parts.length === 2) return { dealId, personId: null };
   const personId = parts[2];
   if (!personId || personId.length === 0) return null;
   return { dealId, personId };
 }
 
+/**
+ * Match `<dealId>/history` tail of `/api/v1/deals/`. Returns `{ dealId }`
+ * or null when the tail is not the history sub-resource.
+ */
+function matchDealHistoryPath(tail: string): { dealId: string } | null {
+  const parts = tail.split("/");
+  if (parts.length !== 2) return null;
+  const dealId = parts[0];
+  if (!dealId || dealId.length === 0) return null;
+  if (parts[1] !== "history") return null;
+  return { dealId };
+}
+
 function notFound(): Response {
   return new Response(
-    JSON.stringify({ success: false, error: { code: 'NOT_FOUND' } }),
+    JSON.stringify({ success: false, error: { code: "NOT_FOUND" } }),
     {
       status: 404,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     },
   );
 }

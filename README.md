@@ -63,12 +63,12 @@ npx flowpunk doctor
 
 `init` provisions everything end-to-end on your Cloudflare account:
 
-| Resource | Count | Purpose |
-| --- | --- | --- |
-| Workers | 5 | 1 public gateway + 4 internal services (auth, users, contacts, pipeline) |
-| D1 database | 1 | All CRM data (shared across services) |
-| KV namespaces | 6 | MCP tool catalog, MCP sessions, idempotency keys, last-used tracking |
-| Durable Object | 1 | MCP streaming sessions |
+| Resource       | Count | Purpose                                                                  |
+| -------------- | ----- | ------------------------------------------------------------------------ |
+| Workers        | 5     | 1 public gateway + 4 internal services (auth, users, contacts, pipeline) |
+| D1 database    | 1     | All CRM data (shared across services)                                    |
+| KV namespaces  | 6     | MCP tool catalog, MCP sessions, idempotency keys, last-used tracking     |
+| Durable Object | 1     | MCP streaming sessions                                                   |
 
 When `init` finishes it prints:
 
@@ -109,13 +109,13 @@ curl -i \
 
 ### CLI commands
 
-| Command | What it does |
-| --- | --- |
-| `flowpunk login` | Browser-based Cloudflare OAuth (via wrangler) |
-| `flowpunk logout` | Clear stored credentials |
-| `flowpunk init` | Interactive first-time provision |
-| `flowpunk doctor` | Health-check the deployment |
-| `flowpunk status` | Show deployed resources and versions |
+| Command             | What it does                                           |
+| ------------------- | ------------------------------------------------------ |
+| `flowpunk login`    | Browser-based Cloudflare OAuth (via wrangler)          |
+| `flowpunk logout`   | Clear stored credentials                               |
+| `flowpunk init`     | Interactive first-time provision                       |
+| `flowpunk doctor`   | Health-check the deployment                            |
+| `flowpunk status`   | Show deployed resources and versions                   |
 | `flowpunk teardown` | Delete deployed Workers + KVs (D1 retained for safety) |
 
 The CLI never copies or persists your Cloudflare token to its own config — it reads wrangler's OAuth token on demand. For CI or sandboxed environments, pass `--token <CF_API_TOKEN>` to any command.

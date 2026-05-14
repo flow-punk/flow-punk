@@ -1,6 +1,6 @@
-import { extractIdentityHeaders } from '@flowpunk/gateway/auth';
+import { extractIdentityHeaders } from "@flowpunk/gateway/auth";
 
-import type { Actor } from '../types.js';
+import type { Actor } from "../types.js";
 
 /**
  * Parse trusted identity headers off a request. Returns null when the

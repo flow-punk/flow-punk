@@ -3,12 +3,50 @@
   "allowed": ["mcp", "flowpunk"],
   "cases": [
     { "input": "mcp", "ok": true, "granted": ["mcp"], "serialized": "mcp" },
-    { "input": "mcp flowpunk", "ok": true, "granted": ["mcp", "flowpunk"], "serialized": "mcp flowpunk" },
-    { "input": "flowpunk mcp", "ok": true, "granted": ["flowpunk", "mcp"], "serialized": "flowpunk mcp" },
-    { "input": "mcp mcp", "ok": true, "granted": ["mcp"], "serialized": "mcp", "note": "dedupe" },
-    { "input": "  mcp   flowpunk  ", "ok": true, "granted": ["mcp", "flowpunk"], "serialized": "mcp flowpunk", "note": "whitespace tolerance" },
-    { "input": "", "ok": true, "granted": [], "serialized": "", "note": "empty input ok with empty default" },
-    { "input": "admin", "ok": false, "error": "invalid_scope", "unsupported": ["admin"] },
-    { "input": "mcp admin", "ok": false, "error": "invalid_scope", "unsupported": ["admin"] }
+    {
+      "input": "mcp flowpunk",
+      "ok": true,
+      "granted": ["mcp", "flowpunk"],
+      "serialized": "mcp flowpunk"
+    },
+    {
+      "input": "flowpunk mcp",
+      "ok": true,
+      "granted": ["flowpunk", "mcp"],
+      "serialized": "flowpunk mcp"
+    },
+    {
+      "input": "mcp mcp",
+      "ok": true,
+      "granted": ["mcp"],
+      "serialized": "mcp",
+      "note": "dedupe"
+    },
+    {
+      "input": "  mcp   flowpunk  ",
+      "ok": true,
+      "granted": ["mcp", "flowpunk"],
+      "serialized": "mcp flowpunk",
+      "note": "whitespace tolerance"
+    },
+    {
+      "input": "",
+      "ok": true,
+      "granted": [],
+      "serialized": "",
+      "note": "empty input ok with empty default"
+    },
+    {
+      "input": "admin",
+      "ok": false,
+      "error": "invalid_scope",
+      "unsupported": ["admin"]
+    },
+    {
+      "input": "mcp admin",
+      "ok": false,
+      "error": "invalid_scope",
+      "unsupported": ["admin"]
+    }
   ]
 }

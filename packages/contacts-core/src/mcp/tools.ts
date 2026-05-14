@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm';
-import { accounts, persons } from '@flowpunk-indie/db';
+import { eq } from "drizzle-orm";
+import { accounts, persons } from "@flowpunk-indie/db";
 import {
   buildToolRegistry,
   type McpToolState,
   type ToolMetadata,
-} from '@flowpunk/tool-registry';
+} from "@flowpunk/tool-registry";
 
-import type { ContactsEnv } from '../types.js';
-import { getDb, type Db } from '../handlers/_shared.js';
+import type { ContactsEnv } from "../types.js";
+import { getDb, type Db } from "../handlers/_shared.js";
 
 interface TenantContactsExistence {
   hasPersons: boolean;
@@ -19,12 +19,12 @@ async function checkExistence(db: Db): Promise<TenantContactsExistence> {
     db
       .select({ id: persons.id })
       .from(persons)
-      .where(eq(persons.status, 'active'))
+      .where(eq(persons.status, "active"))
       .limit(1),
     db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(eq(accounts.status, 'active'))
+      .where(eq(accounts.status, "active"))
       .limit(1),
   ]);
   return {
@@ -42,44 +42,50 @@ interface AvailabilityRule {
 
 const AVAILABILITY_RULES: AvailabilityRule[] = [
   {
-    toolName: 'persons_search',
+    toolName: "persons_search",
     available: (e) => e.hasPersons,
-    reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
+    reason: "no person records exist for this tenant yet",
+    nextStep:
+      "Call the persons create action to add the first person, then re-run tools/list.",
   },
   {
-    toolName: 'persons_get',
+    toolName: "persons_get",
     available: (e) => e.hasPersons,
-    reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
+    reason: "no person records exist for this tenant yet",
+    nextStep:
+      "Call the persons create action to add the first person, then re-run tools/list.",
   },
   {
-    toolName: 'persons_update',
+    toolName: "persons_update",
     available: (e) => e.hasPersons,
-    reason: 'no person records exist for this tenant yet',
-    nextStep: 'Call the persons create action to add the first person, then re-run tools/list.',
+    reason: "no person records exist for this tenant yet",
+    nextStep:
+      "Call the persons create action to add the first person, then re-run tools/list.",
   },
   {
-    toolName: 'accounts_search',
+    toolName: "accounts_search",
     available: (e) => e.hasAccounts,
-    reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
+    reason: "no account records exist for this tenant yet",
+    nextStep:
+      "Call the accounts create action to add the first account, then re-run tools/list.",
   },
   {
-    toolName: 'accounts_get',
+    toolName: "accounts_get",
     available: (e) => e.hasAccounts,
-    reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
+    reason: "no account records exist for this tenant yet",
+    nextStep:
+      "Call the accounts create action to add the first account, then re-run tools/list.",
   },
   {
-    toolName: 'accounts_update',
+    toolName: "accounts_update",
     available: (e) => e.hasAccounts,
-    reason: 'no account records exist for this tenant yet',
-    nextStep: 'Call the accounts create action to add the first account, then re-run tools/list.',
+    reason: "no account records exist for this tenant yet",
+    nextStep:
+      "Call the accounts create action to add the first account, then re-run tools/list.",
   },
 ];
 
-const ALWAYS_AVAILABLE_TOOLS = new Set(['persons_create', 'accounts_create']);
+const ALWAYS_AVAILABLE_TOOLS = new Set(["persons_create", "accounts_create"]);
 
 /**
  * Build the contacts service's per-tenant tool state. Tools backed by data
@@ -89,17 +95,19 @@ const ALWAYS_AVAILABLE_TOOLS = new Set(['persons_create', 'accounts_create']);
  * data-gated tools live in the same registry — the difference is the
  * availability bit.
  */
-export async function buildContactsToolState(env: ContactsEnv): Promise<McpToolState> {
+export async function buildContactsToolState(
+  env: ContactsEnv,
+): Promise<McpToolState> {
   const db = getDb(env);
   const existence = await checkExistence(db);
 
-  const registry = buildToolRegistry('indie');
+  const registry = buildToolRegistry("indie");
 
   const availableTools: ToolMetadata[] = [];
   const unavailableTools: ToolMetadata[] = [];
 
   for (const tool of registry.staticExecutableTools) {
-    if (tool.service !== 'contacts') continue;
+    if (tool.service !== "contacts") continue;
     const rule = AVAILABILITY_RULES.find((r) => r.toolName === tool.name);
     const isAvailable = ALWAYS_AVAILABLE_TOOLS.has(tool.name)
       ? true
@@ -113,7 +121,7 @@ export async function buildContactsToolState(env: ContactsEnv): Promise<McpToolS
       unavailableTools.push({
         ...tool,
         availability: {
-          status: 'unavailable',
+          status: "unavailable",
           reason: rule.reason,
           nextStep: rule.nextStep,
         },
@@ -132,6 +140,6 @@ export async function handleMcpTools(env: ContactsEnv): Promise<Response> {
   const toolState = await buildContactsToolState(env);
   return new Response(JSON.stringify({ toolState }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }

@@ -21,4 +21,4 @@ export interface OAuthEnv {
  * Indie has no per-tenant routing — the `_system` scope is a constant
  * sentinel that signals "this is an indie credential".
  */
-export const INDIE_SCOPE = '_system';
+export const INDIE_SCOPE = "_system";

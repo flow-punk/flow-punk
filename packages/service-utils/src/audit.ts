@@ -17,12 +17,12 @@
  * in audit logs is `resourceId` (the tenant id), never `displayName`.
  */
 
-import type { Logger } from './logger.js';
+import type { Logger } from "./logger.js";
 
 interface AuditEventCommon {
   actorId: string;
   actorTenantId: string;
-  actorCredentialType: 'apikey' | 'oauth' | 'session' | 'system';
+  actorCredentialType: "apikey" | "oauth" | "session" | "system";
   resourceType: string;
   resourceId: string;
   /** Optional tenant the action targets (may differ from actorTenantId for
@@ -32,15 +32,15 @@ interface AuditEventCommon {
 
 export type AuditEvent =
   | (AuditEventCommon & {
-      action: 'tenants.created';
-      detail: { slug: string; plan: 'hobby' | 'pro' };
+      action: "tenants.created";
+      detail: { slug: string; plan: "hobby" | "pro" };
     })
   | (AuditEventCommon & {
-      action: 'tenants.renamed';
+      action: "tenants.renamed";
       detail: { newSlug: string };
     })
   | (AuditEventCommon & {
-      action: 'tenants.suspended';
+      action: "tenants.suspended";
       // The full suspension reason (caller-supplied free-form text) lives on
       // the `tenants.suspensionReason` row column. The audit log records only
       // that the suspension happened, to keep operator-supplied text out of
@@ -48,15 +48,15 @@ export type AuditEvent =
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
-      action: 'tenants.unsuspended';
+      action: "tenants.unsuspended";
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
-      action: 'tenants.softDeleted';
+      action: "tenants.softDeleted";
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
-      action: 'tenants.markedProvisioned';
+      action: "tenants.markedProvisioned";
       detail: {
         routerName: string;
         bindingName: string;
@@ -64,7 +64,7 @@ export type AuditEvent =
       };
     })
   | (AuditEventCommon & {
-      action: 'accounts.created';
+      action: "accounts.created";
       // Non-PII fixed-format fields only. `country` is ISO alpha-2 (regex
       // bounded). Free-form caller-controlled strings (e.g. `industry`)
       // are deliberately excluded — an operator could otherwise stuff PII
@@ -72,18 +72,18 @@ export type AuditEvent =
       detail: { country?: string };
     })
   | (AuditEventCommon & {
-      action: 'accounts.updated';
+      action: "accounts.updated";
       // Column NAMES only — never the new values, since values may be PII.
       // Names are derived from a fixed allowlist (`ALLOWED_PATCH_FIELDS` in
       // `@flowpunk-indie/db`) so unknown/forged keys cannot leak in.
       detail: { fieldsChanged: string[] };
     })
   | (AuditEventCommon & {
-      action: 'accounts.softDeleted';
+      action: "accounts.softDeleted";
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
-      action: 'persons.created';
+      action: "persons.created";
       // Boolean only — never the linked account id (would leak which account
       // a person belongs to into the structured log surface). No consent
       // value: consent records are personal data per GDPR Art. 7. A
@@ -92,7 +92,7 @@ export type AuditEvent =
       detail: { hasAccountId: boolean };
     })
   | (AuditEventCommon & {
-      action: 'persons.updated';
+      action: "persons.updated";
       // Column NAMES only — never the new values, since values may be PII
       // (including `consentEmail`, which is `pii()`-marked at the schema
       // layer per GDPR Art. 7). Names are derived from a fixed allowlist
@@ -101,26 +101,26 @@ export type AuditEvent =
       detail: { fieldsChanged: string[] };
     })
   | (AuditEventCommon & {
-      action: 'persons.softDeleted';
+      action: "persons.softDeleted";
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
-      action: 'users.created';
+      action: "users.created";
       // `role` is the non-PII enum (`owner`/`admin`/`member`/`readonly`);
       // `email` and `displayName` are pii()-marked at the schema layer
       // and stay off the structured log surface.
-      detail: { role: 'owner' | 'admin' | 'member' | 'readonly' };
+      detail: { role: "owner" | "admin" | "member" | "readonly" };
     })
   | (AuditEventCommon & {
-      action: 'users.roleChanged';
+      action: "users.roleChanged";
       // Privilege transition; logs both old and new roles. Non-PII.
       detail: {
-        from: 'owner' | 'admin' | 'member' | 'readonly';
-        to: 'owner' | 'admin' | 'member' | 'readonly';
+        from: "owner" | "admin" | "member" | "readonly";
+        to: "owner" | "admin" | "member" | "readonly";
       };
     })
   | (AuditEventCommon & {
-      action: 'users.updated';
+      action: "users.updated";
       // Column NAMES only — never the new values, since values include
       // pii()-marked columns (email, displayName, firstName, lastName).
       // Names are derived from a fixed allowlist (`ALLOWED_PATCH_FIELDS`
@@ -128,7 +128,7 @@ export type AuditEvent =
       detail: { fieldsChanged: string[] };
     })
   | (AuditEventCommon & {
-      action: 'users.softDeleted';
+      action: "users.softDeleted";
       detail: Record<string, never>;
     })
   | (AuditEventCommon & {
@@ -136,30 +136,55 @@ export type AuditEvent =
       // database hook. `actorId` is the new auth_user.id (self-action;
       // the domain `users` row may not yet be linked). `provider` is the
       // configured auth provider id (`emailPassword` / `google` / `apple`).
-      action: 'auth.sign-up.succeeded';
+      action: "auth.sign-up.succeeded";
       detail: { provider: string };
     })
   | (AuditEventCommon & {
       // Dashboard sign-in — emitted by better-auth's session.create.after
       // database hook. `actorId` is the auth_user.id; `provider` reflects
       // which provider the session was minted from.
-      action: 'auth.sign-in.succeeded';
+      action: "auth.sign-in.succeeded";
       detail: { provider: string };
     })
   | (AuditEventCommon & {
       // Sign-in attempts that better-auth could not satisfy. `actorId` is
       // the literal string `anonymous` (no user identity established).
       // `reason` is a closed enum so failure paths cannot leak PII.
-      action: 'auth.sign-in.failed';
-      detail: { provider: string; reason: 'invalid_credentials' | 'rate_limited' | 'unverified' | 'other' };
+      action: "auth.sign-in.failed";
+      detail: {
+        provider: string;
+        reason: "invalid_credentials" | "rate_limited" | "unverified" | "other";
+      };
     })
   | (AuditEventCommon & {
       // Dashboard sign-out — emitted by better-auth's session.delete.after
       // database hook.
-      action: 'auth.sign-out';
+      action: "auth.sign-out";
       detail: Record<string, never>;
+    })
+  | (AuditEventCommon & {
+      action: "custom_fields.def.created";
+      // `baseModel` is a fixed enum and `pii` is a boolean — both safe to
+      // log. `name` and `description` are deliberately excluded: the slug
+      // is admin-authored metadata but the convention here is
+      // names-only-no-values for any caller-supplied string.
+      detail: { baseModel: "person" | "account" | "deal"; pii: boolean };
+    })
+  | (AuditEventCommon & {
+      action: "custom_fields.def.updated";
+      // Column NAMES only — `description` is free text and could carry
+      // operator-controlled context, `pii` is a bool flag, lifecycle
+      // transitions emit their own dedicated arms (added in PR-β).
+      detail: {
+        baseModel: "person" | "account" | "deal";
+        fieldsChanged: ("description" | "pii")[];
+      };
+    })
+  | (AuditEventCommon & {
+      action: "custom_fields.def.archived";
+      detail: { baseModel: "person" | "account" | "deal" };
     });
 
 export function emitAuditEvent(logger: Logger, event: AuditEvent): void {
-  logger.info('audit.event', event as unknown as Record<string, unknown>);
+  logger.info("audit.event", event as unknown as Record<string, unknown>);
 }

@@ -1,10 +1,10 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-import type { ServiceName } from '../types.js';
-import type { MigrationFile } from '@flowpunk/cf-admin';
-import { CliError } from '../util/errors.js';
+import { readFile, readdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import type { ServiceName } from "../types.js";
+import type { MigrationFile } from "@flowpunk/cf-admin";
+import { CliError } from "../util/errors.js";
 
 /**
  * Locate the bundled artifacts shipped inside the npm tarball.
@@ -33,16 +33,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // we still resolve via `../../dist/workers` from here.
 function bundleRoot(): string {
   // dist build (single bundled file): import.meta.url is dist/cli.js
-  if (HERE.endsWith('/dist') || HERE.endsWith('\\dist')) {
+  if (HERE.endsWith("/dist") || HERE.endsWith("\\dist")) {
     return HERE;
   }
   // dev (tsx run from src/flow): bundles live at <pkg>/dist
-  return join(HERE, '..', '..', 'dist');
+  return join(HERE, "..", "..", "dist");
 }
 
-export async function loadWorkerBundle(service: ServiceName): Promise<Uint8Array> {
+export async function loadWorkerBundle(
+  service: ServiceName,
+): Promise<Uint8Array> {
   const root = bundleRoot();
-  const path = join(root, 'workers', service, 'index.js');
+  const path = join(root, "workers", service, "index.js");
   try {
     const buf = await readFile(path);
     return new Uint8Array(buf);
@@ -55,24 +57,24 @@ export async function loadWorkerBundle(service: ServiceName): Promise<Uint8Array
 }
 
 export function hashBundle(bytes: Uint8Array): string {
-  return 'sha256:' + createHash('sha256').update(bytes).digest('hex');
+  return "sha256:" + createHash("sha256").update(bytes).digest("hex");
 }
 
 export async function loadMigrations(): Promise<MigrationFile[]> {
   const root = bundleRoot();
-  const dir = join(root, 'migrations');
+  const dir = join(root, "migrations");
   let files: string[];
   try {
-    files = (await readdir(dir)).filter((f) => f.endsWith('.sql')).sort();
+    files = (await readdir(dir)).filter((f) => f.endsWith(".sql")).sort();
   } catch (err) {
     throw new CliError(
-      'Migration files not found',
+      "Migration files not found",
       `Expected directory ${dir}. Did the prepublish step run? (${(err as Error).message})`,
     );
   }
   const out: MigrationFile[] = [];
   for (const name of files) {
-    const sql = await readFile(join(dir, name), 'utf8');
+    const sql = await readFile(join(dir, name), "utf8");
     out.push({ name, sql });
   }
   return out;

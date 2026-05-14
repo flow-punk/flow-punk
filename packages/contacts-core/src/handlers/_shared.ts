@@ -1,9 +1,9 @@
-import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
-import type { AuditEvent, Logger } from '@flowpunk/service-utils';
-import { AccountsRepoError, PersonsRepoError } from '@flowpunk-indie/db';
+import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import { createLogger, emitAuditEvent } from "@flowpunk/service-utils";
+import type { AuditEvent, Logger } from "@flowpunk/service-utils";
+import { AccountsRepoError, PersonsRepoError } from "@flowpunk-indie/db";
 
-import type { Actor, ContactsEnv } from '../types.js';
+import type { Actor, ContactsEnv } from "../types.js";
 
 export type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -14,7 +14,7 @@ export function getDb(env: ContactsEnv): Db {
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -42,14 +42,14 @@ export function badRequest(
   return errorResponse(400, code, message, details);
 }
 
-export function notFound(code = 'NOT_FOUND'): Response {
+export function notFound(code = "NOT_FOUND"): Response {
   return errorResponse(404, code);
 }
 
 export type ReadJsonResult<T> =
-  | { kind: 'none' }
-  | { kind: 'malformed' }
-  | { kind: 'parsed'; value: T };
+  | { kind: "none" }
+  | { kind: "malformed" }
+  | { kind: "parsed"; value: T };
 
 /**
  * Discriminated body read.
@@ -62,12 +62,12 @@ export type ReadJsonResult<T> =
 export async function tryReadJson<T>(
   request: Request,
 ): Promise<ReadJsonResult<T>> {
-  const contentType = request.headers.get('Content-Type') ?? '';
-  if (!contentType.includes('application/json')) return { kind: 'none' };
+  const contentType = request.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) return { kind: "none" };
   try {
-    return { kind: 'parsed', value: (await request.json()) as T };
+    return { kind: "parsed", value: (await request.json()) as T };
   } catch {
-    return { kind: 'malformed' };
+    return { kind: "malformed" };
   }
 }
 
@@ -78,17 +78,17 @@ export async function tryReadJson<T>(
  */
 export async function requireJsonBody<T>(
   request: Request,
-): Promise<{ kind: 'ok'; value: T } | { kind: 'err'; response: Response }> {
+): Promise<{ kind: "ok"; value: T } | { kind: "err"; response: Response }> {
   const result = await tryReadJson<T>(request);
-  if (result.kind === 'parsed') return { kind: 'ok', value: result.value };
+  if (result.kind === "parsed") return { kind: "ok", value: result.value };
   return {
-    kind: 'err',
-    response: badRequest('INVALID_BODY', 'request body must be JSON'),
+    kind: "err",
+    response: badRequest("INVALID_BODY", "request body must be JSON"),
   };
 }
 
 export function isString(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0;
+  return typeof value === "string" && value.length > 0;
 }
 
 /**
@@ -104,28 +104,28 @@ export function mapRepoError(err: unknown): Response {
   ) {
     throw err;
   }
-  const repoLabel = err instanceof AccountsRepoError ? 'accounts' : 'persons';
+  const repoLabel = err instanceof AccountsRepoError ? "accounts" : "persons";
   switch (err.code) {
-    case 'not_found':
-      return errorResponse(404, 'NOT_FOUND', err.message);
-    case 'invalid_input':
-      return errorResponse(400, 'INVALID_INPUT', err.message);
-    case 'wrong_state':
-      return errorResponse(409, 'WRONG_STATE', err.message);
-    case 'invariant_violation': {
-      const logger = createLogger({ service: 'contacts' });
+    case "not_found":
+      return errorResponse(404, "NOT_FOUND", err.message);
+    case "invalid_input":
+      return errorResponse(400, "INVALID_INPUT", err.message);
+    case "wrong_state":
+      return errorResponse(409, "WRONG_STATE", err.message);
+    case "invariant_violation": {
+      const logger = createLogger({ service: "contacts" });
       logger.error(`${repoLabel} repo invariant violation`, {
         error: err,
         repoCode: err.code,
       });
-      return errorResponse(500, 'INTERNAL_ERROR');
+      return errorResponse(500, "INTERNAL_ERROR");
     }
   }
 }
 
 export type ContactsAuditEventInput = Omit<
   AuditEvent,
-  'actorId' | 'actorTenantId' | 'actorCredentialType'
+  "actorId" | "actorTenantId" | "actorCredentialType"
 >;
 
 /**
@@ -138,7 +138,7 @@ export function emitContactsAudit(
   event: ContactsAuditEventInput,
   logger?: Logger,
 ): void {
-  const log = logger ?? createLogger({ service: 'contacts' });
+  const log = logger ?? createLogger({ service: "contacts" });
   emitAuditEvent(log, {
     ...event,
     actorId: actor.userId,

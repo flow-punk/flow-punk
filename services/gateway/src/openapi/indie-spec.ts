@@ -6,33 +6,35 @@
  * appending its own fragments, and calling assembleSpec directly.
  */
 
-import { authSpec } from '@flowpunk-indie/auth-spec';
-import { contactsSpec } from '@flowpunk-indie/contacts-spec';
-import { pipelineSpec } from '@flowpunk-indie/pipeline-spec';
-import { usersSpec } from '@flowpunk-indie/users-spec';
+import { authSpec } from "@flowpunk-indie/auth-spec";
+import { contactsSpec } from "@flowpunk-indie/contacts-spec";
+import { customFieldsSpec } from "@flowpunk-indie/custom-fields-spec";
+import { pipelineSpec } from "@flowpunk-indie/pipeline-spec";
+import { usersSpec } from "@flowpunk-indie/users-spec";
 
-import { assembleSpec } from './assemble.js';
-import { gatewaySpec } from './gateway-spec.js';
-import type { OpenAPIFragment, OpenAPIObject } from './types.js';
+import { assembleSpec } from "./assemble.js";
+import { gatewaySpec } from "./gateway-spec.js";
+import type { OpenAPIFragment, OpenAPIObject } from "./types.js";
 
 export const INDIE_INFO = {
-  title: 'flow-punk Indie API',
-  version: '0.1.0',
+  title: "flow-punk Indie API",
+  version: "0.1.0",
   description:
-    'Indie edition. REST + MCP surface served by the indie gateway. ' +
-    'For tenant management, OAuth, and other managed-only endpoints, see the managed edition.',
+    "Indie edition. REST + MCP surface served by the indie gateway. " +
+    "For tenant management, OAuth, and other managed-only endpoints, see the managed edition.",
 } as const;
 
 export const INDIE_FRAGMENTS: ReadonlyArray<OpenAPIFragment> = [
   gatewaySpec,
   authSpec,
   contactsSpec,
+  customFieldsSpec,
   pipelineSpec,
   usersSpec,
 ];
 
 export const INDIE_SERVERS = [
-  { url: 'http://localhost:8787', description: 'Local dev (wrangler dev)' },
+  { url: "http://localhost:8787", description: "Local dev (wrangler dev)" },
 ] as const;
 
 export function buildIndieSpec(): OpenAPIObject {

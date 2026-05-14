@@ -12,14 +12,14 @@
  *   `sameSite: 'Strict'` explicitly)
  */
 export function parseCookies(request: Request): Map<string, string> {
-  const header = request.headers.get('Cookie');
+  const header = request.headers.get("Cookie");
   const cookies = new Map<string, string>();
   if (!header) return cookies;
 
-  for (const part of header.split(';')) {
-    const [rawName, ...rest] = part.trim().split('=');
+  for (const part of header.split(";")) {
+    const [rawName, ...rest] = part.trim().split("=");
     if (!rawName || rest.length === 0) continue;
-    cookies.set(rawName, decodeURIComponent(rest.join('=')));
+    cookies.set(rawName, decodeURIComponent(rest.join("=")));
   }
 
   return cookies;
@@ -28,7 +28,7 @@ export function parseCookies(request: Request): Map<string, string> {
 export interface BuildCookieOptions {
   maxAge?: number;
   httpOnly?: boolean;
-  sameSite?: 'Lax' | 'Strict' | 'None';
+  sameSite?: "Lax" | "Strict" | "None";
   path?: string;
   secure?: boolean;
 }
@@ -39,12 +39,13 @@ export function buildCookie(
   options: BuildCookieOptions = {},
 ): string {
   const segments = [`${name}=${encodeURIComponent(value)}`];
-  segments.push(`Path=${options.path ?? '/'}`);
-  if (typeof options.maxAge === 'number') segments.push(`Max-Age=${options.maxAge}`);
-  if (options.httpOnly ?? true) segments.push('HttpOnly');
-  if (options.secure ?? true) segments.push('Secure');
-  segments.push(`SameSite=${options.sameSite ?? 'Lax'}`);
-  return segments.join('; ');
+  segments.push(`Path=${options.path ?? "/"}`);
+  if (typeof options.maxAge === "number")
+    segments.push(`Max-Age=${options.maxAge}`);
+  if (options.httpOnly ?? true) segments.push("HttpOnly");
+  if (options.secure ?? true) segments.push("Secure");
+  segments.push(`SameSite=${options.sameSite ?? "Lax"}`);
+  return segments.join("; ");
 }
 
 export function clearCookie(name: string): string {

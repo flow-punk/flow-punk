@@ -21,6 +21,6 @@ export interface Actor {
   userId: string;
   tenantId: string;
   scope: string;
-  credentialType: 'apikey' | 'oauth' | 'session';
+  credentialType: "apikey" | "oauth" | "session";
   credentialId?: string;
 }

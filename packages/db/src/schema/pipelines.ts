@@ -1,11 +1,18 @@
-import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from "drizzle-orm";
+import {
+  check,
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
-const PIPELINE_STATUSES = ['active', 'deleted'] as const;
+const PIPELINE_STATUSES = ["active", "deleted"] as const;
 export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Pipelines (sales process containers; hold ordered stages).
@@ -27,32 +34,32 @@ const inList = (values: readonly string[]): string =>
  * the schema does not assume it.
  */
 export const pipelines = sqliteTable(
-  'pipelines',
+  "pipelines",
   {
-    id: text('id').primaryKey(),
-    name: text('name').notNull(),
-    description: text('description'),
-    isDefault: integer('is_default').notNull().default(0),
-    status: text('status').notNull().$type<PipelineStatus>(),
-    deletedAt: text('deleted_at'),
-    deletedBy: text('deleted_by'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    updatedBy: text('updated_by').notNull(),
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    isDefault: integer("is_default").notNull().default(0),
+    status: text("status").notNull().$type<PipelineStatus>(),
+    deletedAt: text("deleted_at"),
+    deletedBy: text("deleted_by"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    updatedBy: text("updated_by").notNull(),
   },
   (t) => ({
-    statusIdx: index('idx_pipelines_status').on(t.status),
-    createdAtIdx: index('idx_pipelines_created_at').on(t.createdAt, t.id),
-    defaultUnique: uniqueIndex('idx_pipelines_default_unique')
+    statusIdx: index("idx_pipelines_status").on(t.status),
+    createdAtIdx: index("idx_pipelines_created_at").on(t.createdAt, t.id),
+    defaultUnique: uniqueIndex("idx_pipelines_default_unique")
       .on(t.isDefault)
       .where(sql`is_default = 1 AND status = 'active'`),
     statusCheck: check(
-      'pipelines_status_check',
+      "pipelines_status_check",
       sql.raw(`status IN (${inList(PIPELINE_STATUSES)})`),
     ),
     isDefaultCheck: check(
-      'pipelines_is_default_check',
+      "pipelines_is_default_check",
       sql`is_default IN (0, 1)`,
     ),
   }),
@@ -62,24 +69,26 @@ export type Pipeline = typeof pipelines.$inferSelect;
 export type NewPipeline = typeof pipelines.$inferInsert;
 
 export const ALLOWED_PATCH_FIELDS = [
-  'name',
-  'description',
-  'isDefault',
+  "name",
+  "description",
+  "isDefault",
 ] as const;
 export type PipelinePatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
 const ALLOWED_PATCH_FIELD_SET = new Set<string>(ALLOWED_PATCH_FIELDS);
-export function isAllowedPatchField(name: string): name is PipelinePatchableField {
+export function isAllowedPatchField(
+  name: string,
+): name is PipelinePatchableField {
   return ALLOWED_PATCH_FIELD_SET.has(name);
 }
 
 export const IMMUTABLE_PATCH_FIELDS = [
-  'id',
-  'createdAt',
-  'createdBy',
-  'status',
-  'deletedAt',
-  'deletedBy',
+  "id",
+  "createdAt",
+  "createdBy",
+  "status",
+  "deletedAt",
+  "deletedBy",
 ] as const;
 
 const IMMUTABLE_PATCH_FIELD_SET = new Set<string>(IMMUTABLE_PATCH_FIELDS);
@@ -93,5 +102,5 @@ export function isImmutablePatchField(name: string): boolean {
  * not `null`.
  */
 export const NULLABLE_PATCH_FIELDS = new Set<PipelinePatchableField>([
-  'description',
+  "description",
 ]);

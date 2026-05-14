@@ -1,4 +1,4 @@
-import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 /**
  * Short-lived, one-shot login tokens minted by `flowpunk connect` and
@@ -18,18 +18,18 @@ import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
  *   rejects on the non-null marker.
  */
 export const authLoginTokens = sqliteTable(
-  'auth_login_tokens',
+  "auth_login_tokens",
   {
-    id: text('id').primaryKey(),
-    tokenHash: text('token_hash').notNull().unique(),
-    userId: text('user_id').notNull(),
-    expiresAt: text('expires_at').notNull(),
-    consumedAt: text('consumed_at'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
+    id: text("id").primaryKey(),
+    tokenHash: text("token_hash").notNull().unique(),
+    userId: text("user_id").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    consumedAt: text("consumed_at"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
   },
   (t) => ({
-    userIdx: index('idx_auth_login_tokens_user_id').on(t.userId),
+    userIdx: index("idx_auth_login_tokens_user_id").on(t.userId),
   }),
 );
 

@@ -1,9 +1,10 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const CACHE_DIR = process.env.FLOWPUNK_CONFIG_DIR ?? join(homedir(), '.flowpunk');
-const CACHE_FILE = join(CACHE_DIR, 'cache.json');
+const CACHE_DIR =
+  process.env.FLOWPUNK_CONFIG_DIR ?? join(homedir(), ".flowpunk");
+const CACHE_FILE = join(CACHE_DIR, "cache.json");
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 2000;
 
@@ -21,8 +22,10 @@ export interface UpgradeHint {
  * silent on failure. Respects DO_NOT_TRACK and CI to skip the network call
  * entirely. Never throws — returns `{ hint: null }` on any error.
  */
-export async function checkForUpgrade(currentVersion: string): Promise<UpgradeHint> {
-  if (process.env.DO_NOT_TRACK === '1' || process.env.CI === 'true') {
+export async function checkForUpgrade(
+  currentVersion: string,
+): Promise<UpgradeHint> {
+  if (process.env.DO_NOT_TRACK === "1" || process.env.CI === "true") {
     return { hint: null };
   }
   try {
@@ -50,12 +53,12 @@ async function fetchLatest(): Promise<string | null> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch('https://registry.npmjs.org/flowpunk/latest', {
+    const res = await fetch("https://registry.npmjs.org/flowpunk/latest", {
       signal: ac.signal,
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { version?: unknown };
-    return typeof json.version === 'string' ? json.version : null;
+    return typeof json.version === "string" ? json.version : null;
   } catch {
     return null;
   } finally {
@@ -65,13 +68,13 @@ async function fetchLatest(): Promise<string | null> {
 
 async function readCache(): Promise<Cache | null> {
   try {
-    const text = await readFile(CACHE_FILE, 'utf8');
+    const text = await readFile(CACHE_FILE, "utf8");
     const parsed = JSON.parse(text) as unknown;
     if (
       parsed &&
-      typeof parsed === 'object' &&
-      typeof (parsed as Cache).checkedAt === 'string' &&
-      typeof (parsed as Cache).latest === 'string'
+      typeof parsed === "object" &&
+      typeof (parsed as Cache).checkedAt === "string" &&
+      typeof (parsed as Cache).latest === "string"
     ) {
       return parsed as Cache;
     }
@@ -92,10 +95,10 @@ async function writeCache(cache: Cache): Promise<void> {
  * is enough for "alpha.1 < alpha.2 < beta.1" sorting).
  */
 export function semverGreater(a: string, b: string): boolean {
-  const [aMain, aPre = ''] = a.split('-', 2);
-  const [bMain, bPre = ''] = b.split('-', 2);
-  const ap = (aMain ?? '').split('.').map(Number);
-  const bp = (bMain ?? '').split('.').map(Number);
+  const [aMain, aPre = ""] = a.split("-", 2);
+  const [bMain, bPre = ""] = b.split("-", 2);
+  const ap = (aMain ?? "").split(".").map(Number);
+  const bp = (bMain ?? "").split(".").map(Number);
   for (let i = 0; i < 3; i++) {
     const ai = ap[i] ?? 0;
     const bi = bp[i] ?? 0;

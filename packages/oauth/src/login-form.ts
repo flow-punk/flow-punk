@@ -1,8 +1,8 @@
-import { htmlEscape } from './_lib/html.js';
+import { htmlEscape } from "./_lib/html.js";
 
 const ERROR_BANNER =
-  'Login token invalid or expired. Run <code>flowpunk connect</code> again ' +
-  'in your terminal to mint a fresh one.';
+  "Login token invalid or expired. Run <code>flowpunk connect</code> again " +
+  "in your terminal to mint a fresh one.";
 
 export interface LoginFormOptions {
   /** Carried through the form so a successful POST redirects back. */
@@ -31,12 +31,10 @@ export interface LoginFormOptions {
  * value reflected, with full HTML escaping.
  */
 export function loginPage(options: LoginFormOptions): Response {
-  const escapedReturnTo = options.returnTo
-    ? htmlEscape(options.returnTo)
-    : '';
+  const escapedReturnTo = options.returnTo ? htmlEscape(options.returnTo) : "";
   const errorBlock = options.showError
     ? `<p class="error" role="alert">${ERROR_BANNER}</p>`
-    : '';
+    : "";
 
   const body = `<!doctype html>
 <html lang="en">
@@ -72,12 +70,12 @@ export function loginPage(options: LoginFormOptions): Response {
   return new Response(body, {
     status: 200,
     headers: {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Referrer-Policy': 'same-origin',
-      'X-Frame-Options': 'DENY',
-      'Content-Security-Policy': "frame-ancestors 'none'",
-      'Cache-Control': 'no-store',
-      'X-Request-ID': options.responseRequestId,
+      "Content-Type": "text/html; charset=utf-8",
+      "Referrer-Policy": "same-origin",
+      "X-Frame-Options": "DENY",
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "Cache-Control": "no-store",
+      "X-Request-ID": options.responseRequestId,
     },
   });
 }

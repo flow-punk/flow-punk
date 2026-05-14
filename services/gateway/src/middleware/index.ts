@@ -1,10 +1,10 @@
-import { composeMiddleware } from './compose.js';
-import { corsMiddleware } from './cors.js';
-import { requestIdMiddleware } from './request-id.js';
-import { loggingMiddleware } from './logging.js';
-import { authMiddleware } from './auth.js';
-import { indieAuthBootstrapMiddleware } from './auth-bootstrap.js';
-import { dispatchIndieRoute, routerMiddleware } from './router.js';
+import { composeMiddleware } from "./compose.js";
+import { corsMiddleware } from "./cors.js";
+import { requestIdMiddleware } from "./request-id.js";
+import { loggingMiddleware } from "./logging.js";
+import { authMiddleware } from "./auth.js";
+import { indieAuthBootstrapMiddleware } from "./auth-bootstrap.js";
+import { dispatchIndieRoute, routerMiddleware } from "./router.js";
 
 export {
   composeMiddleware,
@@ -23,7 +23,7 @@ import {
   OPENAPI_LOCAL_PATHS,
   getPublicPaths,
   isPublicPath,
-} from './public-paths.js';
+} from "./public-paths.js";
 
 export {
   INDIE_PUBLIC_PATHS,

@@ -1,10 +1,10 @@
-import type { AppContext, Middleware } from '../types.js';
-import { handleMcp } from '../mcp/index.js';
-import { handleDocs, handleOpenApi } from '../openapi/handler.js';
-import { handleRest } from '../rest/handler.js';
-import { handleBetterAuth } from '../auth-forward.js';
-import { route as oauthRoute } from '@flowpunk-indie/oauth';
-import { validateSession } from '../auth/validate-session.js';
+import type { AppContext, Middleware } from "../types.js";
+import { handleMcp } from "../mcp/index.js";
+import { handleDocs, handleOpenApi } from "../openapi/handler.js";
+import { handleRest } from "../rest/handler.js";
+import { handleBetterAuth } from "../auth-forward.js";
+import { route as oauthRoute } from "@flowpunk-indie/oauth";
+import { validateSession } from "../auth/validate-session.js";
 
 /**
  * Pure indie route dispatcher shared by indie's own router middleware and
@@ -21,15 +21,13 @@ import { validateSession } from '../auth/validate-session.js';
  *
  * Routing only dispatches; it does not own request-body enforcement.
  */
-export async function dispatchIndieRoute(
-  ctx: AppContext,
-): Promise<Response> {
+export async function dispatchIndieRoute(ctx: AppContext): Promise<Response> {
   const { pathname } = new URL(ctx.request.url);
 
-  if (pathname === '/health') {
-    return new Response(JSON.stringify({ status: 'ok' }), {
+  if (pathname === "/health") {
+    return new Response(JSON.stringify({ status: "ok" }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
 
@@ -48,13 +46,13 @@ export async function dispatchIndieRoute(
   // Match anything under `/.well-known/oauth-protected-resource` so both
   // shapes resolve to the same handler.
   if (
-    pathname.startsWith('/oauth/') ||
-    pathname === '/.well-known/oauth-protected-resource' ||
-    pathname.startsWith('/.well-known/oauth-protected-resource/') ||
-    pathname === '/.well-known/oauth-authorization-server'
+    pathname.startsWith("/oauth/") ||
+    pathname === "/.well-known/oauth-protected-resource" ||
+    pathname.startsWith("/.well-known/oauth-protected-resource/") ||
+    pathname === "/.well-known/oauth-authorization-server"
   ) {
     let session: { userId: string } | null = null;
-    if (pathname === '/oauth/authorize' || pathname === '/oauth/approve') {
+    if (pathname === "/oauth/authorize" || pathname === "/oauth/approve") {
       const validated = await validateSession(ctx.env, ctx.request);
       if (validated) session = { userId: validated.userId };
     }
@@ -64,22 +62,22 @@ export async function dispatchIndieRoute(
     });
   }
 
-  if (ctx.env.OPENAPI_ENABLED === '1') {
-    if (pathname === '/api/openapi.json') return handleOpenApi();
-    if (pathname === '/api/docs') return handleDocs();
+  if (ctx.env.OPENAPI_ENABLED === "1") {
+    if (pathname === "/api/openapi.json") return handleOpenApi();
+    if (pathname === "/api/docs") return handleDocs();
   }
 
-  if (pathname === '/mcp') return handleMcp(ctx);
-  if (pathname.startsWith('/api/v1/')) return handleRest(ctx);
+  if (pathname === "/mcp") return handleMcp(ctx);
+  if (pathname.startsWith("/api/v1/")) return handleRest(ctx);
   // Better-auth dashboard surface — forwarded to AUTH_SERVICE with the
   // Cookie header preserved (REST forwarder strips Cookie). Indie always
   // operates on `_system`; managed intercepts before this dispatcher
   // and stamps a host-resolved tenant id (or `X-Console-Auth: 1`).
-  if (pathname.startsWith('/api/auth/')) {
-    return handleBetterAuth(ctx, { tenantIdStamp: '_system' });
+  if (pathname.startsWith("/api/auth/")) {
+    return handleBetterAuth(ctx, { tenantIdStamp: "_system" });
   }
 
-  return new Response('Not Found', { status: 404 });
+  return new Response("Not Found", { status: 404 });
 }
 
 /**

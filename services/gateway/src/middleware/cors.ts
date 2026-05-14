@@ -1,16 +1,16 @@
-import type { Env, Middleware } from '../types.js';
+import type { Env, Middleware } from "../types.js";
 
-const ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
-const ALLOWED_HEADERS = 'Authorization, Content-Type, X-Request-ID';
-const EXPOSED_HEADERS = 'X-Request-ID';
-const MAX_AGE = '600';
+const ALLOWED_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
+const ALLOWED_HEADERS = "Authorization, Content-Type, X-Request-ID";
+const EXPOSED_HEADERS = "X-Request-ID";
+const MAX_AGE = "600";
 
 const allowlistCache = new WeakMap<Env, Set<string>>();
 
 function getAllowlist(env: Env): Set<string> {
   let set = allowlistCache.get(env);
   if (!set) {
-    set = parseAllowedOrigins(env.ALLOWED_ORIGINS ?? '');
+    set = parseAllowedOrigins(env.ALLOWED_ORIGINS ?? "");
     allowlistCache.set(env, set);
   }
   return set;
@@ -19,7 +19,7 @@ function getAllowlist(env: Env): Set<string> {
 function parseAllowedOrigins(raw: string): Set<string> {
   return new Set(
     raw
-      .split(',')
+      .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
   );
@@ -27,20 +27,20 @@ function parseAllowedOrigins(raw: string): Set<string> {
 
 function isPreflight(req: Request): boolean {
   return (
-    req.method === 'OPTIONS' &&
-    req.headers.get('Access-Control-Request-Method') !== null
+    req.method === "OPTIONS" &&
+    req.headers.get("Access-Control-Request-Method") !== null
   );
 }
 
 function appendVary(headers: Headers, value: string): void {
-  const existing = headers.get('Vary');
+  const existing = headers.get("Vary");
   if (!existing) {
-    headers.set('Vary', value);
+    headers.set("Vary", value);
     return;
   }
-  const tokens = existing.split(',').map((s) => s.trim());
+  const tokens = existing.split(",").map((s) => s.trim());
   if (!tokens.some((t) => t.toLowerCase() === value.toLowerCase())) {
-    headers.set('Vary', `${existing}, ${value}`);
+    headers.set("Vary", `${existing}, ${value}`);
   }
 }
 
@@ -57,7 +57,7 @@ function appendVary(headers: Headers, value: string): void {
  * tools that happen to send Origin.
  */
 export const corsMiddleware: Middleware = async (ctx, next) => {
-  const origin = ctx.request.headers.get('Origin');
+  const origin = ctx.request.headers.get("Origin");
   if (!origin) return next();
 
   const allowlist = getAllowlist(ctx.env);
@@ -65,24 +65,24 @@ export const corsMiddleware: Middleware = async (ctx, next) => {
 
   if (isPreflight(ctx.request)) {
     const headers = new Headers();
-    appendVary(headers, 'Origin');
+    appendVary(headers, "Origin");
     if (allowed) {
-      headers.set('Access-Control-Allow-Origin', origin);
-      headers.set('Access-Control-Allow-Credentials', 'true');
-      headers.set('Access-Control-Allow-Methods', ALLOWED_METHODS);
-      headers.set('Access-Control-Allow-Headers', ALLOWED_HEADERS);
-      headers.set('Access-Control-Max-Age', MAX_AGE);
+      headers.set("Access-Control-Allow-Origin", origin);
+      headers.set("Access-Control-Allow-Credentials", "true");
+      headers.set("Access-Control-Allow-Methods", ALLOWED_METHODS);
+      headers.set("Access-Control-Allow-Headers", ALLOWED_HEADERS);
+      headers.set("Access-Control-Max-Age", MAX_AGE);
     }
     return new Response(null, { status: 204, headers });
   }
 
   const res = await next();
   const headers = new Headers(res.headers);
-  appendVary(headers, 'Origin');
+  appendVary(headers, "Origin");
   if (allowed) {
-    headers.set('Access-Control-Allow-Origin', origin);
-    headers.set('Access-Control-Allow-Credentials', 'true');
-    headers.set('Access-Control-Expose-Headers', EXPOSED_HEADERS);
+    headers.set("Access-Control-Allow-Origin", origin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set("Access-Control-Expose-Headers", EXPOSED_HEADERS);
   }
   return new Response(res.body, {
     status: res.status,

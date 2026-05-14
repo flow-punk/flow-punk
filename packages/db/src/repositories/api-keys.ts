@@ -1,6 +1,6 @@
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { generateId } from '@flowpunk/service-utils';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { generateId } from "@flowpunk/service-utils";
 
 import {
   API_KEY_SCOPE_VALUES,
@@ -8,22 +8,22 @@ import {
   type ApiKey,
   type ApiKeyScope,
   type NewApiKey,
-} from '../schema/api-keys.js';
+} from "../schema/api-keys.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
 export class ApiKeysRepoError extends Error {
   constructor(
     public readonly code:
-      | 'not_found'
-      | 'invalid_input'
-      | 'wrong_state'
-      | 'invariant_violation',
+      | "not_found"
+      | "invalid_input"
+      | "wrong_state"
+      | "invariant_violation",
     message: string,
     public readonly detailCode?: string,
   ) {
     super(message);
-    this.name = 'ApiKeysRepoError';
+    this.name = "ApiKeysRepoError";
   }
 }
 
@@ -75,13 +75,13 @@ export async function create(
   const activeCount = await countActiveForUser(db, normalized.userId);
   if (activeCount >= options.maxActiveKeys) {
     throw new ApiKeysRepoError(
-      'wrong_state',
-      'active API key limit reached',
-      'API_KEY_LIMIT_REACHED',
+      "wrong_state",
+      "active API key limit reached",
+      "API_KEY_LIMIT_REACHED",
     );
   }
 
-  const id = generateId('akey');
+  const id = generateId("akey");
   const row: NewApiKey = {
     id,
     userId: normalized.userId,
@@ -103,17 +103,17 @@ export async function create(
     const key = inserted[0];
     if (!key) {
       throw new ApiKeysRepoError(
-        'invariant_violation',
-        'insert returned no row',
+        "invariant_violation",
+        "insert returned no row",
       );
     }
     return key;
   } catch (err) {
     if (isUniqueViolation(err)) {
       throw new ApiKeysRepoError(
-        'wrong_state',
-        'active API key label or token hash already exists',
-        'API_KEY_CONFLICT',
+        "wrong_state",
+        "active API key label or token hash already exists",
+        "API_KEY_CONFLICT",
       );
     }
     throw err;
@@ -158,11 +158,15 @@ export async function revoke(
     .update(apiKeys)
     .set({ revokedAt: now, updatedAt: now, updatedBy: actorId })
     .where(
-      and(eq(apiKeys.userId, userId), eq(apiKeys.id, id), isNull(apiKeys.revokedAt)),
+      and(
+        eq(apiKeys.userId, userId),
+        eq(apiKeys.id, id),
+        isNull(apiKeys.revokedAt),
+      ),
     );
   const key = await findForUser(db, userId, id);
   if (!key) {
-    throw new ApiKeysRepoError('not_found', 'API key not found');
+    throw new ApiKeysRepoError("not_found", "API key not found");
   }
   return key;
 }
@@ -188,7 +192,7 @@ export async function validateByHash(
     id: row.id,
     userId: row.userId,
     label: row.label,
-    scope: scopes.join(' '),
+    scope: scopes.join(" "),
     expiresAt: row.expiresAt,
   };
 }
@@ -200,7 +204,7 @@ export async function touchLastUsed(
 ): Promise<void> {
   await db
     .update(apiKeys)
-    .set({ lastUsedAt: now, updatedAt: now, updatedBy: 'auth-service' })
+    .set({ lastUsedAt: now, updatedAt: now, updatedBy: "auth-service" })
     .where(eq(apiKeys.id, id));
 }
 
@@ -214,7 +218,7 @@ export function parseStoredScopes(raw: string): ApiKeyScope[] | null {
   if (!Array.isArray(parsed) || parsed.length === 0) return null;
   const scopes: ApiKeyScope[] = [];
   for (const value of parsed) {
-    if (typeof value !== 'string' || !API_KEY_SCOPE_SET.has(value)) {
+    if (typeof value !== "string" || !API_KEY_SCOPE_SET.has(value)) {
       return null;
     }
     scopes.push(value as ApiKeyScope);
@@ -222,18 +226,21 @@ export function parseStoredScopes(raw: string): ApiKeyScope[] | null {
   return [...new Set(scopes)];
 }
 
-function validateCreate(input: CreateApiKeyInput, now: string): Required<CreateApiKeyInput> {
+function validateCreate(
+  input: CreateApiKeyInput,
+  now: string,
+): Required<CreateApiKeyInput> {
   const userId = input.userId.trim();
   const label = input.label.trim();
   const hash = input.hash.trim();
   const prefix = input.prefix.trim();
 
-  if (!userId) throw invalid('userId is required', 'INVALID_USER_ID');
+  if (!userId) throw invalid("userId is required", "INVALID_USER_ID");
   if (label.length < API_KEY_LABEL_MIN || label.length > API_KEY_LABEL_MAX) {
-    throw invalid('label must be 1-64 characters', 'INVALID_LABEL');
+    throw invalid("label must be 1-64 characters", "INVALID_LABEL");
   }
-  if (!hash) throw invalid('hash is required', 'INVALID_HASH');
-  if (!prefix) throw invalid('prefix is required', 'INVALID_PREFIX');
+  if (!hash) throw invalid("hash is required", "INVALID_HASH");
+  if (!prefix) throw invalid("prefix is required", "INVALID_PREFIX");
 
   const scopes = normalizeScopes(input.scopes);
   const expiresAt = input.expiresAt ?? null;
@@ -244,12 +251,12 @@ function validateCreate(input: CreateApiKeyInput, now: string): Required<CreateA
 
 function normalizeScopes(scopes: readonly string[]): ApiKeyScope[] {
   if (!Array.isArray(scopes) || scopes.length === 0) {
-    throw invalid('scopes must be a non-empty array', 'INVALID_SCOPES');
+    throw invalid("scopes must be a non-empty array", "INVALID_SCOPES");
   }
   const out: ApiKeyScope[] = [];
   for (const scope of scopes) {
-    if (typeof scope !== 'string' || !API_KEY_SCOPE_SET.has(scope)) {
-      throw invalid('scopes may only include read and write', 'INVALID_SCOPES');
+    if (typeof scope !== "string" || !API_KEY_SCOPE_SET.has(scope)) {
+      throw invalid("scopes may only include read and write", "INVALID_SCOPES");
     }
     out.push(scope as ApiKeyScope);
   }
@@ -259,18 +266,27 @@ function normalizeScopes(scopes: readonly string[]): ApiKeyScope[] {
 function validateExpiresAt(expiresAt: string, now: string): void {
   const expiresMs = Date.parse(expiresAt);
   const nowMs = Date.parse(now);
-  if (!Number.isFinite(expiresMs) || !Number.isFinite(nowMs) || expiresMs <= nowMs) {
-    throw invalid('expiresAt must be a future ISO 8601 timestamp', 'INVALID_EXPIRES_AT');
+  if (
+    !Number.isFinite(expiresMs) ||
+    !Number.isFinite(nowMs) ||
+    expiresMs <= nowMs
+  ) {
+    throw invalid(
+      "expiresAt must be a future ISO 8601 timestamp",
+      "INVALID_EXPIRES_AT",
+    );
   }
   if (expiresMs - nowMs > API_KEY_MAX_EXPIRES_MS) {
-    throw invalid('expiresAt must be within 1 year', 'INVALID_EXPIRES_AT');
+    throw invalid("expiresAt must be within 1 year", "INVALID_EXPIRES_AT");
   }
 }
 
 function isFuture(expiresAt: string, now: string): boolean {
   const expiresMs = Date.parse(expiresAt);
   const nowMs = Date.parse(now);
-  return Number.isFinite(expiresMs) && Number.isFinite(nowMs) && expiresMs > nowMs;
+  return (
+    Number.isFinite(expiresMs) && Number.isFinite(nowMs) && expiresMs > nowMs
+  );
 }
 
 async function countActiveForUser(db: Db, userId: string): Promise<number> {
@@ -282,7 +298,7 @@ async function countActiveForUser(db: Db, userId: string): Promise<number> {
 }
 
 function invalid(message: string, detailCode: string): ApiKeysRepoError {
-  return new ApiKeysRepoError('invalid_input', message, detailCode);
+  return new ApiKeysRepoError("invalid_input", message, detailCode);
 }
 
 function isUniqueViolation(err: unknown): boolean {

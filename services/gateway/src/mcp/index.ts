@@ -1,4 +1,4 @@
-export { handleMcp } from './handler.js';
+export { handleMcp } from "./handler.js";
 export {
   configureGatewayToolRegistry,
   INVALIDATE_TOOLS_HEADER,
@@ -6,5 +6,5 @@ export {
   SESSION_MODE_HEADER,
   invalidateToolsCacheIfRequired,
   isValidSessionId,
-} from './handler.js';
-export { McpSessionDurableObject } from './session-do.js';
+} from "./handler.js";
+export { McpSessionDurableObject } from "./session-do.js";

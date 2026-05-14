@@ -1,7 +1,7 @@
-import { Buffer } from 'node:buffer';
-import { createHash, randomBytes } from 'node:crypto';
-import { queryD1, type CfClient } from '@flowpunk/cf-admin';
-import { generateId } from '@flowpunk/service-utils';
+import { Buffer } from "node:buffer";
+import { createHash, randomBytes } from "node:crypto";
+import { queryD1, type CfClient } from "@flowpunk/cf-admin";
+import { generateId } from "@flowpunk/service-utils";
 
 /**
  * Seed the first owner user + a transient session in the indie D1.
@@ -24,7 +24,7 @@ import { generateId } from '@flowpunk/service-utils';
  * cookie value isn't recoverable from the hash, so we can't reuse it).
  */
 
-const TENANT_SENTINEL = '_system';
+const TENANT_SENTINEL = "_system";
 const SESSION_LIFETIME_DAYS = 30;
 
 export interface SeedAdminInput {
@@ -44,19 +44,19 @@ export interface SeedAdminOutput {
 
 export function generateCookiePayload(): string {
   const bytes = randomBytes(32);
-  const b64 = Buffer.from(bytes).toString('base64');
-  return b64.replace(/[=+/]/g, '').slice(0, 32);
+  const b64 = Buffer.from(bytes).toString("base64");
+  return b64.replace(/[=+/]/g, "").slice(0, 32);
 }
 
 export function sha256Hex(input: string): string {
-  return createHash('sha256').update(input, 'utf8').digest('hex');
+  return createHash("sha256").update(input, "utf8").digest("hex");
 }
 
 export async function seedAdmin(
   client: CfClient,
   input: SeedAdminInput,
 ): Promise<SeedAdminOutput> {
-  const sessionId = generateId('sess');
+  const sessionId = generateId("sess");
   const sessionPayload = generateCookiePayload();
   const cookieValue = `${TENANT_SENTINEL}.${sessionPayload}`;
   const cookieHash = sha256Hex(cookieValue);
@@ -75,7 +75,7 @@ export async function seedAdmin(
   if (existing) {
     userId = existing;
   } else {
-    userId = generateId('usr');
+    userId = generateId("usr");
     await queryD1(client, {
       databaseId: input.databaseId,
       sql: `INSERT INTO users (id, email, display_name, role, status, created_at, updated_at)
@@ -107,9 +107,9 @@ async function findActiveOwnerByEmail(
   for (const r of rows) {
     if (Array.isArray(r.results)) {
       for (const row of r.results) {
-        if (row && typeof row === 'object' && 'id' in row) {
+        if (row && typeof row === "object" && "id" in row) {
           const id = (row as { id: unknown }).id;
-          if (typeof id === 'string') return id;
+          if (typeof id === "string") return id;
         }
       }
     }

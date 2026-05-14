@@ -3,12 +3,32 @@
   "registrable": [
     { "uri": "https://example.com/cb", "valid": true, "reason": "https" },
     { "uri": "http://127.0.0.1/cb", "valid": true, "reason": "loopback ipv4" },
-    { "uri": "http://127.0.0.1:54321/cb", "valid": true, "reason": "loopback ipv4 with port" },
+    {
+      "uri": "http://127.0.0.1:54321/cb",
+      "valid": true,
+      "reason": "loopback ipv4 with port"
+    },
     { "uri": "http://[::1]/cb", "valid": true, "reason": "loopback ipv6" },
-    { "uri": "http://localhost/cb", "valid": false, "reason": "localhost not permitted; use 127.0.0.1" },
-    { "uri": "http://example.com/cb", "valid": false, "reason": "non-loopback http" },
-    { "uri": "https://example.com/cb#x", "valid": false, "reason": "fragment forbidden" },
-    { "uri": "javascript:alert(1)", "valid": false, "reason": "non-http(s) scheme" },
+    {
+      "uri": "http://localhost/cb",
+      "valid": false,
+      "reason": "localhost not permitted; use 127.0.0.1"
+    },
+    {
+      "uri": "http://example.com/cb",
+      "valid": false,
+      "reason": "non-loopback http"
+    },
+    {
+      "uri": "https://example.com/cb#x",
+      "valid": false,
+      "reason": "fragment forbidden"
+    },
+    {
+      "uri": "javascript:alert(1)",
+      "valid": false,
+      "reason": "non-http(s) scheme"
+    },
     { "uri": "not-a-url", "valid": false, "reason": "not a URL" }
   ],
   "matching": [

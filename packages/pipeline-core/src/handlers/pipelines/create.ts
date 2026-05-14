@@ -1,7 +1,12 @@
-import { pipelinesRepo, type CreatePipelineInput } from '@flowpunk-indie/db';
+import { pipelinesRepo, type CreatePipelineInput } from "@flowpunk-indie/db";
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, requireJsonBody } from '../_shared.js';
+import type { Actor, PipelineEnv } from "../../types.js";
+import {
+  getDb,
+  jsonResponse,
+  mapRepoError,
+  requireJsonBody,
+} from "../_shared.js";
 
 export async function handleCreatePipeline(
   request: Request,
@@ -9,7 +14,7 @@ export async function handleCreatePipeline(
   _actor: Actor,
 ): Promise<Response> {
   const body = await requireJsonBody<CreatePipelineInput>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);

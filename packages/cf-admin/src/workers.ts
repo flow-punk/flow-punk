@@ -1,12 +1,12 @@
-import { CfAdminError, classifyHttpStatus } from './errors.js';
-import { parseEnvelope, type CfClient } from './client.js';
+import { CfAdminError, classifyHttpStatus } from "./errors.js";
+import { parseEnvelope, type CfClient } from "./client.js";
 import {
   buildScriptPutFormData,
   normalizeBinding,
   type BindingMetadata,
   type ScriptDeployment,
   type ScriptMetadata,
-} from './multipart.js';
+} from "./multipart.js";
 
 export interface GetWorkerScriptInput {
   scriptName: string;
@@ -51,30 +51,30 @@ export async function getWorkerScript(
   //   - Cloudflare Workers: binary parts come back as Blob even for JSON.
   //   - Node 18+ undici: JSON parts come back as string; binary as Blob.
   // We accept both shapes for both parts.
-  const metadataEntry = fd.get('metadata') as unknown as Blob | string | null;
+  const metadataEntry = fd.get("metadata") as unknown as Blob | string | null;
   if (metadataEntry === null || metadataEntry === undefined) {
     throw new CfAdminError(
-      'invalid_response',
-      'Script GET returned no `metadata` part',
+      "invalid_response",
+      "Script GET returned no `metadata` part",
     );
   }
   let metadata: ScriptMetadata;
   try {
     const metadataText =
-      typeof metadataEntry === 'string'
+      typeof metadataEntry === "string"
         ? metadataEntry
         : await metadataEntry.text();
     metadata = JSON.parse(metadataText) as ScriptMetadata;
   } catch (err) {
     throw new CfAdminError(
-      'invalid_response',
+      "invalid_response",
       `Script metadata JSON parse failed: ${(err as Error).message}`,
     );
   }
   if (!metadata.main_module) {
     throw new CfAdminError(
-      'invalid_response',
-      'Script metadata missing `main_module` — cannot identify body part',
+      "invalid_response",
+      "Script metadata missing `main_module` — cannot identify body part",
     );
   }
   const bodyEntry = fd.get(metadata.main_module) as unknown as
@@ -83,12 +83,12 @@ export async function getWorkerScript(
     | null;
   if (bodyEntry === null || bodyEntry === undefined) {
     throw new CfAdminError(
-      'invalid_response',
+      "invalid_response",
       `Script GET returned no part named "${metadata.main_module}" (the main module)`,
     );
   }
   const bodyBuffer =
-    typeof bodyEntry === 'string'
+    typeof bodyEntry === "string"
       ? new TextEncoder().encode(bodyEntry).buffer
       : await bodyEntry.arrayBuffer();
 
@@ -117,14 +117,14 @@ export async function putWorkerScript(
 ): Promise<{ id: string; etag?: string }> {
   if (!input.deployment.metadata.main_module) {
     throw new CfAdminError(
-      'invalid_input',
-      'deployment.metadata.main_module is required',
+      "invalid_input",
+      "deployment.metadata.main_module is required",
     );
   }
   const body = buildScriptPutFormData(input.deployment);
   const response = await client.request(
     `/accounts/${client.accountId}/workers/scripts/${encodeURIComponent(input.scriptName)}`,
-    { method: 'PUT', body },
+    { method: "PUT", body },
   );
   return parseEnvelope<{ id: string; etag?: string }>(response);
 }
@@ -155,7 +155,7 @@ export async function workerScriptExists(
     );
   }
   // Drain the body so the connection can be reused.
-  await response.text().catch(() => '');
+  await response.text().catch(() => "");
   return true;
 }
 
@@ -221,7 +221,7 @@ export async function setWorkersDevSubdomain(
   const response = await client.request(
     `/accounts/${client.accountId}/workers/scripts/${encodeURIComponent(input.scriptName)}/subdomain`,
     {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ enabled: input.enabled }),
     },
   );
@@ -235,7 +235,7 @@ export async function deleteWorkerScript(
 ): Promise<void> {
   const response = await client.request(
     `/accounts/${client.accountId}/workers/scripts/${encodeURIComponent(input.scriptName)}?force=true`,
-    { method: 'DELETE' },
+    { method: "DELETE" },
   );
   if (!response.ok && response.status !== 404) {
     throw new CfAdminError(

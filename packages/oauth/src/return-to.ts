@@ -33,6 +33,6 @@ export function validateReturnTo(
     return { ok: false };
   }
   if (parsed.origin !== issuerOrigin) return { ok: false };
-  if (parsed.pathname === '/auth/login') return { ok: false };
+  if (parsed.pathname === "/auth/login") return { ok: false };
   return { ok: true, url: parsed.toString() };
 }

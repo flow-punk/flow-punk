@@ -1,6 +1,6 @@
-import { CfAdminError, classifyHttpStatus } from './errors.js';
+import { CfAdminError, classifyHttpStatus } from "./errors.js";
 
-const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
+const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
 export interface CfClientConfig {
   apiToken: string;
@@ -33,10 +33,10 @@ interface CfEnvelope<T = unknown> {
 
 export function createCfClient(config: CfClientConfig): CfClient {
   if (!config.apiToken) {
-    throw new CfAdminError('invalid_input', 'apiToken is required');
+    throw new CfAdminError("invalid_input", "apiToken is required");
   }
   if (!config.accountId) {
-    throw new CfAdminError('invalid_input', 'accountId is required');
+    throw new CfAdminError("invalid_input", "accountId is required");
   }
   const fetchImpl = config.fetch ?? globalThis.fetch.bind(globalThis);
   const baseUrl = config.baseUrl ?? CF_API_BASE;
@@ -45,20 +45,20 @@ export function createCfClient(config: CfClientConfig): CfClient {
     accountId: config.accountId,
     baseUrl,
     async request(path, init = {}) {
-      const url = path.startsWith('http')
+      const url = path.startsWith("http")
         ? path
-        : `${baseUrl}${path.startsWith('/') ? path : `/${path}`}`;
+        : `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
       const headers = new Headers(init.headers);
-      headers.set('Authorization', `Bearer ${config.apiToken}`);
+      headers.set("Authorization", `Bearer ${config.apiToken}`);
       // Don't set Content-Type if the caller passed FormData — fetch sets the
       // multipart boundary automatically.
       if (
-        !headers.has('Content-Type') &&
+        !headers.has("Content-Type") &&
         init.body !== undefined &&
         !(init.body instanceof FormData) &&
-        typeof init.body !== 'undefined'
+        typeof init.body !== "undefined"
       ) {
-        headers.set('Content-Type', 'application/json');
+        headers.set("Content-Type", "application/json");
       }
       return fetchImpl(url, { ...init, headers });
     },
@@ -71,8 +71,8 @@ export function createCfClient(config: CfClientConfig): CfClient {
  */
 export async function parseEnvelope<T>(response: Response): Promise<T> {
   let payload: CfEnvelope<T>;
-  const contentType = response.headers.get('Content-Type') ?? '';
-  if (!contentType.includes('application/json')) {
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("application/json")) {
     if (!response.ok) {
       throw new CfAdminError(
         classifyHttpStatus(response.status),
@@ -81,7 +81,7 @@ export async function parseEnvelope<T>(response: Response): Promise<T> {
       );
     }
     throw new CfAdminError(
-      'invalid_response',
+      "invalid_response",
       `Expected JSON envelope, got Content-Type=${contentType}`,
       response.status,
     );
@@ -90,7 +90,7 @@ export async function parseEnvelope<T>(response: Response): Promise<T> {
     payload = (await response.json()) as CfEnvelope<T>;
   } catch (err) {
     throw new CfAdminError(
-      'invalid_response',
+      "invalid_response",
       `CF API returned malformed JSON: ${(err as Error).message}`,
       response.status,
     );
@@ -100,7 +100,7 @@ export async function parseEnvelope<T>(response: Response): Promise<T> {
     throw new CfAdminError(
       classifyHttpStatus(response.status),
       cfErrors.length
-        ? cfErrors.map((e) => `[${e.code}] ${e.message}`).join('; ')
+        ? cfErrors.map((e) => `[${e.code}] ${e.message}`).join("; ")
         : `CF API error (status ${response.status})`,
       response.status,
       cfErrors,
@@ -108,8 +108,8 @@ export async function parseEnvelope<T>(response: Response): Promise<T> {
   }
   if (payload.result === undefined) {
     throw new CfAdminError(
-      'invalid_response',
-      'CF API success response missing `result` field',
+      "invalid_response",
+      "CF API success response missing `result` field",
       response.status,
     );
   }

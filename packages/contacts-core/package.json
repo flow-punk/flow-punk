@@ -11,11 +11,12 @@
     "./middleware/identity": "./src/middleware/identity.ts"
   },
   "scripts": {
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node ../../scripts/test-if-any.mjs",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@flowpunk-indie/custom-fields-core": "workspace:*",
     "@flowpunk-indie/db": "workspace:*",
     "@flowpunk/gateway": "workspace:*",
     "@flowpunk/service-utils": "workspace:*",

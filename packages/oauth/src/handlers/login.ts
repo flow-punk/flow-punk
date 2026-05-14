@@ -1,8 +1,5 @@
-import { drizzle } from 'drizzle-orm/d1';
-import {
-  authLoginTokensRepo,
-  mcpSessionsRepo,
-} from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import { authLoginTokensRepo, mcpSessionsRepo } from "@flowpunk-indie/db";
 import {
   isExpired,
   isoNow,
@@ -10,17 +7,17 @@ import {
   randomBase64Url,
   randomOpaqueId,
   sha256Hex,
-} from '@flowpunk-indie/oauth-protocol';
+} from "@flowpunk-indie/oauth-protocol";
 
-import type { OAuthEnv } from '../env.js';
-import { OAUTH_ACTOR } from '../policy.js';
-import { safeFormUrlEncoded } from '../body.js';
-import { getIssuerOrigin } from '../origin.js';
-import { oauthJsonError } from '../responses.js';
-import { isApproveOriginAllowed } from './approve.js';
-import { validateReturnTo } from '../return-to.js';
-import { buildCookie } from '../_lib/cookies.js';
-import { loginPage } from '../login-form.js';
+import type { OAuthEnv } from "../env.js";
+import { OAUTH_ACTOR } from "../policy.js";
+import { safeFormUrlEncoded } from "../body.js";
+import { getIssuerOrigin } from "../origin.js";
+import { oauthJsonError } from "../responses.js";
+import { isApproveOriginAllowed } from "./approve.js";
+import { validateReturnTo } from "../return-to.js";
+import { buildCookie } from "../_lib/cookies.js";
+import { loginPage } from "../login-form.js";
 
 /**
  * Per ADR-019 amendment 2026-05-06. Session cookie matches the indie
@@ -28,8 +25,8 @@ import { loginPage } from '../login-form.js';
  * indie's single-tenant model; matches what `seedAdmin.ts` originally
  * produced and what `validateSession` expects).
  */
-const SESSION_TENANT_SCOPE = '_system';
-const SESSION_COOKIE_NAME = 'fp_session';
+const SESSION_TENANT_SCOPE = "_system";
+const SESSION_COOKIE_NAME = "fp_session";
 const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 /** GET /auth/login — render the paste-token form. */
@@ -39,8 +36,8 @@ export function handleLoginPage(
   requestId: string,
 ): Response {
   const url = new URL(request.url);
-  const returnTo = url.searchParams.get('return_to');
-  const error = url.searchParams.get('error');
+  const returnTo = url.searchParams.get("return_to");
+  const error = url.searchParams.get("error");
 
   // We don't validate `return_to` for shape here — the form just round-trips
   // it as a hidden input, and the POST handler validates it before
@@ -48,7 +45,7 @@ export function handleLoginPage(
   // on a tighter ruleset than the POST. The HTML template escapes the value.
   return loginPage({
     returnTo,
-    showError: error === 'invalid_token',
+    showError: error === "invalid_token",
     responseRequestId: requestId,
   });
 }
@@ -63,25 +60,25 @@ export async function handleLoginSubmit(
   try {
     issuerOrigin = getIssuerOrigin(env, request);
   } catch {
-    return oauthJsonError(500, 'server_error');
+    return oauthJsonError(500, "server_error");
   }
 
   // Same-origin attestation (Chrome, Firefox, Safari, Origin: null +
   // Sec-Fetch-Site: same-origin all handled by the shared helper).
   if (!isApproveOriginAllowed(request, issuerOrigin)) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
 
   const form = await safeFormUrlEncoded(request, env, requestId);
   if (form instanceof Response) return form;
-  if (!form) return oauthJsonError(400, 'invalid_request');
+  if (!form) return oauthJsonError(400, "invalid_request");
 
-  const token = form.get('token');
-  const returnToRaw = form.get('return_to');
-  if (typeof token !== 'string' || token.length === 0) {
-    return oauthJsonError(400, 'invalid_request');
+  const token = form.get("token");
+  const returnToRaw = form.get("return_to");
+  if (typeof token !== "string" || token.length === 0) {
+    return oauthJsonError(400, "invalid_request");
   }
-  const returnTo = typeof returnToRaw === 'string' ? returnToRaw : null;
+  const returnTo = typeof returnToRaw === "string" ? returnToRaw : null;
 
   const db = drizzle(env.DB);
 
@@ -131,35 +128,32 @@ export async function handleLoginSubmit(
     status: 302,
     headers: {
       Location: target,
-      'Set-Cookie': buildCookie(SESSION_COOKIE_NAME, cookieValue, {
+      "Set-Cookie": buildCookie(SESSION_COOKIE_NAME, cookieValue, {
         httpOnly: true,
         secure: true,
-        sameSite: 'Strict',
-        path: '/',
+        sameSite: "Strict",
+        path: "/",
         maxAge: SESSION_TTL_SECONDS,
       }),
-      'Cache-Control': 'no-store',
-      'X-Request-ID': requestId,
+      "Cache-Control": "no-store",
+      "X-Request-ID": requestId,
     },
   });
 }
 
-function rejectInvalid(
-  returnTo: string | null,
-  requestId: string,
-): Response {
+function rejectInvalid(returnTo: string | null, requestId: string): Response {
   // Redirect back to GET form with the error banner. Carries `return_to`
   // through so the operator doesn't lose context across retries. We do
   // NOT echo the submitted token in any form.
   const params = new URLSearchParams();
-  params.set('error', 'invalid_token');
-  if (returnTo) params.set('return_to', returnTo);
+  params.set("error", "invalid_token");
+  if (returnTo) params.set("return_to", returnTo);
   return new Response(null, {
     status: 302,
     headers: {
       Location: `/auth/login?${params.toString()}`,
-      'Cache-Control': 'no-store',
-      'X-Request-ID': requestId,
+      "Cache-Control": "no-store",
+      "X-Request-ID": requestId,
     },
   });
 }

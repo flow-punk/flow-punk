@@ -1,9 +1,13 @@
-import * as p from '@clack/prompts';
-import { CfAdminError, createCfClient, type CfClient } from '@flowpunk/cf-admin';
-import { resolveToken, runWranglerLogin } from '../auth/oauth.js';
-import { listAccounts, type AccountSummary } from '../auth/verify.js';
-import { CliError } from '../util/errors.js';
-import { theme } from '../ui/theme.js';
+import * as p from "@clack/prompts";
+import {
+  CfAdminError,
+  createCfClient,
+  type CfClient,
+} from "@flowpunk/cf-admin";
+import { resolveToken, runWranglerLogin } from "../auth/oauth.js";
+import { listAccounts, type AccountSummary } from "../auth/verify.js";
+import { CliError } from "../util/errors.js";
+import { theme } from "../ui/theme.js";
 
 /**
  * Read token + account, verify against CF, and return a configured client.
@@ -25,7 +29,7 @@ export async function resolveAndVerify(opts: {
 }): Promise<{
   client: CfClient;
   token: string;
-  tokenSource: 'wrangler-oauth' | 'explicit';
+  tokenSource: "wrangler-oauth" | "explicit";
   accounts: AccountSummary[];
   account: AccountSummary;
 }> {
@@ -40,29 +44,29 @@ export async function resolveAndVerify(opts: {
   // `listAccounts` call below serves the same purpose: if the token is
   // unauthenticated, this is where we'll find out, and the error handling
   // below converts it to a friendly message.
-  const probeClient = createCfClient({ apiToken, accountId: 'unknown' });
+  const probeClient = createCfClient({ apiToken, accountId: "unknown" });
   let accounts: AccountSummary[];
   try {
     accounts = await listAccounts(probeClient);
   } catch (err) {
-    if (err instanceof CfAdminError && err.code === 'unauthenticated') {
-      if (source === 'explicit') {
+    if (err instanceof CfAdminError && err.code === "unauthenticated") {
+      if (source === "explicit") {
         throw new CliError(
-          'The provided --token is invalid or revoked',
-          'Generate a fresh token at https://dash.cloudflare.com/profile/api-tokens.',
+          "The provided --token is invalid or revoked",
+          "Generate a fresh token at https://dash.cloudflare.com/profile/api-tokens.",
         );
       }
       throw new CliError(
-        'Your stored Cloudflare credentials are invalid or revoked',
-        'Run `flowpunk login` to re-authenticate.',
+        "Your stored Cloudflare credentials are invalid or revoked",
+        "Run `flowpunk login` to re-authenticate.",
       );
     }
     throw err;
   }
   if (accounts.length === 0) {
     throw new CliError(
-      'Token has no accessible Cloudflare accounts',
-      'The token must include the `Account: Read` scope.',
+      "Token has no accessible Cloudflare accounts",
+      "The token must include the `Account: Read` scope.",
     );
   }
   const account = pickAccount(accounts, opts.accountIdHint);
@@ -77,7 +81,7 @@ export async function resolveAndVerify(opts: {
  */
 async function resolveTokenOrLogin(opts: {
   explicitToken?: string;
-}): Promise<{ apiToken: string; source: 'wrangler-oauth' | 'explicit' }> {
+}): Promise<{ apiToken: string; source: "wrangler-oauth" | "explicit" }> {
   try {
     return await resolveToken({ explicitToken: opts.explicitToken });
   } catch (err) {
@@ -88,10 +92,12 @@ async function resolveTokenOrLogin(opts: {
     p.note(
       [
         "You're not logged in to Cloudflare yet.",
-        '',
-        theme.dim('Opening your browser to authorize. This is a one-time step.'),
-      ].join('\n'),
-      'Cloudflare login',
+        "",
+        theme.dim(
+          "Opening your browser to authorize. This is a one-time step.",
+        ),
+      ].join("\n"),
+      "Cloudflare login",
     );
     await runWranglerLogin();
     return await resolveToken({ explicitToken: opts.explicitToken });
@@ -107,7 +113,7 @@ function pickAccount(
     if (!match) {
       throw new CliError(
         `Account "${hint}" not visible to this token`,
-        `Visible accounts: ${accounts.map((a) => a.id).join(', ')}`,
+        `Visible accounts: ${accounts.map((a) => a.id).join(", ")}`,
       );
     }
     return match;

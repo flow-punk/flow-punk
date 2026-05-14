@@ -1,9 +1,9 @@
-import { spawn } from 'node:child_process';
-import { resolveAndVerify } from './helpers.js';
-import { readConfig } from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
-import type { ServiceName } from '../types.js';
+import { spawn } from "node:child_process";
+import { resolveAndVerify } from "./helpers.js";
+import { readConfig } from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
+import type { ServiceName } from "../types.js";
 
 export interface LogsOpts {
   token?: string;
@@ -12,7 +12,13 @@ export interface LogsOpts {
   service?: string;
 }
 
-const SERVICES: ServiceName[] = ['gateway', 'auth', 'contacts', 'pipeline', 'users'];
+const SERVICES: ServiceName[] = [
+  "gateway",
+  "auth",
+  "contacts",
+  "pipeline",
+  "users",
+];
 
 /**
  * Tail Worker logs by shelling out to `wrangler tail`. We pass the resolved
@@ -21,14 +27,14 @@ const SERVICES: ServiceName[] = ['gateway', 'auth', 'contacts', 'pipeline', 'use
 export async function logsCommand(opts: LogsOpts): Promise<void> {
   if (!opts.service) {
     throw new CliError(
-      'Specify a service to tail',
-      `Usage: flowpunk logs <${SERVICES.join(' | ')}>`,
+      "Specify a service to tail",
+      `Usage: flowpunk logs <${SERVICES.join(" | ")}>`,
     );
   }
   if (!SERVICES.includes(opts.service as ServiceName)) {
     throw new CliError(
       `Unknown service "${opts.service}"`,
-      `Valid: ${SERVICES.join(', ')}`,
+      `Valid: ${SERVICES.join(", ")}`,
     );
   }
   const service = opts.service as ServiceName;
@@ -42,19 +48,18 @@ export async function logsCommand(opts: LogsOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
   if (matching.length === 0) {
     throw new CliError(
       `No deployment for account ${account.name}`,
-      'Run `flowpunk init` first.',
+      "Run `flowpunk init` first.",
     );
   }
   if (matching.length > 1 && !opts.prefix) {
     throw new CliError(
-      `Multiple deployments: ${matching.map((d) => d.prefix).join(', ')}`,
-      'Pass --prefix <name>.',
+      `Multiple deployments: ${matching.map((d) => d.prefix).join(", ")}`,
+      "Pass --prefix <name>.",
     );
   }
   const dep = matching[0]!;
@@ -65,16 +70,20 @@ export async function logsCommand(opts: LogsOpts): Promise<void> {
   );
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn('npx', ['wrangler', 'tail', scriptName, '--format', 'pretty'], {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        CLOUDFLARE_API_TOKEN: token,
-        CLOUDFLARE_ACCOUNT_ID: account.id,
+    const child = spawn(
+      "npx",
+      ["wrangler", "tail", scriptName, "--format", "pretty"],
+      {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          CLOUDFLARE_API_TOKEN: token,
+          CLOUDFLARE_ACCOUNT_ID: account.id,
+        },
       },
-    });
-    child.on('error', reject);
-    child.on('exit', (code) => {
+    );
+    child.on("error", reject);
+    child.on("exit", (code) => {
       if (code === 0 || code === null) resolve();
       else reject(new CliError(`wrangler tail exited with code ${code}`));
     });

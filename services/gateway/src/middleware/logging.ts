@@ -1,10 +1,10 @@
-import { createLogger } from '@flowpunk/service-utils';
+import { createLogger } from "@flowpunk/service-utils";
 import type {
   CredentialDescriptor,
   Logger,
   LogLevel,
-} from '@flowpunk/service-utils';
-import type { AppContext, Middleware } from '../types.js';
+} from "@flowpunk/service-utils";
+import type { AppContext, Middleware } from "../types.js";
 
 // TODO: when MCP SSE streaming lands (GET /mcp), emit separate `connect` and
 // `close` log lines instead of a single completion line. A long-lived stream
@@ -21,7 +21,7 @@ export const loggingMiddleware: Middleware = async (ctx, next) => {
   const start = performance.now();
   const method = ctx.request.method;
   const path = new URL(ctx.request.url).pathname;
-  const baseLogger = createLogger({ service: 'gateway' }).withRequestId(
+  const baseLogger = createLogger({ service: "gateway" }).withRequestId(
     ctx.requestId,
   );
 
@@ -29,8 +29,8 @@ export const loggingMiddleware: Middleware = async (ctx, next) => {
     const res = await next();
     const duration = Math.round((performance.now() - start) * 100) / 100;
     const level: LogLevel =
-      res.status >= 500 ? 'error' : res.status >= 400 ? 'warn' : 'info';
-    bindIdentity(baseLogger, ctx)[level]('request', {
+      res.status >= 500 ? "error" : res.status >= 400 ? "warn" : "info";
+    bindIdentity(baseLogger, ctx)[level]("request", {
       method,
       path,
       statusCode: res.status,
@@ -40,7 +40,7 @@ export const loggingMiddleware: Middleware = async (ctx, next) => {
     return res;
   } catch (err) {
     const duration = Math.round((performance.now() - start) * 100) / 100;
-    bindIdentity(baseLogger, ctx).error('request', {
+    bindIdentity(baseLogger, ctx).error("request", {
       method,
       path,
       statusCode: 500,
@@ -49,12 +49,12 @@ export const loggingMiddleware: Middleware = async (ctx, next) => {
       ...(ctx.scope !== undefined ? { scope: ctx.scope } : {}),
     });
     return new Response(
-      JSON.stringify({ error: 'internal_error', requestId: ctx.requestId }),
+      JSON.stringify({ error: "internal_error", requestId: ctx.requestId }),
       {
         status: 500,
         headers: {
-          'Content-Type': 'application/json',
-          'X-Request-ID': ctx.requestId,
+          "Content-Type": "application/json",
+          "X-Request-ID": ctx.requestId,
         },
       },
     );
@@ -67,7 +67,7 @@ function bindIdentity(logger: Logger, ctx: AppContext): Logger {
     const descriptor: CredentialDescriptor = {
       credentialId: ctx.credentialId,
       credentialType: ctx.credentialType,
-      ...(ctx.credentialType === 'apikey'
+      ...(ctx.credentialType === "apikey"
         ? { keyLabel: ctx.keyLabel ?? null }
         : {}),
     };

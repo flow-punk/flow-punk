@@ -1,13 +1,13 @@
-import { sql } from 'drizzle-orm';
-import { check, index, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from "drizzle-orm";
+import { check, index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { pii } from '../utils/pii.js';
+import { pii } from "../utils/pii.js";
 
-const ACCOUNT_STATUSES = ['active', 'deleted'] as const;
+const ACCOUNT_STATUSES = ["active", "deleted"] as const;
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Accounts (companies/orgs).
@@ -26,49 +26,53 @@ const inList = (values: readonly string[]): string =>
  * and country (ISO 3166-1 alpha-2) are not PII.
  */
 export const accounts = sqliteTable(
-  'accounts',
+  "accounts",
   {
-    id: text('id').primaryKey(),
-    displayName: pii(text('display_name').notNull()),
-    domain: pii(text('domain')),
-    website: pii(text('website')),
-    industry: text('industry'),
-    streetLine1: pii(text('street_line_1')),
-    streetLine2: pii(text('street_line_2')),
-    city: pii(text('city')),
-    region: pii(text('region')),
-    postalCode: pii(text('postal_code')),
-    country: text('country'),
-    latitude: pii(real('latitude')),
-    longitude: pii(real('longitude')),
-    phone1CountryCode: pii(text('phone1_country_code')),
-    phone1Number: pii(text('phone1_number')),
-    phone1Ext: pii(text('phone1_ext')),
-    phone2CountryCode: pii(text('phone2_country_code')),
-    phone2Number: pii(text('phone2_number')),
-    phone2Ext: pii(text('phone2_ext')),
-    imageLogo: pii(text('image_logo')),
+    id: text("id").primaryKey(),
+    displayName: pii(text("display_name").notNull()),
+    domain: pii(text("domain")),
+    website: pii(text("website")),
+    industry: text("industry"),
+    streetLine1: pii(text("street_line_1")),
+    streetLine2: pii(text("street_line_2")),
+    city: pii(text("city")),
+    region: pii(text("region")),
+    postalCode: pii(text("postal_code")),
+    country: text("country"),
+    latitude: pii(real("latitude")),
+    longitude: pii(real("longitude")),
+    phone1CountryCode: pii(text("phone1_country_code")),
+    phone1Number: pii(text("phone1_number")),
+    phone1Ext: pii(text("phone1_ext")),
+    phone2CountryCode: pii(text("phone2_country_code")),
+    phone2Number: pii(text("phone2_number")),
+    phone2Ext: pii(text("phone2_ext")),
+    imageLogo: pii(text("image_logo")),
     // ownerUserId is not declared as a Drizzle `references()` FK: users
     // live in a different concern, and the schema/users.ts and
     // schema/accounts.ts modules are loaded independently. Mirrors the
     // `deals.ownerUserId` posture (`schema/deals.ts:34-37`). Repo treats
     // this as a free-form user id; format-validated only.
-    ownerUserId: text('owner_user_id'),
-    status: text('status').notNull().$type<AccountStatus>(),
-    deletedAt: text('deleted_at'),
-    deletedBy: text('deleted_by'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    updatedBy: text('updated_by').notNull(),
+    ownerUserId: text("owner_user_id"),
+    // Tenant-defined custom fields (ADR-023). PII by default — operator-
+    // defined free-text values may carry anything; per-field redaction
+    // selectivity is governed by `custom_field_defs.pii` at the registry.
+    customData: pii(text("custom_data", { mode: "json" })),
+    status: text("status").notNull().$type<AccountStatus>(),
+    deletedAt: text("deleted_at"),
+    deletedBy: text("deleted_by"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    updatedBy: text("updated_by").notNull(),
   },
   (t) => ({
-    statusIdx: index('idx_accounts_status').on(t.status),
-    domainIdx: index('idx_accounts_domain').on(t.domain),
-    ownerUserIdIdx: index('idx_accounts_owner_user_id').on(t.ownerUserId),
-    createdAtIdx: index('idx_accounts_created_at').on(t.createdAt, t.id),
+    statusIdx: index("idx_accounts_status").on(t.status),
+    domainIdx: index("idx_accounts_domain").on(t.domain),
+    ownerUserIdIdx: index("idx_accounts_owner_user_id").on(t.ownerUserId),
+    createdAtIdx: index("idx_accounts_created_at").on(t.createdAt, t.id),
     statusCheck: check(
-      'accounts_status_check',
+      "accounts_status_check",
       sql.raw(`status IN (${inList(ACCOUNT_STATUSES)})`),
     ),
   }),
@@ -85,42 +89,44 @@ export type NewAccount = typeof accounts.$inferInsert;
  * audit logs).
  */
 export const ALLOWED_PATCH_FIELDS = [
-  'displayName',
-  'domain',
-  'website',
-  'industry',
-  'streetLine1',
-  'streetLine2',
-  'city',
-  'region',
-  'postalCode',
-  'country',
-  'latitude',
-  'longitude',
-  'phone1CountryCode',
-  'phone1Number',
-  'phone1Ext',
-  'phone2CountryCode',
-  'phone2Number',
-  'phone2Ext',
-  'imageLogo',
-  'ownerUserId',
+  "displayName",
+  "domain",
+  "website",
+  "industry",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "latitude",
+  "longitude",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "phone2CountryCode",
+  "phone2Number",
+  "phone2Ext",
+  "imageLogo",
+  "ownerUserId",
 ] as const;
 export type AccountPatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
 const ALLOWED_PATCH_FIELD_SET = new Set<string>(ALLOWED_PATCH_FIELDS);
-export function isAllowedPatchField(name: string): name is AccountPatchableField {
+export function isAllowedPatchField(
+  name: string,
+): name is AccountPatchableField {
   return ALLOWED_PATCH_FIELD_SET.has(name);
 }
 
 /** Fields that PATCH must reject if present in the body (immutable). */
 export const IMMUTABLE_PATCH_FIELDS = [
-  'id',
-  'createdAt',
-  'createdBy',
-  'status',
-  'deletedAt',
-  'deletedBy',
+  "id",
+  "createdAt",
+  "createdBy",
+  "status",
+  "deletedAt",
+  "deletedBy",
 ] as const;
 
 const IMMUTABLE_PATCH_FIELD_SET = new Set<string>(IMMUTABLE_PATCH_FIELDS);
@@ -130,23 +136,23 @@ export function isImmutablePatchField(name: string): boolean {
 
 /** Fields that may be cleared via explicit `null` in PATCH (nullable columns). */
 export const NULLABLE_PATCH_FIELDS = new Set<AccountPatchableField>([
-  'domain',
-  'website',
-  'industry',
-  'streetLine1',
-  'streetLine2',
-  'city',
-  'region',
-  'postalCode',
-  'country',
-  'latitude',
-  'longitude',
-  'phone1CountryCode',
-  'phone1Number',
-  'phone1Ext',
-  'phone2CountryCode',
-  'phone2Number',
-  'phone2Ext',
-  'imageLogo',
-  'ownerUserId',
+  "domain",
+  "website",
+  "industry",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "latitude",
+  "longitude",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "phone2CountryCode",
+  "phone2Number",
+  "phone2Ext",
+  "imageLogo",
+  "ownerUserId",
 ]);

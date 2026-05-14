@@ -1,7 +1,7 @@
-import { CfAdminError, classifyHttpStatus } from './errors.js';
-import { parseEnvelope, type CfClient } from './client.js';
+import { CfAdminError, classifyHttpStatus } from "./errors.js";
+import { parseEnvelope, type CfClient } from "./client.js";
 
-export type D1LocationHint = 'wnam' | 'enam' | 'weur' | 'eeur' | 'apac' | 'oc';
+export type D1LocationHint = "wnam" | "enam" | "weur" | "eeur" | "apac" | "oc";
 
 export interface D1Database {
   uuid: string;
@@ -48,7 +48,7 @@ export async function createD1(
   }
   const response = await client.request(
     `/accounts/${client.accountId}/d1/database`,
-    { method: 'POST', body: JSON.stringify(body) },
+    { method: "POST", body: JSON.stringify(body) },
   );
   return parseEnvelope<D1Database>(response);
 }
@@ -59,10 +59,10 @@ export async function listD1(
   filter?: { name?: string },
 ): Promise<D1Database[]> {
   const params = new URLSearchParams();
-  if (filter?.name) params.set('name', filter.name);
+  if (filter?.name) params.set("name", filter.name);
   const qs = params.toString();
   const response = await client.request(
-    `/accounts/${client.accountId}/d1/database${qs ? `?${qs}` : ''}`,
+    `/accounts/${client.accountId}/d1/database${qs ? `?${qs}` : ""}`,
   );
   return parseEnvelope<D1Database[]>(response);
 }
@@ -89,7 +89,7 @@ export async function queryD1(
   input: QueryD1Input,
 ): Promise<QueryD1Result[]> {
   if (!input.databaseId) {
-    throw new CfAdminError('invalid_input', 'databaseId is required');
+    throw new CfAdminError("invalid_input", "databaseId is required");
   }
   const body: Record<string, unknown> = { sql: input.sql };
   if (input.params && input.params.length > 0) {
@@ -97,7 +97,7 @@ export async function queryD1(
   }
   const response = await client.request(
     `/accounts/${client.accountId}/d1/database/${input.databaseId}/query`,
-    { method: 'POST', body: JSON.stringify(body) },
+    { method: "POST", body: JSON.stringify(body) },
   );
   return parseEnvelope<QueryD1Result[]>(response);
 }
@@ -132,7 +132,7 @@ export async function deleteD1(
 ): Promise<void> {
   const response = await client.request(
     `/accounts/${client.accountId}/d1/database/${input.databaseId}`,
-    { method: 'DELETE' },
+    { method: "DELETE" },
   );
   if (!response.ok && response.status !== 404) {
     throw new CfAdminError(

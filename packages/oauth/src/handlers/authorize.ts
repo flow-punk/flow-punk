@@ -1,8 +1,8 @@
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle } from "drizzle-orm/d1";
 import {
   oauthAuthorizeRequestsRepo,
   oauthClientsRepo,
-} from '@flowpunk-indie/db';
+} from "@flowpunk-indie/db";
 import {
   isoNow,
   isoSecondsFromNow,
@@ -12,19 +12,23 @@ import {
   redirectUriMatches,
   sha256Hex,
   isSupportedPkceMethod,
-} from '@flowpunk-indie/oauth-protocol';
-import { buildCookie } from '../_lib/cookies.js';
+} from "@flowpunk-indie/oauth-protocol";
+import { buildCookie } from "../_lib/cookies.js";
 
-import type { OAuthEnv } from '../env.js';
+import type { OAuthEnv } from "../env.js";
 import {
   ALLOWED_SCOPES,
   AUTHORIZE_REQUEST_COOKIE,
   AUTHORIZE_REQUEST_TTL_SECONDS,
   OAUTH_ACTOR,
-} from '../policy.js';
-import { consentPage } from '../consent.js';
-import { getAllowedResources, getIssuerOrigin, getSingleResource } from '../origin.js';
-import { oauthJsonError, oauthRedirectError } from '../responses.js';
+} from "../policy.js";
+import { consentPage } from "../consent.js";
+import {
+  getAllowedResources,
+  getIssuerOrigin,
+  getSingleResource,
+} from "../origin.js";
+import { oauthJsonError, oauthRedirectError } from "../responses.js";
 
 interface ParsedClientRow {
   id: string;
@@ -45,33 +49,33 @@ export async function handleAuthorize(
   session: { userId: string } | null,
 ): Promise<Response> {
   const url = new URL(request.url);
-  const clientId = url.searchParams.get('client_id');
-  const redirectUri = url.searchParams.get('redirect_uri');
-  const responseType = url.searchParams.get('response_type');
-  const state = url.searchParams.get('state');
-  const codeChallenge = url.searchParams.get('code_challenge');
-  const codeChallengeMethod = url.searchParams.get('code_challenge_method');
-  const scopeParam = url.searchParams.get('scope');
+  const clientId = url.searchParams.get("client_id");
+  const redirectUri = url.searchParams.get("redirect_uri");
+  const responseType = url.searchParams.get("response_type");
+  const state = url.searchParams.get("state");
+  const codeChallenge = url.searchParams.get("code_challenge");
+  const codeChallengeMethod = url.searchParams.get("code_challenge_method");
+  const scopeParam = url.searchParams.get("scope");
 
-  if (!clientId || !redirectUri || responseType !== 'code') {
-    return oauthJsonError(400, 'invalid_request');
+  if (!clientId || !redirectUri || responseType !== "code") {
+    return oauthJsonError(400, "invalid_request");
   }
 
   const db = drizzle(env.DB);
   const clientRow = await oauthClientsRepo.findByClientId(db, clientId);
   if (!clientRow) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
   const client = parseClient(clientRow);
   if (!client.redirectUris.some((u) => redirectUriMatches(redirectUri, [u]))) {
-    return oauthJsonError(400, 'invalid_request');
+    return oauthJsonError(400, "invalid_request");
   }
 
-  if (!state) return oauthRedirectError(redirectUri, 'invalid_request');
+  if (!state) return oauthRedirectError(redirectUri, "invalid_request");
 
   const allowedResources = getAllowedResources(env, request);
   const resourceResult = getSingleResource(
-    url.searchParams.getAll('resource'),
+    url.searchParams.getAll("resource"),
     allowedResources,
   );
   if (!resourceResult.ok) {
@@ -79,18 +83,18 @@ export async function handleAuthorize(
   }
 
   const scopeResult = normalizeScope(scopeParam, ALLOWED_SCOPES, {
-    defaultIfEmpty: ['mcp'],
+    defaultIfEmpty: ["mcp"],
   });
   if (!scopeResult.ok) {
-    return oauthRedirectError(redirectUri, 'invalid_scope', state);
+    return oauthRedirectError(redirectUri, "invalid_scope", state);
   }
   const grantedScope = scopeResult.serialized;
   if (grantedScope.length === 0) {
-    return oauthRedirectError(redirectUri, 'invalid_scope', state);
+    return oauthRedirectError(redirectUri, "invalid_scope", state);
   }
 
   if (!codeChallenge || !isSupportedPkceMethod(codeChallengeMethod)) {
-    return oauthRedirectError(redirectUri, 'invalid_request', state);
+    return oauthRedirectError(redirectUri, "invalid_request", state);
   }
 
   // Session gate — per ADR-019 amendment 2026-05-06. We send unauthenticated
@@ -103,19 +107,16 @@ export async function handleAuthorize(
     try {
       issuerOrigin = getIssuerOrigin(env, request);
     } catch {
-      return oauthJsonError(500, 'server_error');
+      return oauthJsonError(500, "server_error");
     }
-    const loginUrl = new URL('/auth/login', issuerOrigin);
-    loginUrl.searchParams.set(
-      'return_to',
-      `${url.pathname}${url.search}`,
-    );
+    const loginUrl = new URL("/auth/login", issuerOrigin);
+    loginUrl.searchParams.set("return_to", `${url.pathname}${url.search}`);
     return new Response(null, {
       status: 302,
       headers: {
         Location: loginUrl.toString(),
-        'Cache-Control': 'no-store',
-        'X-Request-ID': requestId,
+        "Cache-Control": "no-store",
+        "X-Request-ID": requestId,
       },
     });
   }
@@ -154,10 +155,10 @@ export async function handleAuthorize(
     responseRequestId: requestId,
   });
   response.headers.append(
-    'Set-Cookie',
+    "Set-Cookie",
     buildCookie(AUTHORIZE_REQUEST_COOKIE, cookieBindingValue, {
       maxAge: AUTHORIZE_REQUEST_TTL_SECONDS,
-      sameSite: 'Strict',
+      sameSite: "Strict",
     }),
   );
   return response;
@@ -181,7 +182,7 @@ function safeJsonArray(value: string): string[] {
   try {
     const parsed = JSON.parse(value) as unknown;
     return Array.isArray(parsed)
-      ? parsed.filter((v): v is string => typeof v === 'string')
+      ? parsed.filter((v): v is string => typeof v === "string")
       : [];
   } catch {
     return [];

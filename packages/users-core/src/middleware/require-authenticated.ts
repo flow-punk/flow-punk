@@ -1,9 +1,9 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { hasAdminRights, usersRepo, type Role } from '@flowpunk-indie/db';
+import { drizzle } from "drizzle-orm/d1";
+import { hasAdminRights, usersRepo, type Role } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
-import { errorResponse } from '../handlers/_shared.js';
-import { parseIdentity } from './identity.js';
+import type { Actor, UsersEnv } from "../types.js";
+import { errorResponse } from "../handlers/_shared.js";
+import { parseIdentity } from "./identity.js";
 
 export type AuthCheckResult =
   | {
@@ -29,15 +29,15 @@ export async function requireAuthenticated(
 ): Promise<AuthCheckResult> {
   const actor = parseIdentity(request);
   if (!actor) {
-    return { ok: false, response: errorResponse(401, 'UNAUTHENTICATED') };
+    return { ok: false, response: errorResponse(401, "UNAUTHENTICATED") };
   }
-  if (actor.credentialType !== 'oauth' && actor.credentialType !== 'session') {
+  if (actor.credentialType !== "oauth" && actor.credentialType !== "session") {
     return {
       ok: false,
       response: errorResponse(
         403,
-        'ADMIN_CREDENTIAL_REQUIRED',
-        'Users endpoints require session/OAuth authentication.',
+        "ADMIN_CREDENTIAL_REQUIRED",
+        "Users endpoints require session/OAuth authentication.",
       ),
     };
   }
@@ -45,8 +45,8 @@ export async function requireAuthenticated(
   const user = await usersRepo.findById(db, actor.userId, {
     includeDeleted: true,
   });
-  if (!user || user.status !== 'active') {
-    return { ok: false, response: errorResponse(403, 'FORBIDDEN') };
+  if (!user || user.status !== "active") {
+    return { ok: false, response: errorResponse(403, "FORBIDDEN") };
   }
   return {
     ok: true,

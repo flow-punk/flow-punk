@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsx scripts/build-cli.ts",
     "prepublishOnly": "tsx scripts/prepublish.ts",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node ../../scripts/test-if-any.mjs",
     "typecheck": "tsc --noEmit",
     "verify:metadata": "tsx scripts/verify-metadata-matches-toml.ts",
     "clean": "rm -rf dist"

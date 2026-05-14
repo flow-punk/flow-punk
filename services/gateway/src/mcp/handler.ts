@@ -1,6 +1,9 @@
-import { createLogger } from '@flowpunk/service-utils';
-import type { CredentialDescriptor, Logger } from '@flowpunk/service-utils';
-import { buildToolRegistry, createMcpToolAdapter } from '@flowpunk/tool-registry';
+import { createLogger } from "@flowpunk/service-utils";
+import type { CredentialDescriptor, Logger } from "@flowpunk/service-utils";
+import {
+  buildToolRegistry,
+  createMcpToolAdapter,
+} from "@flowpunk/tool-registry";
 import type {
   Edition,
   McpServiceName,
@@ -8,8 +11,11 @@ import type {
   McpToolState,
   ToolMetadata,
   ToolRegistry,
-} from '@flowpunk/tool-registry';
-import { copyIdentityHeaders, extractIdentityHeaders } from '../auth/identity-headers.js';
+} from "@flowpunk/tool-registry";
+import {
+  copyIdentityHeaders,
+  extractIdentityHeaders,
+} from "../auth/identity-headers.js";
 import {
   BodyTooLargeError,
   declaredContentLengthTooLarge,
@@ -18,11 +24,14 @@ import {
   readRequestTextWithinLimit,
   readResponseBytesWithinLimit,
   requestTooLargeResponse,
-} from '../body-size.js';
-import { fetchWithServiceTimeout } from '../fetch-with-timeout.js';
-import { hasToolExecutionScope, type CredentialScopeType } from '../auth/scope.js';
-import type { AppContext, Env } from '../types.js';
-import type { CredentialType } from '../auth/identity-headers.js';
+} from "../body-size.js";
+import { fetchWithServiceTimeout } from "../fetch-with-timeout.js";
+import {
+  hasToolExecutionScope,
+  type CredentialScopeType,
+} from "../auth/scope.js";
+import type { AppContext, Env } from "../types.js";
+import type { CredentialType } from "../auth/identity-headers.js";
 
 /**
  * Narrow the wider trusted `CredentialType` to the MCP-accepted subset.
@@ -33,9 +42,9 @@ import type { CredentialType } from '../auth/identity-headers.js';
 function narrowMcpCredentialType(
   type: CredentialType | undefined,
 ): CredentialScopeType | undefined {
-  return type === 'session' ? undefined : type;
+  return type === "session" ? undefined : type;
 }
-import type { SessionState } from './session-do.js';
+import type { SessionState } from "./session-do.js";
 
 // Public-facing MCP streamable-HTTP session header. Per the spec
 // (modelcontextprotocol.io 2025-03-26) this is the literal name
@@ -44,27 +53,28 @@ import type { SessionState } from './session-do.js';
 // the response side (server returning a freshly-minted session ID on
 // the initial `initialize` POST). The same constant doubles as the
 // gateway↔DO forwarding header to keep the wire shape consistent.
-export const SESSION_HEADER = 'Mcp-Session-Id';
+export const SESSION_HEADER = "Mcp-Session-Id";
 // Internal-only forwarding header used by the gateway to tell the DO
 // whether the incoming request expects an existing session, an
 // explicit reattach, or fresh creation. Not part of the MCP spec.
-export const SESSION_MODE_HEADER = 'X-MCP-Session-Mode';
-export const IDEMPOTENCY_KEY_HEADER = 'X-Idempotency-Key';
+export const SESSION_MODE_HEADER = "X-MCP-Session-Mode";
+export const IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
 export const SSE_HEADERS = {
-  'Content-Type': 'text/event-stream',
-  'Cache-Control': 'no-cache',
-  Connection: 'keep-alive',
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
 } as const;
 
-const JSONRPC_VERSION = '2.0';
-const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26'] as const;
+const JSONRPC_VERSION = "2.0";
+const SUPPORTED_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26"] as const;
 const DEFAULT_PROTOCOL_VERSION = SUPPORTED_PROTOCOL_VERSIONS[0];
-const SERVER_NAME = 'flowpunk-gateway';
-const SERVER_VERSION = '0.1.0';
+const SERVER_NAME = "flowpunk-gateway";
+const SERVER_VERSION = "0.1.0";
 const TOOLS_CACHE_TTL_SECONDS = 300;
-const REQUEST_ID_HEADER = 'X-Request-ID';
-export const INVALIDATE_TOOLS_HEADER = 'X-FlowPunk-MCP-Invalidate-Tools';
-export const INVALIDATE_TOOLS_REASON_HEADER = 'X-FlowPunk-MCP-Invalidate-Tools-Reason';
+const REQUEST_ID_HEADER = "X-Request-ID";
+export const INVALIDATE_TOOLS_HEADER = "X-FlowPunk-MCP-Invalidate-Tools";
+export const INVALIDATE_TOOLS_REASON_HEADER =
+  "X-FlowPunk-MCP-Invalidate-Tools-Reason";
 
 export const SESSION_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const SESSION_ID_PATTERN = /^mcp_sess_[A-Za-z0-9_-]{22}$/;
@@ -79,13 +89,13 @@ interface JsonRpcRequest {
 }
 
 interface JsonRpcSuccess {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: JsonRpcId;
   result: unknown;
 }
 
 interface JsonRpcError {
-  jsonrpc: '2.0';
+  jsonrpc: "2.0";
   id: JsonRpcId;
   error: {
     code: number;
@@ -98,7 +108,7 @@ interface SessionIdentity {
   tenantId: string;
   userId: string;
   credentialId: string;
-  credentialType: 'apikey' | 'oauth';
+  credentialType: "apikey" | "oauth";
   scope: string;
 }
 
@@ -108,27 +118,27 @@ interface DownstreamToolsResponse {
 
 type CachedToolState =
   | {
-    mode: 'dynamic';
-    toolState: McpToolState;
-    /**
-     * Services whose `GET /mcp/tools` actually succeeded when the cache
-     * was written. The hybrid adapter uses this (∩ current adoption set)
-     * to decide which services contribute dynamic state vs static fallback —
-     * a partial fan-out where pipeline failed must NOT cause pipeline tools
-     * to disappear; static fallback fills in for adopted-but-failed.
-     */
-    succeededServices: string[];
-    /**
-     * The adoption set in effect at cache write time. If the gateway is
-     * redeployed with a different `MCP_TOOLS_DYNAMIC_SERVICES`, cached
-     * entries are ignored (treated as stale) so newly-adopted services
-     * are queried immediately rather than waiting for TTL.
-     */
-    adoptionSet: string[];
-  }
+      mode: "dynamic";
+      toolState: McpToolState;
+      /**
+       * Services whose `GET /mcp/tools` actually succeeded when the cache
+       * was written. The hybrid adapter uses this (∩ current adoption set)
+       * to decide which services contribute dynamic state vs static fallback —
+       * a partial fan-out where pipeline failed must NOT cause pipeline tools
+       * to disappear; static fallback fills in for adopted-but-failed.
+       */
+      succeededServices: string[];
+      /**
+       * The adoption set in effect at cache write time. If the gateway is
+       * redeployed with a different `MCP_TOOLS_DYNAMIC_SERVICES`, cached
+       * entries are ignored (treated as stale) so newly-adopted services
+       * are queried immediately rather than waiting for TTL.
+       */
+      adoptionSet: string[];
+    }
   | {
-    mode: 'fallback';
-  };
+      mode: "fallback";
+    };
 
 /**
  * MCP front controller.
@@ -137,32 +147,28 @@ type CachedToolState =
  * ownership and expiry checks.
  */
 export async function handleMcp(ctx: AppContext): Promise<Response> {
-  const identity = validateMcpSessionIdentity(extractIdentityHeaders(ctx.request.headers));
+  const identity = validateMcpSessionIdentity(
+    extractIdentityHeaders(ctx.request.headers),
+  );
   if (!identity) {
-    return new Response(
-      JSON.stringify({ error: 'unauthorized' }),
-      {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          [REQUEST_ID_HEADER]: ctx.requestId,
-        },
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json",
+        [REQUEST_ID_HEADER]: ctx.requestId,
       },
-    );
+    });
   }
 
   const suppliedSessionId = getSessionId(ctx.request);
   if (suppliedSessionId && !isValidSessionId(suppliedSessionId)) {
-    return new Response(
-      JSON.stringify({ error: 'invalid_session_id' }),
-      {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          [REQUEST_ID_HEADER]: ctx.requestId,
-        },
+    return new Response(JSON.stringify({ error: "invalid_session_id" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        [REQUEST_ID_HEADER]: ctx.requestId,
       },
-    );
+    });
   }
 
   // Per MCP streamable-HTTP spec (2025-03-26): the FIRST POST to /mcp
@@ -171,36 +177,35 @@ export async function handleMcp(ctx: AppContext): Promise<Response> {
   // response. Subsequent POSTs include the ID. We generate-on-missing
   // for both GET (SSE channel open) and POST (initial JSON-RPC) so the
   // DO can always handle a coherent session lifecycle.
-  const isInitialPost = ctx.request.method === 'POST' && !suppliedSessionId;
-  const shouldGenerate = ctx.request.method === 'GET' || isInitialPost;
+  const isInitialPost = ctx.request.method === "POST" && !suppliedSessionId;
+  const shouldGenerate = ctx.request.method === "GET" || isInitialPost;
   const sessionId = shouldGenerate
     ? (suppliedSessionId ?? generateSessionId())
     : suppliedSessionId;
   const sessionMode = shouldGenerate
-    ? (suppliedSessionId ? 'reattach' : 'create')
-    : 'existing';
+    ? suppliedSessionId
+      ? "reattach"
+      : "create"
+    : "existing";
 
   if (!sessionId) {
-    return new Response(
-      JSON.stringify({ error: 'missing_session_id' }),
-      {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          [REQUEST_ID_HEADER]: ctx.requestId,
-        },
+    return new Response(JSON.stringify({ error: "missing_session_id" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        [REQUEST_ID_HEADER]: ctx.requestId,
       },
-    );
+    });
   }
 
   const stub = ctx.env.MCP_SESSION_DO.get(
     ctx.env.MCP_SESSION_DO.idFromName(sessionId),
   );
   const headers = buildSessionForwardHeaders(ctx, sessionId, sessionMode);
-  const request = new Request('http://internal/mcp/session', {
+  const request = new Request("http://internal/mcp/session", {
     method: ctx.request.method,
     headers,
-    body: ctx.request.method === 'POST' ? ctx.request.body : undefined,
+    body: ctx.request.method === "POST" ? ctx.request.body : undefined,
   });
 
   return stub.fetch(request);
@@ -220,7 +225,7 @@ export function createJsonRpcContext(
     userId: session.userId,
     credentialId: session.credentialId,
     credentialType: session.credentialType,
-    scope: request.headers.get('X-Scope') ?? '',
+    scope: request.headers.get("X-Scope") ?? "",
   };
 }
 
@@ -236,9 +241,14 @@ export async function executeJsonRpc(
 
   const parsed = await parseJsonRpcRequest(ctx.request, maxBytes);
   if (!parsed.ok) {
-    const response = parsed.message === 'Request too large'
-      ? requestTooLargeResponse(maxBytes, ctx.requestId)
-      : jsonRpcResponse(errorPayload(null, -32700, parsed.message), 400, ctx.requestId);
+    const response =
+      parsed.message === "Request too large"
+        ? requestTooLargeResponse(maxBytes, ctx.requestId)
+        : jsonRpcResponse(
+            errorPayload(null, -32700, parsed.message),
+            400,
+            ctx.requestId,
+          );
     return response;
   }
 
@@ -251,7 +261,7 @@ export async function executeJsonRpc(
   }
   if (!isValidJsonRpcRequest(request)) {
     return jsonRpcResponse(
-      errorPayload(jsonRpcIdFromUnknown(request), -32600, 'Invalid Request'),
+      errorPayload(jsonRpcIdFromUnknown(request), -32600, "Invalid Request"),
       400,
       ctx.requestId,
     );
@@ -262,16 +272,20 @@ export async function executeJsonRpc(
 
   try {
     switch (request.method) {
-      case 'initialize':
-        payload = initializePayload(request.id ?? null, request.params, session.sessionId);
-        if ('error' in payload) status = 400;
+      case "initialize":
+        payload = initializePayload(
+          request.id ?? null,
+          request.params,
+          session.sessionId,
+        );
+        if ("error" in payload) status = 400;
         break;
-      case 'tools/list':
+      case "tools/list":
         payload = successPayload(request.id ?? null, {
           tools: await listAvailableTools(ctx, maxBytes),
         });
         break;
-      case 'tools/call':
+      case "tools/call":
         payload = await handleToolCall(ctx, session, request, maxBytes);
         break;
       default:
@@ -283,13 +297,13 @@ export async function executeJsonRpc(
         status = 404;
     }
   } catch (error) {
-    bindLogger(ctx).error('mcp_request_failed', {
+    bindLogger(ctx).error("mcp_request_failed", {
       method: request.method,
       sessionId: session.sessionId,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "unknown error",
     });
-    payload = errorPayload(request.id ?? null, -32603, 'Internal error');
+    payload = errorPayload(request.id ?? null, -32603, "Internal error");
     status = 500;
   }
 
@@ -304,28 +318,46 @@ async function handleToolCall(
 ): Promise<JsonRpcSuccess | JsonRpcError> {
   const params = request.params;
   if (!isToolCallParams(params)) {
-    return errorPayload(request.id ?? null, -32602, 'Invalid tool call params');
+    return errorPayload(request.id ?? null, -32602, "Invalid tool call params");
   }
 
   const toolName = params.name;
   const { adapter } = await resolveGatewayToolAdapter(ctx, maxBytes);
   const toolMetadata = adapter.getToolMetadata(toolName);
   if (!toolMetadata) {
-    return errorPayload(request.id ?? null, -32601, `Unknown tool: ${toolName}`);
+    return errorPayload(
+      request.id ?? null,
+      -32601,
+      `Unknown tool: ${toolName}`,
+    );
   }
 
-  const requiredScope = adapter.requiredScopeForTool(toolName, params.arguments);
-  if (!hasToolExecutionScope(narrowMcpCredentialType(ctx.credentialType), ctx.scope, requiredScope)) {
-    return errorPayload(request.id ?? null, -32003, 'Insufficient scope', {
+  const requiredScope = adapter.requiredScopeForTool(
+    toolName,
+    params.arguments,
+  );
+  if (
+    !hasToolExecutionScope(
+      narrowMcpCredentialType(ctx.credentialType),
+      ctx.scope,
+      requiredScope,
+    )
+  ) {
+    return errorPayload(request.id ?? null, -32003, "Insufficient scope", {
       requiredScope,
     });
   }
 
-  if (toolMetadata.availability.status !== 'available') {
-    return errorPayload(request.id ?? null, -32004, 'Tool is not available for this tenant', {
-      reason: toolMetadata.availability.reason,
-      nextStep: toolMetadata.availability.nextStep,
-    });
+  if (toolMetadata.availability.status !== "available") {
+    return errorPayload(
+      request.id ?? null,
+      -32004,
+      "Tool is not available for this tenant",
+      {
+        reason: toolMetadata.availability.reason,
+        nextStep: toolMetadata.availability.nextStep,
+      },
+    );
   }
 
   const description = adapter.describeModelAction(toolName, params.arguments);
@@ -333,8 +365,11 @@ async function handleToolCall(
     return successPayload(request.id ?? null, toolResult(description));
   }
 
-  const modelActionCall = adapter.resolveModelAction(toolName, params.arguments);
-  if (toolMetadata.kind === 'model' && !modelActionCall) {
+  const modelActionCall = adapter.resolveModelAction(
+    toolName,
+    params.arguments,
+  );
+  if (toolMetadata.kind === "model" && !modelActionCall) {
     return errorPayload(
       request.id ?? null,
       -32602,
@@ -343,7 +378,8 @@ async function handleToolCall(
   }
 
   const downstreamToolName = modelActionCall?.downstreamName ?? toolName;
-  const downstreamArguments = modelActionCall?.arguments ?? params.arguments ?? {};
+  const downstreamArguments =
+    modelActionCall?.arguments ?? params.arguments ?? {};
   const downstreamMetadata = modelActionCall?.metadata ?? toolMetadata;
   const service = bindingForTool(downstreamMetadata.service, ctx);
   if (!service) {
@@ -359,7 +395,7 @@ async function handleToolCall(
   // notifications would replay against `withIdempotency` with no dedup key
   // and writes could double-execute on retry.
   if (
-    requiredScope === 'write' &&
+    requiredScope === "write" &&
     (request.id === undefined || request.id === null)
   ) {
     return errorPayload(
@@ -369,9 +405,13 @@ async function handleToolCall(
     );
   }
 
-  const headers = buildDownstreamServiceHeaders(ctx.request.headers, ctx.requestId, session.sessionId);
+  const headers = buildDownstreamServiceHeaders(
+    ctx.request.headers,
+    ctx.requestId,
+    session.sessionId,
+  );
 
-  if (requiredScope === 'write') {
+  if (requiredScope === "write") {
     const argumentsHash = await hashArguments(downstreamArguments);
     headers.set(
       IDEMPOTENCY_KEY_HEADER,
@@ -388,9 +428,9 @@ async function handleToolCall(
   try {
     response = await fetchWithServiceTimeout(
       service,
-      'http://internal/mcp/execute',
+      "http://internal/mcp/execute",
       {
-        method: 'POST',
+        method: "POST",
         headers,
         // Body is the stable retry-identity payload — must not contain any
         // per-HTTP-request entropy. `withIdempotency` hashes the body to
@@ -407,13 +447,13 @@ async function handleToolCall(
       ctx.env.SERVICE_TIMEOUT_MS,
     );
   } catch (error) {
-    bindLogger(ctx).error('mcp_tool_dispatch_failed', {
+    bindLogger(ctx).error("mcp_tool_dispatch_failed", {
       toolName: downstreamToolName,
       sessionId: session.sessionId,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "unknown error",
     });
-    return errorPayload(request.id ?? null, -32010, 'Tool dispatch failed');
+    return errorPayload(request.id ?? null, -32010, "Tool dispatch failed");
   }
 
   let responseBody: unknown;
@@ -421,14 +461,14 @@ async function handleToolCall(
     responseBody = await parseDownstreamBody(response, maxBytes);
   } catch (error) {
     if (error instanceof BodyTooLargeError) {
-      bindLogger(ctx).warn('mcp_tool_response_too_large', {
+      bindLogger(ctx).warn("mcp_tool_response_too_large", {
         toolName: downstreamToolName,
         sessionId: session.sessionId,
         maxBytes,
       });
-      return errorPayload(request.id ?? null, -32011, 'Tool execution failed', {
+      return errorPayload(request.id ?? null, -32011, "Tool execution failed", {
         status: response.status,
-        body: { error: 'response_too_large', maxBytes },
+        body: { error: "response_too_large", maxBytes },
       });
     }
     throw error;
@@ -437,12 +477,12 @@ async function handleToolCall(
   await invalidateToolsCacheIfRequired(response.headers, ctx);
 
   if (!response.ok) {
-    bindLogger(ctx).warn('mcp_tool_dispatch_rejected', {
+    bindLogger(ctx).warn("mcp_tool_dispatch_rejected", {
       toolName: downstreamToolName,
       sessionId: session.sessionId,
       statusCode: response.status,
     });
-    return errorPayload(request.id ?? null, -32011, 'Tool execution failed', {
+    return errorPayload(request.id ?? null, -32011, "Tool execution failed", {
       status: response.status,
       body: responseBody,
     });
@@ -454,7 +494,13 @@ async function handleToolCall(
 async function listAvailableTools(
   ctx: AppContext,
   maxBytes: number,
-): Promise<Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>> {
+): Promise<
+  Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+  }>
+> {
   const { adapter } = await resolveGatewayToolAdapter(ctx, maxBytes);
   return adapter.listAvailableTools().map(toToolDefinition);
 }
@@ -470,28 +516,26 @@ export async function invalidateToolsCacheIfRequired(
 
   try {
     await ctx.env.MCP_TOOLS_KV.delete(`mcp:tools:${ctx.tenantId}`);
-    bindLogger(ctx).info('mcp_tools_cache_invalidated', {
+    bindLogger(ctx).info("mcp_tools_cache_invalidated", {
       tenantId: ctx.tenantId,
       reason: invalidation.reason,
       ttlSeconds: TOOLS_CACHE_TTL_SECONDS,
     });
   } catch (error) {
-    bindLogger(ctx).warn('mcp_tools_cache_invalidation_failed', {
+    bindLogger(ctx).warn("mcp_tools_cache_invalidation_failed", {
       tenantId: ctx.tenantId,
       reason: invalidation.reason,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "unknown error",
     });
   }
 }
 
-function downstreamToolsInvalidationFromHeaders(
-  headers: Headers,
-): {
+function downstreamToolsInvalidationFromHeaders(headers: Headers): {
   invalidateTools: boolean;
   reason?: string;
 } {
-  const invalidateTools = headers.get(INVALIDATE_TOOLS_HEADER) === 'true';
+  const invalidateTools = headers.get(INVALIDATE_TOOLS_HEADER) === "true";
   const reason = headers.get(INVALIDATE_TOOLS_REASON_HEADER) ?? undefined;
   return {
     invalidateTools,
@@ -502,7 +546,7 @@ function downstreamToolsInvalidationFromHeaders(
 function buildSessionForwardHeaders(
   ctx: AppContext,
   sessionId: string,
-  sessionMode: 'create' | 'reattach' | 'existing',
+  sessionMode: "create" | "reattach" | "existing",
 ): Headers {
   const headers = new Headers();
   copyIdentityHeaders(ctx.request.headers, headers);
@@ -510,8 +554,8 @@ function buildSessionForwardHeaders(
   headers.set(SESSION_HEADER, sessionId);
   headers.set(SESSION_MODE_HEADER, sessionMode);
 
-  const contentType = ctx.request.headers.get('Content-Type');
-  if (contentType) headers.set('Content-Type', contentType);
+  const contentType = ctx.request.headers.get("Content-Type");
+  if (contentType) headers.set("Content-Type", contentType);
   return headers;
 }
 
@@ -522,7 +566,7 @@ function buildDownstreamServiceHeaders(
 ): Headers {
   const headers = new Headers();
   copyIdentityHeaders(sourceHeaders, headers);
-  headers.set('Content-Type', 'application/json');
+  headers.set("Content-Type", "application/json");
   headers.set(REQUEST_ID_HEADER, requestId);
   if (sessionId) headers.set(SESSION_HEADER, sessionId);
   return headers;
@@ -530,10 +574,10 @@ function buildDownstreamServiceHeaders(
 
 export function getSessionId(request: Request): string | null {
   const headerValue = request.headers.get(SESSION_HEADER);
-  if (headerValue && headerValue.trim() !== '') return headerValue.trim();
+  if (headerValue && headerValue.trim() !== "") return headerValue.trim();
 
-  const queryValue = new URL(request.url).searchParams.get('sessionId');
-  if (queryValue && queryValue.trim() !== '') return queryValue.trim();
+  const queryValue = new URL(request.url).searchParams.get("sessionId");
+  if (queryValue && queryValue.trim() !== "") return queryValue.trim();
 
   return null;
 }
@@ -558,7 +602,7 @@ export function validateMcpSessionIdentity(
   // Sessions are admin-REST-only, never valid for MCP. Path scoping in the
   // gateway auth middleware should prevent stamping `'session'` on `/mcp`,
   // but reject here as defense in depth (ADR-011 §MCP auth).
-  if (identity.credentialType === 'session') {
+  if (identity.credentialType === "session") {
     return null;
   }
 
@@ -571,13 +615,16 @@ export function validateMcpSessionIdentity(
   };
 }
 
-function bindingForTool(service: McpServiceName, ctx: AppContext): Fetcher | null {
+function bindingForTool(
+  service: McpServiceName,
+  ctx: AppContext,
+): Fetcher | null {
   switch (service) {
-    case 'contacts':
+    case "contacts":
       return ctx.env.CONTACTS_SERVICE;
-    case 'pipeline':
+    case "pipeline":
       return ctx.env.PIPELINE_SERVICE;
-    case 'gateway':
+    case "gateway":
       return null;
   }
 }
@@ -585,43 +632,40 @@ function bindingForTool(service: McpServiceName, ctx: AppContext): Fetcher | nul
 async function parseJsonRpcRequest(
   request: Request,
   maxBytes: number,
-): Promise<
-  | { ok: true; request: unknown }
-  | { ok: false; message: string }
-> {
+): Promise<{ ok: true; request: unknown } | { ok: false; message: string }> {
   try {
     const body = await readRequestTextWithinLimit(request, maxBytes);
     return { ok: true, request: JSON.parse(body) };
   } catch (error) {
     if (error instanceof BodyTooLargeError) {
-      return { ok: false, message: 'Request too large' };
+      return { ok: false, message: "Request too large" };
     }
-    return { ok: false, message: 'Parse error' };
+    return { ok: false, message: "Parse error" };
   }
 }
 
 function isValidJsonRpcRequest(value: unknown): value is JsonRpcRequest {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<JsonRpcRequest>;
   return (
     candidate.jsonrpc === JSONRPC_VERSION &&
-    typeof candidate.method === 'string' &&
+    typeof candidate.method === "string" &&
     candidate.id !== undefined
   );
 }
 
 function isJsonRpcNotification(value: unknown): value is JsonRpcRequest {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<JsonRpcRequest>;
   return (
     candidate.jsonrpc === JSONRPC_VERSION &&
-    typeof candidate.method === 'string' &&
+    typeof candidate.method === "string" &&
     candidate.id === undefined
   );
 }
 
 function isJsonRpcResponse(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as {
     jsonrpc?: unknown;
     method?: unknown;
@@ -633,16 +677,16 @@ function isJsonRpcResponse(value: unknown): boolean {
     candidate.jsonrpc === JSONRPC_VERSION &&
     candidate.method === undefined &&
     candidate.id !== undefined &&
-    ('result' in candidate || 'error' in candidate)
+    ("result" in candidate || "error" in candidate)
   );
 }
 
 function jsonRpcIdFromUnknown(value: unknown): JsonRpcId {
-  if (!value || typeof value !== 'object') return null;
+  if (!value || typeof value !== "object") return null;
   const candidate = value as { id?: unknown };
   if (
-    typeof candidate.id === 'string' ||
-    typeof candidate.id === 'number' ||
+    typeof candidate.id === "string" ||
+    typeof candidate.id === "number" ||
     candidate.id === null
   ) {
     return candidate.id;
@@ -674,9 +718,10 @@ function initializePayload(
 }
 
 function protocolVersionFromInitializeParams(params: unknown): string | null {
-  if (!params || typeof params !== 'object') return null;
-  const protocolVersion = (params as { protocolVersion?: unknown }).protocolVersion;
-  return typeof protocolVersion === 'string' ? protocolVersion : null;
+  if (!params || typeof params !== "object") return null;
+  const protocolVersion = (params as { protocolVersion?: unknown })
+    .protocolVersion;
+  return typeof protocolVersion === "string" ? protocolVersion : null;
 }
 
 function negotiateProtocolVersion(requestedVersion: string | null): string {
@@ -692,16 +737,16 @@ function negotiateProtocolVersion(requestedVersion: string | null): string {
 function isToolCallParams(
   value: unknown,
 ): value is { name: string; arguments?: Record<string, unknown> } {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as {
     name?: unknown;
     arguments?: unknown;
   };
-  if (typeof candidate.name !== 'string') return false;
+  if (typeof candidate.name !== "string") return false;
   if (
     candidate.arguments !== undefined &&
     (candidate.arguments === null ||
-      typeof candidate.arguments !== 'object' ||
+      typeof candidate.arguments !== "object" ||
       Array.isArray(candidate.arguments))
   ) {
     return false;
@@ -719,11 +764,11 @@ function successPayload(id: JsonRpcId, result: unknown): JsonRpcSuccess {
 }
 
 function toolResult(data: unknown): {
-  content: Array<{ type: 'text'; text: string }>;
+  content: Array<{ type: "text"; text: string }>;
   isError: false;
 } {
   return {
-    content: [{ type: 'text', text: JSON.stringify(data) }],
+    content: [{ type: "text", text: JSON.stringify(data) }],
     isError: false,
   };
 }
@@ -753,7 +798,7 @@ function jsonRpcResponse(
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       [REQUEST_ID_HEADER]: requestId,
     },
   });
@@ -775,13 +820,13 @@ async function parseDownstreamBody(
   const bytes = await readResponseBytesWithinLimit(response, maxBytes);
   if (bytes.byteLength === 0) return null;
 
-  const contentType = response.headers.get('Content-Type') ?? '';
+  const contentType = response.headers.get("Content-Type") ?? "";
   const text = new TextDecoder().decode(bytes);
-  if (contentType.includes('application/json')) {
+  if (contentType.includes("application/json")) {
     try {
       return JSON.parse(text) as unknown;
     } catch {
-      return { error: 'invalid_json_response' };
+      return { error: "invalid_json_response" };
     }
   }
 
@@ -789,7 +834,7 @@ async function parseDownstreamBody(
 }
 
 function bindLogger(ctx: AppContext): Logger {
-  let logger = createLogger({ service: 'gateway' })
+  let logger = createLogger({ service: "gateway" })
     .withRequestId(ctx.requestId)
     .withTenantId(ctx.tenantId)
     .withUserId(ctx.userId);
@@ -797,7 +842,7 @@ function bindLogger(ctx: AppContext): Logger {
     const descriptor: CredentialDescriptor = {
       credentialId: ctx.credentialId,
       credentialType: ctx.credentialType,
-      ...(ctx.credentialType === 'apikey'
+      ...(ctx.credentialType === "apikey"
         ? { keyLabel: ctx.keyLabel ?? null }
         : {}),
     };
@@ -844,7 +889,7 @@ async function synthesizeIdempotencyKey(
   argumentsHash: string,
 ): Promise<string> {
   const composite = JSON.stringify([
-    'mcp',
+    "mcp",
     sessionId,
     typeof jsonrpcId,
     jsonrpcId,
@@ -852,25 +897,28 @@ async function synthesizeIdempotencyKey(
     argumentsHash,
   ]);
   const bytes = new TextEncoder().encode(composite);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
   const hex = Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   return `mcp_${hex}`;
 }
 
 async function hashArguments(args: Record<string, unknown>): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(args));
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function base64UrlEncode(bytes: Uint8Array): string {
-  let binary = '';
+  let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 /**
@@ -898,16 +946,21 @@ export function configureGatewayToolRegistry(
 }
 
 function envEdition(env: Env): Edition {
-  return env.EDITION === 'managed' ? 'managed' : 'indie';
+  return env.EDITION === "managed" ? "managed" : "indie";
 }
 
-function parseDynamicServices(raw: string | undefined): Set<Exclude<McpServiceName, 'gateway'>> {
-  const allowed = new Set<Exclude<McpServiceName, 'gateway'>>(['contacts', 'pipeline']);
-  const out = new Set<Exclude<McpServiceName, 'gateway'>>();
-  for (const part of (raw ?? '').split(',')) {
+function parseDynamicServices(
+  raw: string | undefined,
+): Set<Exclude<McpServiceName, "gateway">> {
+  const allowed = new Set<Exclude<McpServiceName, "gateway">>([
+    "contacts",
+    "pipeline",
+  ]);
+  const out = new Set<Exclude<McpServiceName, "gateway">>();
+  for (const part of (raw ?? "").split(",")) {
     const trimmed = part.trim();
-    if (allowed.has(trimmed as Exclude<McpServiceName, 'gateway'>)) {
-      out.add(trimmed as Exclude<McpServiceName, 'gateway'>);
+    if (allowed.has(trimmed as Exclude<McpServiceName, "gateway">)) {
+      out.add(trimmed as Exclude<McpServiceName, "gateway">);
     }
   }
   return out;
@@ -935,11 +988,12 @@ function createStaticGatewayToolAdapter(ctx: AppContext): McpToolAdapter {
 function createHybridGatewayToolAdapter(
   ctx: AppContext,
   toolState: McpToolState,
-  dynamicServices: Set<Exclude<McpServiceName, 'gateway'>>,
+  dynamicServices: Set<Exclude<McpServiceName, "gateway">>,
 ): McpToolAdapter {
   const registry = registryForEdition(envEdition(ctx.env));
   const staticForNonAdopted = registry.staticExecutableTools.filter(
-    (tool) => !dynamicServices.has(tool.service as Exclude<McpServiceName, 'gateway'>),
+    (tool) =>
+      !dynamicServices.has(tool.service as Exclude<McpServiceName, "gateway">),
   );
   return createMcpToolAdapter(
     {
@@ -978,7 +1032,9 @@ async function resolveGatewayToolAdapter(
     };
   }
 
-  const dynamicServices = parseDynamicServices(ctx.env.MCP_TOOLS_DYNAMIC_SERVICES);
+  const dynamicServices = parseDynamicServices(
+    ctx.env.MCP_TOOLS_DYNAMIC_SERVICES,
+  );
 
   // No services adopted dynamic introspection → straight to static.
   if (dynamicServices.size === 0) {
@@ -987,7 +1043,7 @@ async function resolveGatewayToolAdapter(
 
   const cachedState = await readCachedToolState(ctx, dynamicServices);
   if (cachedState) {
-    if (cachedState.mode === 'fallback') {
+    if (cachedState.mode === "fallback") {
       return { adapter: createStaticGatewayToolAdapter(ctx) };
     }
     // The set of services that contribute dynamic state is the
@@ -995,11 +1051,19 @@ async function resolveGatewayToolAdapter(
     // other adopted services get static fallback so a single failed
     // service in a fan-out doesn't make its tools disappear.
     const effectivelyDynamic = intersect(
-      new Set(cachedState.succeededServices as Array<Exclude<McpServiceName, 'gateway'>>),
+      new Set(
+        cachedState.succeededServices as Array<
+          Exclude<McpServiceName, "gateway">
+        >,
+      ),
       dynamicServices,
     );
     return {
-      adapter: createHybridGatewayToolAdapter(ctx, cachedState.toolState, effectivelyDynamic),
+      adapter: createHybridGatewayToolAdapter(
+        ctx,
+        cachedState.toolState,
+        effectivelyDynamic,
+      ),
     };
   }
 
@@ -1008,7 +1072,7 @@ async function resolveGatewayToolAdapter(
     // All adopted services failed introspection. Degrade to static for THIS
     // request (do not poison the cache with a fallback marker) so the next
     // request retries fan-out — service deploys recover quickly.
-    bindLogger(ctx).warn('mcp_tools_introspection_failed', {
+    bindLogger(ctx).warn("mcp_tools_introspection_failed", {
       tenantId: ctx.tenantId,
       adoptedServices: [...dynamicServices].sort(),
     });
@@ -1016,13 +1080,17 @@ async function resolveGatewayToolAdapter(
   }
 
   await writeCachedToolState(ctx, {
-    mode: 'dynamic',
+    mode: "dynamic",
     toolState: fanOut.toolState,
     succeededServices: [...fanOut.succeededServices].sort(),
     adoptionSet: [...dynamicServices].sort(),
   });
   return {
-    adapter: createHybridGatewayToolAdapter(ctx, fanOut.toolState, fanOut.succeededServices),
+    adapter: createHybridGatewayToolAdapter(
+      ctx,
+      fanOut.toolState,
+      fanOut.succeededServices,
+    ),
   };
 }
 
@@ -1034,68 +1102,78 @@ function intersect<T>(a: Set<T>, b: Set<T>): Set<T> {
 
 async function readCachedToolState(
   ctx: AppContext,
-  currentAdoption: Set<Exclude<McpServiceName, 'gateway'>>,
+  currentAdoption: Set<Exclude<McpServiceName, "gateway">>,
 ): Promise<CachedToolState | null> {
   if (!ctx.tenantId) return null;
 
   try {
-    const cached = await ctx.env.MCP_TOOLS_KV.get(toolsCacheKey(ctx.tenantId), 'json') as
-      | CachedToolState
-      | null;
+    const cached = (await ctx.env.MCP_TOOLS_KV.get(
+      toolsCacheKey(ctx.tenantId),
+      "json",
+    )) as CachedToolState | null;
     if (!isCachedToolState(cached)) return null;
     // Ignore cache when the adoption set has changed — otherwise newly
     // adopted services would be invisible until TTL expires.
-    if (cached.mode === 'dynamic') {
-      const cachedSig = cached.adoptionSet.join(',');
-      const currentSig = [...currentAdoption].sort().join(',');
+    if (cached.mode === "dynamic") {
+      const cachedSig = cached.adoptionSet.join(",");
+      const currentSig = [...currentAdoption].sort().join(",");
       if (cachedSig !== currentSig) return null;
     }
     return cached;
   } catch (error) {
-    bindLogger(ctx).warn('mcp_tools_cache_read_failed', {
+    bindLogger(ctx).warn("mcp_tools_cache_read_failed", {
       tenantId: ctx.tenantId,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "unknown error",
     });
   }
 
   return null;
 }
 
-async function writeCachedToolState(ctx: AppContext, cachedState: CachedToolState): Promise<void> {
+async function writeCachedToolState(
+  ctx: AppContext,
+  cachedState: CachedToolState,
+): Promise<void> {
   if (!ctx.tenantId) return;
 
   try {
-    await ctx.env.MCP_TOOLS_KV.put(toolsCacheKey(ctx.tenantId), JSON.stringify(cachedState), {
-      expirationTtl: TOOLS_CACHE_TTL_SECONDS,
-    });
+    await ctx.env.MCP_TOOLS_KV.put(
+      toolsCacheKey(ctx.tenantId),
+      JSON.stringify(cachedState),
+      {
+        expirationTtl: TOOLS_CACHE_TTL_SECONDS,
+      },
+    );
   } catch (error) {
-    bindLogger(ctx).warn('mcp_tools_cache_write_failed', {
+    bindLogger(ctx).warn("mcp_tools_cache_write_failed", {
       tenantId: ctx.tenantId,
-      errorName: error instanceof Error ? error.name : 'UnknownError',
-      errorMessage: error instanceof Error ? error.message : 'unknown error',
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorMessage: error instanceof Error ? error.message : "unknown error",
     });
   }
 }
 
 interface FanOutResult {
   toolState: McpToolState;
-  succeededServices: Set<Exclude<McpServiceName, 'gateway'>>;
+  succeededServices: Set<Exclude<McpServiceName, "gateway">>;
 }
 
 async function fetchTenantToolState(
   ctx: AppContext,
   maxBytes: number,
-  dynamicServices: Set<Exclude<McpServiceName, 'gateway'>>,
+  dynamicServices: Set<Exclude<McpServiceName, "gateway">>,
 ): Promise<FanOutResult | null> {
   const allServices: Array<{
-    name: Exclude<McpServiceName, 'gateway'>;
+    name: Exclude<McpServiceName, "gateway">;
     binding: Fetcher;
   }> = [
-    { name: 'contacts' as const, binding: ctx.env.CONTACTS_SERVICE },
-    { name: 'pipeline' as const, binding: ctx.env.PIPELINE_SERVICE },
+    { name: "contacts" as const, binding: ctx.env.CONTACTS_SERVICE },
+    { name: "pipeline" as const, binding: ctx.env.PIPELINE_SERVICE },
   ];
-  const services = allServices.filter((entry) => dynamicServices.has(entry.name));
+  const services = allServices.filter((entry) =>
+    dynamicServices.has(entry.name),
+  );
   if (services.length === 0) return null;
 
   const results = await Promise.allSettled(
@@ -1106,21 +1184,22 @@ async function fetchTenantToolState(
   );
 
   const mergedState = emptyToolState();
-  const succeededServices = new Set<Exclude<McpServiceName, 'gateway'>>();
+  const succeededServices = new Set<Exclude<McpServiceName, "gateway">>();
 
   for (const [index, result] of results.entries()) {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       mergeToolState(mergedState, result.value.response.toolState);
       succeededServices.add(result.value.name);
       continue;
     }
 
     const failure = result.reason;
-    bindLogger(ctx).warn('mcp_tools_fanout_failed', {
+    bindLogger(ctx).warn("mcp_tools_fanout_failed", {
       tenantId: ctx.tenantId,
-      service: services[index]?.name ?? 'unknown',
-      errorName: failure instanceof Error ? failure.name : 'UnknownError',
-      errorMessage: failure instanceof Error ? failure.message : 'unknown error',
+      service: services[index]?.name ?? "unknown",
+      errorName: failure instanceof Error ? failure.name : "UnknownError",
+      errorMessage:
+        failure instanceof Error ? failure.message : "unknown error",
     });
   }
 
@@ -1130,7 +1209,7 @@ async function fetchTenantToolState(
 
 async function fetchDownstreamToolState(
   ctx: AppContext,
-  serviceName: Exclude<McpServiceName, 'gateway'>,
+  serviceName: Exclude<McpServiceName, "gateway">,
   service: Fetcher,
   maxBytes: number,
 ): Promise<DownstreamToolsResponse> {
@@ -1138,17 +1217,20 @@ async function fetchDownstreamToolState(
   try {
     response = await fetchWithServiceTimeout(
       service,
-      'http://internal/mcp/tools',
+      "http://internal/mcp/tools",
       {
-        method: 'GET',
-        headers: buildDownstreamServiceHeaders(ctx.request.headers, ctx.requestId),
+        method: "GET",
+        headers: buildDownstreamServiceHeaders(
+          ctx.request.headers,
+          ctx.requestId,
+        ),
       },
       ctx.env.SERVICE_TIMEOUT_MS,
     );
   } catch (error) {
     throw new Error(
       `Downstream MCP tools request failed for ${serviceName}: ${
-        error instanceof Error ? error.message : 'unknown error'
+        error instanceof Error ? error.message : "unknown error"
       }`,
     );
   }
@@ -1161,7 +1243,9 @@ async function fetchDownstreamToolState(
 
   const body = await parseDownstreamBody(response, maxBytes);
   if (!isDownstreamToolsResponse(body)) {
-    throw new Error(`Downstream MCP tools payload for ${serviceName} is invalid`);
+    throw new Error(
+      `Downstream MCP tools payload for ${serviceName} is invalid`,
+    );
   }
 
   return body;
@@ -1200,13 +1284,15 @@ function dedupeToolMetadata(tools: ToolMetadata[]): ToolMetadata[] {
   return [...deduped.values()];
 }
 
-function isDownstreamToolsResponse(value: unknown): value is DownstreamToolsResponse {
-  if (!value || typeof value !== 'object') return false;
+function isDownstreamToolsResponse(
+  value: unknown,
+): value is DownstreamToolsResponse {
+  if (!value || typeof value !== "object") return false;
   return isMcpToolState((value as { toolState?: unknown }).toolState);
 }
 
 function isMcpToolState(value: unknown): value is McpToolState {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<McpToolState>;
   return (
     Array.isArray(candidate.availableTools) &&
@@ -1216,16 +1302,16 @@ function isMcpToolState(value: unknown): value is McpToolState {
 }
 
 function isCachedToolState(value: unknown): value is CachedToolState {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") return false;
   const candidate = value as {
     mode?: unknown;
     toolState?: unknown;
     succeededServices?: unknown;
     adoptionSet?: unknown;
   };
-  if (candidate.mode === 'fallback') return true;
+  if (candidate.mode === "fallback") return true;
   return (
-    candidate.mode === 'dynamic' &&
+    candidate.mode === "dynamic" &&
     isMcpToolState(candidate.toolState) &&
     isStringArray(candidate.succeededServices) &&
     isStringArray(candidate.adoptionSet)
@@ -1233,5 +1319,7 @@ function isCachedToolState(value: unknown): value is CachedToolState {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+  return (
+    Array.isArray(value) && value.every((entry) => typeof entry === "string")
+  );
 }

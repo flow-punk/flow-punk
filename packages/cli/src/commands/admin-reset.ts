@@ -1,10 +1,10 @@
-import * as p from '@clack/prompts';
-import { resolveAndVerify } from './helpers.js';
-import { readConfig } from '../auth/token-store.js';
-import { theme } from '../ui/theme.js';
-import { CliError } from '../util/errors.js';
-import { seedAdmin } from '../flow/seed-admin.js';
-import { mintApiKey } from '../flow/mint-api-key.js';
+import * as p from "@clack/prompts";
+import { resolveAndVerify } from "./helpers.js";
+import { readConfig } from "../auth/token-store.js";
+import { theme } from "../ui/theme.js";
+import { CliError } from "../util/errors.js";
+import { seedAdmin } from "../flow/seed-admin.js";
+import { mintApiKey } from "../flow/mint-api-key.js";
 
 export interface AdminResetOpts {
   token?: string;
@@ -34,27 +34,26 @@ export async function adminResetCommand(opts: AdminResetOpts): Promise<void> {
   const config = await readConfig();
   const matching = Object.values(config.deployments).filter(
     (d) =>
-      d.accountId === account.id &&
-      (!opts.prefix || d.prefix === opts.prefix),
+      d.accountId === account.id && (!opts.prefix || d.prefix === opts.prefix),
   );
   if (matching.length === 0) {
     throw new CliError(
       `No deployment recorded for account ${account.name}`,
-      'Run `flowpunk init` first.',
+      "Run `flowpunk init` first.",
     );
   }
   if (matching.length > 1 && !opts.prefix) {
     throw new CliError(
-      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(', ')}`,
-      'Pass --prefix <name>.',
+      `Multiple deployments on this account: ${matching.map((d) => d.prefix).join(", ")}`,
+      "Pass --prefix <name>.",
     );
   }
   const dep = matching[0]!;
   const gatewayUrl = dep.resources.workers.gateway.url;
   if (!gatewayUrl) {
     throw new CliError(
-      'Gateway URL missing from deployment record',
-      'Re-run `flowpunk init --resume` to fix the record, then retry.',
+      "Gateway URL missing from deployment record",
+      "Re-run `flowpunk init --resume` to fix the record, then retry.",
     );
   }
 
@@ -62,12 +61,14 @@ export async function adminResetCommand(opts: AdminResetOpts): Promise<void> {
     opts.email ??
     (await (async () => {
       const v = await p.text({
-        message: 'Admin email for the new user row?',
+        message: "Admin email for the new user row?",
         validate: (s) =>
-          /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) ? undefined : 'Enter a valid email.',
+          /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)
+            ? undefined
+            : "Enter a valid email.",
       });
       if (p.isCancel(v)) {
-        p.cancel('Cancelled.');
+        p.cancel("Cancelled.");
         process.exit(0);
       }
       return v as string;
@@ -77,12 +78,12 @@ export async function adminResetCommand(opts: AdminResetOpts): Promise<void> {
     opts.displayName ??
     (await (async () => {
       const v = await p.text({
-        message: 'Admin display name?',
-        placeholder: 'Operator',
-        defaultValue: 'Operator',
+        message: "Admin display name?",
+        placeholder: "Operator",
+        defaultValue: "Operator",
       });
       if (p.isCancel(v)) {
-        p.cancel('Cancelled.');
+        p.cancel("Cancelled.");
         process.exit(0);
       }
       return v as string;
@@ -95,13 +96,15 @@ export async function adminResetCommand(opts: AdminResetOpts): Promise<void> {
       `Gateway:   ${gatewayUrl}`,
       `New email: ${adminEmail}`,
       ``,
-      theme.dim('A new owner row + session will be inserted (existing rows untouched).'),
-    ].join('\n'),
-    'Mint new admin credentials',
+      theme.dim(
+        "A new owner row + session will be inserted (existing rows untouched).",
+      ),
+    ].join("\n"),
+    "Mint new admin credentials",
   );
-  const ok = await p.confirm({ message: 'Proceed?' });
+  const ok = await p.confirm({ message: "Proceed?" });
   if (p.isCancel(ok) || !ok) {
-    p.cancel('Cancelled.');
+    p.cancel("Cancelled.");
     process.exit(0);
   }
 
@@ -114,29 +117,33 @@ export async function adminResetCommand(opts: AdminResetOpts): Promise<void> {
   const minted = await mintApiKey({
     gatewayUrl,
     cookieValue: seeded.cookieValue,
-    label: 'flowpunk admin reset',
+    label: "flowpunk admin reset",
   });
 
-  const banner = '═'.repeat(72);
+  const banner = "═".repeat(72);
   process.stdout.write(
     [
-      '',
+      "",
       theme.brand(banner),
-      theme.bold('  New admin API key — shown ONCE'),
+      theme.bold("  New admin API key — shown ONCE"),
       theme.brand(banner),
-      '',
-      `${theme.bold('User ID:')}      ${seeded.userId}`,
-      `${theme.bold('API key:')}      ${theme.accent(minted.apiKey)}`,
-      '',
-      theme.bold('Browser login:'),
-      `  ${theme.accent('flowpunk connect')}`,
-      `  ${theme.dim('then visit')} ${theme.accent(`${gatewayUrl}/auth/login`)}`,
-      '',
-      theme.warn('  Old credentials remain valid. Revoke them via the deployed'),
-      theme.warn('  gateway if you need to rotate (DELETE /api/v1/auth/api-keys/<id>'),
-      theme.warn('  or DELETE /api/v1/users/<old-user-id>).'),
+      "",
+      `${theme.bold("User ID:")}      ${seeded.userId}`,
+      `${theme.bold("API key:")}      ${theme.accent(minted.apiKey)}`,
+      "",
+      theme.bold("Browser login:"),
+      `  ${theme.accent("flowpunk connect")}`,
+      `  ${theme.dim("then visit")} ${theme.accent(`${gatewayUrl}/auth/login`)}`,
+      "",
+      theme.warn(
+        "  Old credentials remain valid. Revoke them via the deployed",
+      ),
+      theme.warn(
+        "  gateway if you need to rotate (DELETE /api/v1/auth/api-keys/<id>",
+      ),
+      theme.warn("  or DELETE /api/v1/users/<old-user-id>)."),
       theme.brand(banner),
-      '',
-    ].join('\n'),
+      "",
+    ].join("\n"),
   );
 }

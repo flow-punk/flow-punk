@@ -2,11 +2,11 @@
 // @flowpunk/db lands. Until then, callers must not pass PII via the data
 // parameter.
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface CredentialDescriptor {
   credentialId: string;
-  credentialType: 'apikey' | 'oauth' | 'session';
+  credentialType: "apikey" | "oauth" | "session";
   keyLabel?: string | null;
 }
 
@@ -77,10 +77,10 @@ function build(ctx: BoundContext): Logger {
       userId === undefined ? build(ctx) : build({ ...ctx, userId }),
     withCredential: (credential) =>
       credential === undefined ? build(ctx) : build({ ...ctx, credential }),
-    debug: (message, data) => emit(ctx, 'debug', message, data),
-    info: (message, data) => emit(ctx, 'info', message, data),
-    warn: (message, data) => emit(ctx, 'warn', message, data),
-    error: (message, data) => emit(ctx, 'error', message, data),
+    debug: (message, data) => emit(ctx, "debug", message, data),
+    info: (message, data) => emit(ctx, "info", message, data),
+    warn: (message, data) => emit(ctx, "warn", message, data),
+    error: (message, data) => emit(ctx, "error", message, data),
   };
 }
 

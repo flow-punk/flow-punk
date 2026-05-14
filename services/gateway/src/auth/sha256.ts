@@ -8,12 +8,12 @@
  */
 export async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest(
-    'SHA-256',
+    "SHA-256",
     new TextEncoder().encode(input),
   );
-  let out = '';
+  let out = "";
   for (const b of new Uint8Array(buf)) {
-    out += b.toString(16).padStart(2, '0');
+    out += b.toString(16).padStart(2, "0");
   }
   return out;
 }

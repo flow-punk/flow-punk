@@ -1,16 +1,16 @@
-import { createLogger, emitAuditEvent } from '@flowpunk/service-utils';
+import { createLogger, emitAuditEvent } from "@flowpunk/service-utils";
 import {
   route,
   type AuthCoreOptions,
   type AuthEnv,
-} from '@flowpunk-indie/auth-core';
+} from "@flowpunk-indie/auth-core";
 import {
   createAuthHandler,
   indieDefaultConfig,
   listEnabledProviders,
   validateDashboardSession,
   type AuthFactoryConfig,
-} from '@flowpunk-indie/auth-better';
+} from "@flowpunk-indie/auth-better";
 
 /**
  * Indie auth worker.
@@ -37,13 +37,13 @@ interface IndieAuthBetterEnv {
   GATEWAY_PUBLIC_ORIGIN: string;
 }
 
-type IndieAuthEnv = Omit<AuthEnv, 'AUTH_OPTIONS'> & IndieAuthBetterEnv;
+type IndieAuthEnv = Omit<AuthEnv, "AUTH_OPTIONS"> & IndieAuthBetterEnv;
 
 let cachedConfig: AuthFactoryConfig | null = null;
 function resolveConfig(env: IndieAuthBetterEnv): AuthFactoryConfig {
   if (cachedConfig) return cachedConfig;
   cachedConfig = indieDefaultConfig({
-    publicOrigin: env.GATEWAY_PUBLIC_ORIGIN || 'http://localhost:3000',
+    publicOrigin: env.GATEWAY_PUBLIC_ORIGIN || "http://localhost:3000",
     secret: env.AUTH_SECRET,
   });
   return cachedConfig;
@@ -52,9 +52,9 @@ function resolveConfig(env: IndieAuthBetterEnv): AuthFactoryConfig {
 export default {
   async fetch(request: Request, env: IndieAuthEnv): Promise<Response> {
     const requestId =
-      request.headers.get('X-Request-ID') ?? crypto.randomUUID();
-    const tenantId = request.headers.get('X-Tenant-Id') ?? undefined;
-    const logger = createLogger({ service: 'auth' })
+      request.headers.get("X-Request-ID") ?? crypto.randomUUID();
+    const tenantId = request.headers.get("X-Tenant-Id") ?? undefined;
+    const logger = createLogger({ service: "auth" })
       .withRequestId(requestId)
       .withTenantId(tenantId);
 
@@ -66,8 +66,8 @@ export default {
     // a stable identity body. 401 on any failure — the gateway falls
     // through to its other credential paths.
     if (
-      url.pathname === '/auth/session-identity' &&
-      request.method === 'POST'
+      url.pathname === "/auth/session-identity" &&
+      request.method === "POST"
     ) {
       try {
         const config = resolveConfig(env);
@@ -79,7 +79,7 @@ export default {
         if (!identity) {
           return jsonResponse(401, {
             success: false,
-            error: { code: 'INVALID_SESSION' },
+            error: { code: "INVALID_SESSION" },
           });
         }
         return jsonResponse(200, {
@@ -91,16 +91,16 @@ export default {
         });
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        logger.error('session-identity check failed', { error: err });
+        logger.error("session-identity check failed", { error: err });
         return jsonResponse(500, {
           success: false,
-          error: { code: 'AUTH_INTERNAL_ERROR' },
+          error: { code: "AUTH_INTERNAL_ERROR" },
         });
       }
     }
 
     // Better-auth surface — dashboard sign-in / sign-up / sessions / OAuth.
-    if (url.pathname.startsWith('/api/auth/')) {
+    if (url.pathname.startsWith("/api/auth/")) {
       try {
         const config = resolveConfig(env);
 
@@ -108,11 +108,11 @@ export default {
         // render provider buttons dynamically (ADR-021 §4). Indie returns
         // `['emailPassword']`; managed returns email + google + apple
         // based on whatever its config object holds.
-        if (url.pathname === '/api/auth/providers') {
-          if (request.method !== 'GET' && request.method !== 'HEAD') {
+        if (url.pathname === "/api/auth/providers") {
+          if (request.method !== "GET" && request.method !== "HEAD") {
             return new Response(null, {
               status: 405,
-              headers: { Allow: 'GET, HEAD' },
+              headers: { Allow: "GET, HEAD" },
             });
           }
           return jsonResponse(200, { providers: listEnabledProviders(config) });
@@ -122,21 +122,21 @@ export default {
           d1: env.DB,
           config,
           audit: {
-            actorTenantId: '_system',
+            actorTenantId: "_system",
             emit: (event) => emitAuditEvent(logger, event),
           },
         });
         return await handler(request);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        logger.error('better-auth handler failed', {
+        logger.error("better-auth handler failed", {
           error: err,
           method: request.method,
           path: url.pathname,
         });
         return jsonResponse(500, {
           success: false,
-          error: { code: 'AUTH_INTERNAL_ERROR' },
+          error: { code: "AUTH_INTERNAL_ERROR" },
         });
       }
     }
@@ -150,14 +150,14 @@ export default {
       );
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.error('unhandled error in auth worker', {
+      logger.error("unhandled error in auth worker", {
         error: err,
         method: request.method,
         path: url.pathname,
       });
       return jsonResponse(500, {
         success: false,
-        error: { code: 'INTERNAL_ERROR' },
+        error: { code: "INTERNAL_ERROR" },
       });
     }
   },
@@ -166,8 +166,8 @@ export default {
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
-export type { AuthEnv } from '@flowpunk-indie/auth-core';
+export type { AuthEnv } from "@flowpunk-indie/auth-core";

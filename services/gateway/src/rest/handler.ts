@@ -1,8 +1,8 @@
-import type { AppContext } from '../types.js';
+import type { AppContext } from "../types.js";
 import {
   IDENTITY_HEADER_NAMES,
   REST_FORWARDED_REQUEST_HEADERS,
-} from '../auth/identity-headers.js';
+} from "../auth/identity-headers.js";
 import {
   BodyTooLargeError,
   declaredContentLengthTooLarge,
@@ -10,9 +10,9 @@ import {
   parseMaxBodyBytes,
   readRequestBytesWithinLimit,
   requestTooLargeResponse,
-} from '../body-size.js';
-import { fetchWithServiceTimeout } from '../fetch-with-timeout.js';
-import { invalidateToolsCacheIfRequired } from '../mcp/index.js';
+} from "../body-size.js";
+import { fetchWithServiceTimeout } from "../fetch-with-timeout.js";
+import { invalidateToolsCacheIfRequired } from "../mcp/index.js";
 
 /**
  * REST route handler.
@@ -45,14 +45,14 @@ export async function handleRest(ctx: AppContext): Promise<Response> {
   }
 
   const target = bindingForPath(new URL(ctx.request.url).pathname, ctx);
-  if (!target) return new Response('Not Found', { status: 404 });
+  if (!target) return new Response("Not Found", { status: 404 });
 
   const headers = buildForwardHeaders(ctx.request.headers, ctx.requestId);
   let forwardedRequest: Request;
-  if (ctx.request.method !== 'GET' && ctx.request.method !== 'HEAD') {
+  if (ctx.request.method !== "GET" && ctx.request.method !== "HEAD") {
     try {
       const body = await readRequestBytesWithinLimit(ctx.request, maxBytes);
-      headers.delete('Content-Length');
+      headers.delete("Content-Length");
 
       // Construct from URL+init (not from ctx.request) so we don't fall back
       // to ctx.request.body — which readRequestBytesWithinLimit just consumed.
@@ -92,9 +92,9 @@ function buildForwardHeaders(
   requestId: string,
 ): Headers {
   const headers = new Headers();
-  const contentType = sourceHeaders.get('Content-Type');
-  if (contentType) headers.set('Content-Type', contentType);
-  headers.set('X-Request-ID', requestId);
+  const contentType = sourceHeaders.get("Content-Type");
+  if (contentType) headers.set("Content-Type", contentType);
+  headers.set("X-Request-ID", requestId);
 
   for (const name of IDENTITY_HEADER_NAMES) {
     const value = sourceHeaders.get(name);
@@ -108,62 +108,62 @@ function buildForwardHeaders(
   return headers;
 }
 
-export function bindingForPath(pathname: string, ctx: AppContext): Fetcher | null {
+export function bindingForPath(
+  pathname: string,
+  ctx: AppContext,
+): Fetcher | null {
   if (
-    pathname === '/api/v1/persons' ||
-    pathname.startsWith('/api/v1/persons/') ||
-    pathname === '/api/v1/accounts' ||
-    pathname.startsWith('/api/v1/accounts/')
+    pathname === "/api/v1/persons" ||
+    pathname.startsWith("/api/v1/persons/") ||
+    pathname === "/api/v1/accounts" ||
+    pathname.startsWith("/api/v1/accounts/")
   ) {
     return ctx.env.CONTACTS_SERVICE;
   }
   if (
-    pathname === '/api/v1/deals' ||
-    pathname.startsWith('/api/v1/deals/') ||
-    pathname === '/api/v1/pipelines' ||
-    pathname.startsWith('/api/v1/pipelines/') ||
-    pathname === '/api/v1/stages' ||
-    pathname.startsWith('/api/v1/stages/')
+    pathname === "/api/v1/deals" ||
+    pathname.startsWith("/api/v1/deals/") ||
+    pathname === "/api/v1/pipelines" ||
+    pathname.startsWith("/api/v1/pipelines/") ||
+    pathname === "/api/v1/stages" ||
+    pathname.startsWith("/api/v1/stages/")
   ) {
     return ctx.env.PIPELINE_SERVICE;
   }
   if (
-    pathname.startsWith('/api/v1/automations/') ||
-    pathname.startsWith('/api/v1/workflows/')
+    pathname.startsWith("/api/v1/automations/") ||
+    pathname.startsWith("/api/v1/workflows/")
   ) {
     return ctx.env.AUTOMATIONS_SERVICE;
   }
-  if (pathname.startsWith('/api/v1/forms/')) {
+  if (pathname.startsWith("/api/v1/forms/")) {
     return ctx.env.FORMINPUTS_SERVICE;
   }
   if (
-    pathname.startsWith('/api/v1/collections/') ||
-    pathname.startsWith('/api/v1/entries/')
+    pathname.startsWith("/api/v1/collections/") ||
+    pathname.startsWith("/api/v1/entries/")
   ) {
     return ctx.env.CMS_SERVICE;
   }
-  if (pathname.startsWith('/api/v1/auth/')) {
+  if (pathname.startsWith("/api/v1/auth/")) {
     return ctx.env.AUTH_SERVICE;
   }
-  if (
-    pathname === '/api/v1/users' ||
-    pathname.startsWith('/api/v1/users/')
-  ) {
+  if (pathname === "/api/v1/users" || pathname.startsWith("/api/v1/users/")) {
     return ctx.env.USERS_SERVICE;
   }
 
-  const managedEnv = ctx.env as AppContext['env'] & {
+  const managedEnv = ctx.env as AppContext["env"] & {
     SHOPIFY_SERVICE?: Fetcher;
     TENANTS_SERVICE?: Fetcher;
   };
-  if (pathname.startsWith('/api/v1/shopify/')) {
+  if (pathname.startsWith("/api/v1/shopify/")) {
     return managedEnv.SHOPIFY_SERVICE ?? null;
   }
   if (
-    pathname === '/api/v1/tenants' ||
-    pathname.startsWith('/api/v1/tenants/') ||
-    pathname === '/api/v1/signup' ||
-    pathname.startsWith('/api/v1/signup/')
+    pathname === "/api/v1/tenants" ||
+    pathname.startsWith("/api/v1/tenants/") ||
+    pathname === "/api/v1/signup" ||
+    pathname.startsWith("/api/v1/signup/")
   ) {
     return managedEnv.TENANTS_SERVICE ?? null;
   }

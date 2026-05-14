@@ -6,12 +6,12 @@
  * tombstone (see ADR-019 §10) which is set by the indie users wrapper on
  * soft-delete.
  */
-import { sha256Hex } from '@flowpunk-indie/oauth-protocol';
-import type { OAuthEnv } from './env.js';
+import { sha256Hex } from "@flowpunk-indie/oauth-protocol";
+import type { OAuthEnv } from "./env.js";
 
-export const OAUTH_TOKEN_CACHE_PREFIX = 'oauth:';
-export const OAUTH_TOKEN_REVOCATION_PREFIX = 'oauth:revoked:';
-export const OAUTH_USER_INVALIDATION_PREFIX = 'user_invalidated:';
+export const OAUTH_TOKEN_CACHE_PREFIX = "oauth:";
+export const OAUTH_TOKEN_REVOCATION_PREFIX = "oauth:revoked:";
+export const OAUTH_USER_INVALIDATION_PREFIX = "user_invalidated:";
 export const OAUTH_TOKEN_REVOCATION_TTL_SECONDS = 60;
 export const OAUTH_USER_INVALIDATION_TTL_SECONDS = 60;
 
@@ -21,13 +21,13 @@ export interface RevocableOauthToken {
 }
 
 export interface OAuthRevocationTombstone {
-  kind: 'revoked';
+  kind: "revoked";
   tokenHash: string;
   revokedAt: string;
 }
 
 export interface OauthRevocationCacheFailure {
-  operation: 'put_tombstone' | 'delete_identity';
+  operation: "put_tombstone" | "delete_identity";
   tokenHash: string;
   cacheKey: string;
   errorName: string;
@@ -41,7 +41,9 @@ export interface OauthRevocationCacheResult {
   failures: OauthRevocationCacheFailure[];
 }
 
-export async function oauthTokenHashFromRawToken(rawToken: string): Promise<string> {
+export async function oauthTokenHashFromRawToken(
+  rawToken: string,
+): Promise<string> {
   return sha256Hex(rawToken);
 }
 
@@ -49,7 +51,9 @@ export function oauthTokenCacheKeyFromTokenHash(tokenHash: string): string {
   return `${OAUTH_TOKEN_CACHE_PREFIX}${tokenHash}`;
 }
 
-export function oauthTokenRevocationKeyFromTokenHash(tokenHash: string): string {
+export function oauthTokenRevocationKeyFromTokenHash(
+  tokenHash: string,
+): string {
   return `${OAUTH_TOKEN_REVOCATION_PREFIX}${tokenHash}`;
 }
 
@@ -68,9 +72,13 @@ export async function readOauthTokenRevocationTombstone(
 ): Promise<OAuthRevocationTombstone | null> {
   const tombstone = await env.OAUTH_TOKEN_CACHE.get<OAuthRevocationTombstone>(
     oauthTokenRevocationKeyFromTokenHash(tokenHash),
-    'json',
+    "json",
   );
-  if (!tombstone || tombstone.kind !== 'revoked' || tombstone.tokenHash !== tokenHash) {
+  if (
+    !tombstone ||
+    tombstone.kind !== "revoked" ||
+    tombstone.tokenHash !== tokenHash
+  ) {
     return null;
   }
   return tombstone;
@@ -81,7 +89,9 @@ export async function readUserInvalidationTombstone(
   scope: string,
   userId: string,
 ): Promise<boolean> {
-  const value = await env.OAUTH_TOKEN_CACHE.get(userInvalidationKey(scope, userId));
+  const value = await env.OAUTH_TOKEN_CACHE.get(
+    userInvalidationKey(scope, userId),
+  );
   return value !== null;
 }
 
@@ -103,7 +113,7 @@ export async function protectRevokedOauthTokens(
 ): Promise<OauthRevocationCacheResult> {
   const tokenHashes = new Set<string>();
   for (const token of tokens) {
-    if (token.tokenType !== 'access') continue;
+    if (token.tokenType !== "access") continue;
     tokenHashes.add(token.tokenHash);
   }
 
@@ -120,22 +130,30 @@ export async function protectRevokedOauthTokens(
 
   await Promise.all(
     result.tokenHashes.map(async (tokenHash) => {
-      const tombstone: OAuthRevocationTombstone = { kind: 'revoked', tokenHash, revokedAt };
+      const tombstone: OAuthRevocationTombstone = {
+        kind: "revoked",
+        tokenHash,
+        revokedAt,
+      };
       const tombstoneKey = oauthTokenRevocationKeyFromTokenHash(tokenHash);
       const identityKey = oauthTokenCacheKeyFromTokenHash(tokenHash);
 
       try {
-        await env.OAUTH_TOKEN_CACHE.put(tombstoneKey, JSON.stringify(tombstone), {
-          expirationTtl: OAUTH_TOKEN_REVOCATION_TTL_SECONDS,
-        });
+        await env.OAUTH_TOKEN_CACHE.put(
+          tombstoneKey,
+          JSON.stringify(tombstone),
+          {
+            expirationTtl: OAUTH_TOKEN_REVOCATION_TTL_SECONDS,
+          },
+        );
         result.tombstonesWritten += 1;
       } catch (error) {
         result.failures.push({
-          operation: 'put_tombstone',
+          operation: "put_tombstone",
           tokenHash,
           cacheKey: tombstoneKey,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-          errorMessage: error instanceof Error ? error.message : 'unknown',
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorMessage: error instanceof Error ? error.message : "unknown",
         });
       }
 
@@ -144,11 +162,11 @@ export async function protectRevokedOauthTokens(
         result.identityDeletes += 1;
       } catch (error) {
         result.failures.push({
-          operation: 'delete_identity',
+          operation: "delete_identity",
           tokenHash,
           cacheKey: identityKey,
-          errorName: error instanceof Error ? error.name : 'UnknownError',
-          errorMessage: error instanceof Error ? error.message : 'unknown',
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorMessage: error instanceof Error ? error.message : "unknown",
         });
       }
     }),

@@ -1,19 +1,19 @@
-import { sql } from 'drizzle-orm';
-import { check, index, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from "drizzle-orm";
+import { check, index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { pii } from '../utils/pii.js';
+import { pii } from "../utils/pii.js";
 
-const PERSON_STATUSES = ['active', 'deleted'] as const;
+const PERSON_STATUSES = ["active", "deleted"] as const;
 export type PersonStatus = (typeof PERSON_STATUSES)[number];
 
-const PHONE1_TYPES = ['mobile', 'landline', 'voip', 'fax', 'other'] as const;
+const PHONE1_TYPES = ["mobile", "landline", "voip", "fax", "other"] as const;
 export type Phone1Type = (typeof PHONE1_TYPES)[number];
 
-const EMAIL_CONSENTS = ['subscribed', 'unsubscribed', 'no_consent'] as const;
+const EMAIL_CONSENTS = ["subscribed", "unsubscribed", "no_consent"] as const;
 export type EmailConsent = (typeof EMAIL_CONSENTS)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Persons (humans, optionally linked to an account).
@@ -39,62 +39,70 @@ const inList = (values: readonly string[]): string =>
  * `phone1_type` (category, not value), `status`, audit columns.
  */
 export const persons = sqliteTable(
-  'persons',
+  "persons",
   {
-    id: text('id').primaryKey(),
+    id: text("id").primaryKey(),
     // FK to accounts.id is declared at the SQL layer (see
     // 0004_persons.sql) — Drizzle's `references()` would create a circular
     // module init between persons.ts and accounts.ts. The constraint is
     // enforced by SQLite (`PRAGMA foreign_keys = ON`, ADR-001:233); the
     // repo additionally pre-checks active status before insert/update.
-    accountId: text('account_id'),
-    displayName: pii(text('display_name').notNull()),
-    firstName: pii(text('first_name')),
-    lastName: pii(text('last_name')),
-    emailPrimary: pii(text('email_primary')),
-    phone1CountryCode: pii(text('phone1_country_code')),
-    phone1Number: pii(text('phone1_number')),
-    phone1Ext: pii(text('phone1_ext')),
-    phone1Type: text('phone1_type').$type<Phone1Type>(),
-    title: text('title'),
-    streetLine1: pii(text('street_line_1')),
-    streetLine2: pii(text('street_line_2')),
-    city: pii(text('city')),
-    region: pii(text('region')),
-    postalCode: pii(text('postal_code')),
-    country: text('country'),
-    latitude: pii(real('latitude')),
-    longitude: pii(real('longitude')),
-    imageAvatar: pii(text('image_avatar')),
+    accountId: text("account_id"),
+    displayName: pii(text("display_name").notNull()),
+    firstName: pii(text("first_name")),
+    lastName: pii(text("last_name")),
+    emailPrimary: pii(text("email_primary")),
+    phone1CountryCode: pii(text("phone1_country_code")),
+    phone1Number: pii(text("phone1_number")),
+    phone1Ext: pii(text("phone1_ext")),
+    phone1Type: text("phone1_type").$type<Phone1Type>(),
+    title: text("title"),
+    streetLine1: pii(text("street_line_1")),
+    streetLine2: pii(text("street_line_2")),
+    city: pii(text("city")),
+    region: pii(text("region")),
+    postalCode: pii(text("postal_code")),
+    country: text("country"),
+    latitude: pii(real("latitude")),
+    longitude: pii(real("longitude")),
+    imageAvatar: pii(text("image_avatar")),
     consentEmail: pii(
-      text('consent_email').notNull().default('no_consent').$type<EmailConsent>(),
+      text("consent_email")
+        .notNull()
+        .default("no_consent")
+        .$type<EmailConsent>(),
     ),
-    status: text('status').notNull().$type<PersonStatus>(),
-    deletedAt: text('deleted_at'),
-    deletedBy: text('deleted_by'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    updatedBy: text('updated_by').notNull(),
+    // Tenant-defined custom fields (ADR-023). PII by default — values are
+    // operator-defined free text and may carry anything (IDs, phone numbers,
+    // notes). Per-field redaction selectivity is governed by the
+    // `custom_field_defs.pii` flag at the registry layer.
+    customData: pii(text("custom_data", { mode: "json" })),
+    status: text("status").notNull().$type<PersonStatus>(),
+    deletedAt: text("deleted_at"),
+    deletedBy: text("deleted_by"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    updatedBy: text("updated_by").notNull(),
   },
   (t) => ({
-    statusIdx: index('idx_persons_status').on(t.status),
-    accountIdIdx: index('idx_persons_account_id').on(t.accountId),
-    emailPrimaryIdx: index('idx_persons_email_primary').on(t.emailPrimary),
-    consentEmailIdx: index('idx_persons_consent_email').on(t.consentEmail),
-    createdAtIdx: index('idx_persons_created_at').on(t.createdAt, t.id),
+    statusIdx: index("idx_persons_status").on(t.status),
+    accountIdIdx: index("idx_persons_account_id").on(t.accountId),
+    emailPrimaryIdx: index("idx_persons_email_primary").on(t.emailPrimary),
+    consentEmailIdx: index("idx_persons_consent_email").on(t.consentEmail),
+    createdAtIdx: index("idx_persons_created_at").on(t.createdAt, t.id),
     statusCheck: check(
-      'persons_status_check',
+      "persons_status_check",
       sql.raw(`status IN (${inList(PERSON_STATUSES)})`),
     ),
     phone1TypeCheck: check(
-      'persons_phone1_type_check',
+      "persons_phone1_type_check",
       sql.raw(
         `phone1_type IS NULL OR phone1_type IN (${inList(PHONE1_TYPES)})`,
       ),
     ),
     consentEmailCheck: check(
-      'persons_consent_email_check',
+      "persons_consent_email_check",
       sql.raw(`consent_email IN (${inList(EMAIL_CONSENTS)})`),
     ),
   }),
@@ -114,42 +122,44 @@ export type NewPerson = typeof persons.$inferInsert;
  * The repo pre-checks that the target account exists and is active.
  */
 export const ALLOWED_PATCH_FIELDS = [
-  'accountId',
-  'displayName',
-  'firstName',
-  'lastName',
-  'emailPrimary',
-  'phone1CountryCode',
-  'phone1Number',
-  'phone1Ext',
-  'phone1Type',
-  'title',
-  'streetLine1',
-  'streetLine2',
-  'city',
-  'region',
-  'postalCode',
-  'country',
-  'latitude',
-  'longitude',
-  'imageAvatar',
-  'consentEmail',
+  "accountId",
+  "displayName",
+  "firstName",
+  "lastName",
+  "emailPrimary",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "phone1Type",
+  "title",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "latitude",
+  "longitude",
+  "imageAvatar",
+  "consentEmail",
 ] as const;
 export type PersonPatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
 const ALLOWED_PATCH_FIELD_SET = new Set<string>(ALLOWED_PATCH_FIELDS);
-export function isAllowedPatchField(name: string): name is PersonPatchableField {
+export function isAllowedPatchField(
+  name: string,
+): name is PersonPatchableField {
   return ALLOWED_PATCH_FIELD_SET.has(name);
 }
 
 /** Fields that PATCH must reject if present in the body (immutable). */
 export const IMMUTABLE_PATCH_FIELDS = [
-  'id',
-  'createdAt',
-  'createdBy',
-  'status',
-  'deletedAt',
-  'deletedBy',
+  "id",
+  "createdAt",
+  "createdBy",
+  "status",
+  "deletedAt",
+  "deletedBy",
 ] as const;
 
 const IMMUTABLE_PATCH_FIELD_SET = new Set<string>(IMMUTABLE_PATCH_FIELDS);
@@ -164,24 +174,24 @@ export function isImmutablePatchField(name: string): boolean {
  * `"no_consent"`, not `null`.
  */
 export const NULLABLE_PATCH_FIELDS = new Set<PersonPatchableField>([
-  'accountId',
-  'firstName',
-  'lastName',
-  'emailPrimary',
-  'phone1CountryCode',
-  'phone1Number',
-  'phone1Ext',
-  'phone1Type',
-  'title',
-  'streetLine1',
-  'streetLine2',
-  'city',
-  'region',
-  'postalCode',
-  'country',
-  'latitude',
-  'longitude',
-  'imageAvatar',
+  "accountId",
+  "firstName",
+  "lastName",
+  "emailPrimary",
+  "phone1CountryCode",
+  "phone1Number",
+  "phone1Ext",
+  "phone1Type",
+  "title",
+  "streetLine1",
+  "streetLine2",
+  "city",
+  "region",
+  "postalCode",
+  "country",
+  "latitude",
+  "longitude",
+  "imageAvatar",
 ]);
 
 export const PHONE1_TYPE_VALUES: readonly Phone1Type[] = PHONE1_TYPES;

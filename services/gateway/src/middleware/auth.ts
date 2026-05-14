@@ -1,13 +1,13 @@
-import type { AppContext, Middleware } from '../types.js';
-import { extractAuthMaterial } from '../auth/extract-material.js';
-import { enforceRestScope } from '../auth/scope.js';
-import { validateApiKey } from '../auth/validate-apikey.js';
+import type { AppContext, Middleware } from "../types.js";
+import { extractAuthMaterial } from "../auth/extract-material.js";
+import { enforceRestScope } from "../auth/scope.js";
+import { validateApiKey } from "../auth/validate-apikey.js";
 import {
   stripIdentityHeadersFromRequest,
   withIdentityHeaders,
-} from '../auth/identity-headers.js';
-import { unauthorized } from '../auth/unauthorized.js';
-import { validateSession } from '../auth/validate-session.js';
+} from "../auth/identity-headers.js";
+import { unauthorized } from "../auth/unauthorized.js";
+import { validateSession } from "../auth/validate-session.js";
 import {
   hasBetterAuthCookie,
   validateBetterAuthSession,
@@ -17,12 +17,12 @@ import {
   isPublicPath,
   INDIE_PUBLIC_PATHS,
   INDIE_BOOTSTRAP_PUBLIC_PATHS,
-} from './public-paths.js';
+} from "./public-paths.js";
 import {
   getAllowedResources,
   getIssuerOrigin,
   validateOAuthToken,
-} from '@flowpunk-indie/oauth';
+} from "@flowpunk-indie/oauth";
 
 /**
  * Paths where a `Cookie: fp_session=...` cookie is accepted as a credential
@@ -43,10 +43,10 @@ function isSessionAllowedPath(pathname: string): boolean {
   // session-allowed prefixes (e.g. future indie AUTH_SERVICE endpoints)
   // can be added here.
   return (
-    pathname === '/api/v1/users' ||
-    pathname.startsWith('/api/v1/users/') ||
-    pathname === '/api/v1/auth/keys' ||
-    pathname.startsWith('/api/v1/auth/keys/')
+    pathname === "/api/v1/users" ||
+    pathname.startsWith("/api/v1/users/") ||
+    pathname === "/api/v1/auth/keys" ||
+    pathname.startsWith("/api/v1/auth/keys/")
   );
 }
 
@@ -114,7 +114,7 @@ export const authMiddleware: Middleware = async (
       ctx.tenantId = session.tenantId;
       ctx.userId = session.userId;
       ctx.credentialId = session.credentialId;
-      ctx.credentialType = 'session';
+      ctx.credentialType = "session";
       ctx.scope = session.scope;
 
       ctx.request = new Request(ctx.request, {
@@ -122,7 +122,7 @@ export const authMiddleware: Middleware = async (
           tenantId: session.tenantId,
           userId: session.userId,
           scope: session.scope,
-          credentialType: 'session',
+          credentialType: "session",
           credentialId: session.credentialId,
         }),
       });
@@ -137,11 +137,11 @@ export const authMiddleware: Middleware = async (
   // OAuth token path (per ADR-019). Tokens with prefix `mcp_` are validated
   // here; managed-shaped `mcp_<tenantId>.<...>` tokens are rejected by
   // `isIndieToken` inside `validateOAuthToken` (returns null → 401).
-  if (material.credentialType === 'oauth') {
+  if (material.credentialType === "oauth") {
     return handleOAuthCredential(ctx, url, material.rawCredential, next);
   }
 
-  if (material.credentialType !== 'apikey') {
+  if (material.credentialType !== "apikey") {
     return unauthorized();
   }
 
@@ -155,7 +155,7 @@ export const authMiddleware: Middleware = async (
   ctx.tenantId = validation.tenantId;
   ctx.userId = validation.userId;
   ctx.credentialId = validation.credentialId;
-  ctx.credentialType = 'apikey';
+  ctx.credentialType = "apikey";
   ctx.keyLabel = validation.keyLabel ?? null;
   ctx.scope = validation.scope;
 
@@ -167,7 +167,7 @@ export const authMiddleware: Middleware = async (
       tenantId: validation.tenantId,
       userId: validation.userId,
       scope: validation.scope,
-      credentialType: 'apikey',
+      credentialType: "apikey",
       credentialId: validation.credentialId,
     }),
   });
@@ -219,18 +219,18 @@ async function handleOAuthCredential(
     return oauthInsufficientScope(ctx, required);
   }
 
-  ctx.tenantId = '_system';
+  ctx.tenantId = "_system";
   ctx.userId = identity.userId;
   ctx.credentialId = identity.tokenHash;
-  ctx.credentialType = 'oauth';
+  ctx.credentialType = "oauth";
   ctx.scope = identity.scope;
 
   ctx.request = new Request(ctx.request, {
     headers: withIdentityHeaders(ctx.request.headers, {
-      tenantId: '_system',
+      tenantId: "_system",
       userId: identity.userId,
       scope: identity.scope,
-      credentialType: 'oauth',
+      credentialType: "oauth",
       credentialId: identity.tokenHash,
     }),
   });
@@ -240,23 +240,20 @@ async function handleOAuthCredential(
 
 function isAdminPath(pathname: string): boolean {
   return (
-    pathname === '/api/v1/users' ||
-    pathname.startsWith('/api/v1/users/') ||
-    pathname === '/api/v1/auth/keys' ||
-    pathname.startsWith('/api/v1/auth/keys/')
+    pathname === "/api/v1/users" ||
+    pathname.startsWith("/api/v1/users/") ||
+    pathname === "/api/v1/auth/keys" ||
+    pathname.startsWith("/api/v1/auth/keys/")
   );
 }
 
 function requiredScopeFor(pathname: string): string | null {
-  if (pathname === '/mcp' || pathname.startsWith('/mcp/')) return 'mcp';
-  if (pathname.startsWith('/api/v1/')) return 'flowpunk';
+  if (pathname === "/mcp" || pathname.startsWith("/mcp/")) return "mcp";
+  if (pathname.startsWith("/api/v1/")) return "flowpunk";
   return null;
 }
 
-function challengeHeaders(
-  ctx: AppContext,
-  challenge: string,
-): Headers {
+function challengeHeaders(ctx: AppContext, challenge: string): Headers {
   // Per RFC 9728 §3.1, when the protected resource URI has a path
   // component (ours is `<origin>/mcp`), the metadata document lives at
   // `/.well-known/oauth-protected-resource{path}`. The bare-suffix form
@@ -271,13 +268,13 @@ function challengeHeaders(
     }
   })();
   return new Headers({
-    'WWW-Authenticate': `${challenge}, resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp"`,
-    'Content-Type': 'application/json',
+    "WWW-Authenticate": `${challenge}, resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp"`,
+    "Content-Type": "application/json",
   });
 }
 
 function oauthInvalidToken(ctx: AppContext): Response {
-  return new Response(JSON.stringify({ error: 'invalid_token' }), {
+  return new Response(JSON.stringify({ error: "invalid_token" }), {
     status: 401,
     headers: challengeHeaders(
       ctx,
@@ -288,7 +285,7 @@ function oauthInvalidToken(ctx: AppContext): Response {
 
 function oauthInsufficientScope(ctx: AppContext, required: string): Response {
   return new Response(
-    JSON.stringify({ error: 'insufficient_scope', scope: required }),
+    JSON.stringify({ error: "insufficient_scope", scope: required }),
     {
       status: 403,
       headers: challengeHeaders(
@@ -302,8 +299,8 @@ function oauthInsufficientScope(ctx: AppContext, required: string): Response {
 function oauthSessionRequired(ctx: AppContext): Response {
   return new Response(
     JSON.stringify({
-      error: 'invalid_token',
-      error_description: 'session required for this resource',
+      error: "invalid_token",
+      error_description: "session required for this resource",
     }),
     {
       status: 403,

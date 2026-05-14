@@ -1,0 +1,29 @@
+{
+  "name": "@flowpunk-indie/custom-fields-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./router": "./src/router.ts",
+    "./types": "./src/types.ts",
+    "./handlers/_shared": "./src/handlers/_shared.ts",
+    "./cache": "./src/cache.ts"
+  },
+  "scripts": {
+    "test": "node ../../scripts/test-if-any.mjs",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@flowpunk-indie/db": "workspace:*",
+    "@flowpunk/gateway": "workspace:*",
+    "@flowpunk/service-utils": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.3"
+  }
+}

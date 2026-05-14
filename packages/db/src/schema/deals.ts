@@ -1,13 +1,13 @@
-import { sql } from 'drizzle-orm';
-import { check, index, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from "drizzle-orm";
+import { check, index, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-import { pii } from '../utils/pii.js';
+import { pii } from "../utils/pii.js";
 
-const DEAL_STATUSES = ['active', 'deleted'] as const;
+const DEAL_STATUSES = ["active", "deleted"] as const;
 export type DealStatus = (typeof DEAL_STATUSES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Deals (opportunities flowing through a pipeline).
@@ -45,63 +45,67 @@ const inList = (values: readonly string[]): string =>
  *   metadata); not marked.
  */
 export const deals = sqliteTable(
-  'deals',
+  "deals",
   {
-    id: text('id').primaryKey(),
-    name: pii(text('name').notNull()),
-    pipelineId: text('pipeline_id').notNull(),
-    stageId: text('stage_id').notNull(),
-    stageEnteredAt: text('stage_entered_at').notNull(),
-    accountId: text('account_id'),
-    primaryPersonId: text('primary_person_id'),
-    amount: real('amount'),
-    currency: text('currency'),
-    expectedCloseDate: text('expected_close_date'),
-    probability: real('probability'),
-    ownerUserId: text('owner_user_id'),
-    lostReason: pii(text('lost_reason')),
-    status: text('status').notNull().$type<DealStatus>(),
-    deletedAt: text('deleted_at'),
-    deletedBy: text('deleted_by'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    updatedBy: text('updated_by').notNull(),
+    id: text("id").primaryKey(),
+    name: pii(text("name").notNull()),
+    pipelineId: text("pipeline_id").notNull(),
+    stageId: text("stage_id").notNull(),
+    stageEnteredAt: text("stage_entered_at").notNull(),
+    accountId: text("account_id"),
+    primaryPersonId: text("primary_person_id"),
+    amount: real("amount"),
+    currency: text("currency"),
+    expectedCloseDate: text("expected_close_date"),
+    probability: real("probability"),
+    ownerUserId: text("owner_user_id"),
+    lostReason: pii(text("lost_reason")),
+    // Tenant-defined custom fields (ADR-023). PII by default — operator-
+    // defined free-text values may carry anything; per-field redaction
+    // selectivity is governed by `custom_field_defs.pii` at the registry.
+    customData: pii(text("custom_data", { mode: "json" })),
+    status: text("status").notNull().$type<DealStatus>(),
+    deletedAt: text("deleted_at"),
+    deletedBy: text("deleted_by"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    updatedBy: text("updated_by").notNull(),
   },
   (t) => ({
-    statusCreatedIdx: index('idx_deals_status_created').on(
+    statusCreatedIdx: index("idx_deals_status_created").on(
       t.status,
       t.createdAt,
       t.id,
     ),
-    pipelineStageStatusIdx: index('idx_deals_pipeline_stage_status').on(
+    pipelineStageStatusIdx: index("idx_deals_pipeline_stage_status").on(
       t.pipelineId,
       t.stageId,
       t.status,
     ),
-    accountIdIdx: index('idx_deals_account_id').on(t.accountId),
-    primaryPersonIdIdx: index('idx_deals_primary_person_id').on(
+    accountIdIdx: index("idx_deals_account_id").on(t.accountId),
+    primaryPersonIdIdx: index("idx_deals_primary_person_id").on(
       t.primaryPersonId,
     ),
-    ownerUserIdIdx: index('idx_deals_owner_user_id').on(t.ownerUserId),
+    ownerUserIdIdx: index("idx_deals_owner_user_id").on(t.ownerUserId),
     statusCheck: check(
-      'deals_status_check',
+      "deals_status_check",
       sql.raw(`status IN (${inList(DEAL_STATUSES)})`),
     ),
     amountCheck: check(
-      'deals_amount_check',
+      "deals_amount_check",
       sql`amount IS NULL OR amount >= 0`,
     ),
     currencyCheck: check(
-      'deals_currency_check',
+      "deals_currency_check",
       sql`currency IS NULL OR LENGTH(currency) = 3`,
     ),
     probabilityCheck: check(
-      'deals_probability_check',
+      "deals_probability_check",
       sql`probability IS NULL OR (probability >= 0 AND probability <= 100)`,
     ),
     expectedCloseDateCheck: check(
-      'deals_expected_close_date_check',
+      "deals_expected_close_date_check",
       sql`expected_close_date IS NULL OR expected_close_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`,
     ),
   }),
@@ -120,16 +124,16 @@ export type NewDeal = typeof deals.$inferInsert;
  * `pipelineId` is intentionally NOT patchable — see IMMUTABLE_PATCH_FIELDS.
  */
 export const ALLOWED_PATCH_FIELDS = [
-  'name',
-  'stageId',
-  'accountId',
-  'primaryPersonId',
-  'amount',
-  'currency',
-  'expectedCloseDate',
-  'probability',
-  'ownerUserId',
-  'lostReason',
+  "name",
+  "stageId",
+  "accountId",
+  "primaryPersonId",
+  "amount",
+  "currency",
+  "expectedCloseDate",
+  "probability",
+  "ownerUserId",
+  "lostReason",
 ] as const;
 export type DealPatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
@@ -139,14 +143,14 @@ export function isAllowedPatchField(name: string): name is DealPatchableField {
 }
 
 export const IMMUTABLE_PATCH_FIELDS = [
-  'id',
-  'pipelineId',
-  'stageEnteredAt',
-  'createdAt',
-  'createdBy',
-  'status',
-  'deletedAt',
-  'deletedBy',
+  "id",
+  "pipelineId",
+  "stageEnteredAt",
+  "createdAt",
+  "createdBy",
+  "status",
+  "deletedAt",
+  "deletedBy",
 ] as const;
 
 const IMMUTABLE_PATCH_FIELD_SET = new Set<string>(IMMUTABLE_PATCH_FIELDS);
@@ -160,12 +164,12 @@ export function isImmutablePatchField(name: string): boolean {
  * it via DELETE instead).
  */
 export const NULLABLE_PATCH_FIELDS = new Set<DealPatchableField>([
-  'accountId',
-  'primaryPersonId',
-  'amount',
-  'currency',
-  'expectedCloseDate',
-  'probability',
-  'ownerUserId',
-  'lostReason',
+  "accountId",
+  "primaryPersonId",
+  "amount",
+  "currency",
+  "expectedCloseDate",
+  "probability",
+  "ownerUserId",
+  "lostReason",
 ]);

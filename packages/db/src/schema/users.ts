@@ -1,20 +1,20 @@
-import { sql } from 'drizzle-orm';
+import { sql } from "drizzle-orm";
 import {
   check,
   index,
   sqliteTable,
   text,
   uniqueIndex,
-} from 'drizzle-orm/sqlite-core';
+} from "drizzle-orm/sqlite-core";
 
-import { pii } from '../utils/pii.js';
-import { ROLE_VALUES, type Role } from '../utils/roles.js';
+import { pii } from "../utils/pii.js";
+import { ROLE_VALUES, type Role } from "../utils/roles.js";
 
-const USER_STATUSES = ['active', 'deleted'] as const;
+const USER_STATUSES = ["active", "deleted"] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
 const inList = (values: readonly string[]): string =>
-  values.map((v) => `'${v}'`).join(', ');
+  values.map((v) => `'${v}'`).join(", ");
 
 /**
  * Tenant users (per-tenant D1 on managed; the single bound D1 on indie).
@@ -50,16 +50,16 @@ const inList = (values: readonly string[]): string =>
  * `status` / audit columns are non-PII.
  */
 export const users = sqliteTable(
-  'users',
+  "users",
   {
-    id: text('id').primaryKey(),
-    email: pii(text('email').notNull()),
-    displayName: pii(text('display_name').notNull()),
-    firstName: pii(text('first_name')),
-    lastName: pii(text('last_name')),
-    role: text('role').notNull().$type<Role>().default('member'),
-    status: text('status').notNull().$type<UserStatus>(),
-    lastLoginAt: text('last_login_at'),
+    id: text("id").primaryKey(),
+    email: pii(text("email").notNull()),
+    displayName: pii(text("display_name").notNull()),
+    firstName: pii(text("first_name")),
+    lastName: pii(text("last_name")),
+    role: text("role").notNull().$type<Role>().default("member"),
+    status: text("status").notNull().$type<UserStatus>(),
+    lastLoginAt: text("last_login_at"),
     /**
      * FK to `auth_user.id` (the better-auth user row, per ADR-021 §3).
      * Nullable for two reasons: (1) rows created before the better-auth
@@ -69,30 +69,30 @@ export const users = sqliteTable(
      * `auth_user.domain_user_id` column is the other half of the
      * bidirectional FK.
      */
-    authUserId: text('auth_user_id'),
-    deletedAt: text('deleted_at'),
-    deletedBy: text('deleted_by'),
-    createdAt: text('created_at').notNull(),
-    createdBy: text('created_by'),
-    updatedAt: text('updated_at').notNull(),
-    updatedBy: text('updated_by'),
+    authUserId: text("auth_user_id"),
+    deletedAt: text("deleted_at"),
+    deletedBy: text("deleted_by"),
+    createdAt: text("created_at").notNull(),
+    createdBy: text("created_by"),
+    updatedAt: text("updated_at").notNull(),
+    updatedBy: text("updated_by"),
   },
   (t) => ({
-    emailActiveUnique: uniqueIndex('idx_users_email_active_unique')
+    emailActiveUnique: uniqueIndex("idx_users_email_active_unique")
       .on(t.email)
       .where(sql`status = 'active'`),
-    authUserIdUnique: uniqueIndex('idx_users_auth_user_id_unique')
+    authUserIdUnique: uniqueIndex("idx_users_auth_user_id_unique")
       .on(t.authUserId)
       .where(sql`auth_user_id IS NOT NULL`),
-    statusIdx: index('idx_users_status').on(t.status),
-    roleIdx: index('idx_users_role').on(t.role),
-    createdAtIdx: index('idx_users_created_at').on(t.createdAt, t.id),
+    statusIdx: index("idx_users_status").on(t.status),
+    roleIdx: index("idx_users_role").on(t.role),
+    createdAtIdx: index("idx_users_created_at").on(t.createdAt, t.id),
     statusCheck: check(
-      'users_status_check',
+      "users_status_check",
       sql.raw(`status IN (${inList(USER_STATUSES)})`),
     ),
     roleCheck: check(
-      'users_role_check',
+      "users_role_check",
       sql.raw(`role IN (${inList(ROLE_VALUES)})`),
     ),
   }),
@@ -109,11 +109,11 @@ export type NewUser = typeof users.$inferInsert;
  * body keys.
  */
 export const ALLOWED_PATCH_FIELDS = [
-  'email',
-  'displayName',
-  'firstName',
-  'lastName',
-  'role',
+  "email",
+  "displayName",
+  "firstName",
+  "lastName",
+  "role",
 ] as const;
 export type UserPatchableField = (typeof ALLOWED_PATCH_FIELDS)[number];
 
@@ -128,9 +128,9 @@ export function isAllowedPatchField(name: string): name is UserPatchableField {
  * verification flow, which is out of scope for this iteration.
  */
 export const SELF_ALLOWED_PATCH_FIELDS = new Set<UserPatchableField>([
-  'displayName',
-  'firstName',
-  'lastName',
+  "displayName",
+  "firstName",
+  "lastName",
 ]);
 export function isSelfPatchField(name: string): name is UserPatchableField {
   return (
@@ -141,13 +141,13 @@ export function isSelfPatchField(name: string): name is UserPatchableField {
 
 /** Fields that PATCH must reject if present in the body (immutable). */
 export const IMMUTABLE_PATCH_FIELDS = [
-  'id',
-  'createdAt',
-  'createdBy',
-  'status',
-  'deletedAt',
-  'deletedBy',
-  'lastLoginAt',
+  "id",
+  "createdAt",
+  "createdBy",
+  "status",
+  "deletedAt",
+  "deletedBy",
+  "lastLoginAt",
 ] as const;
 
 const IMMUTABLE_PATCH_FIELD_SET = new Set<string>(IMMUTABLE_PATCH_FIELDS);
@@ -161,8 +161,8 @@ export function isImmutablePatchField(name: string): boolean {
  * default. Only the optional name fields are nullable.
  */
 export const NULLABLE_PATCH_FIELDS = new Set<UserPatchableField>([
-  'firstName',
-  'lastName',
+  "firstName",
+  "lastName",
 ]);
 
 export const USER_STATUS_VALUES: readonly UserStatus[] = USER_STATUSES;
@@ -181,4 +181,4 @@ export {
   canManageTenantSettings,
   canRead,
   canWrite,
-} from '../utils/roles.js';
+} from "../utils/roles.js";

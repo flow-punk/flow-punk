@@ -1,16 +1,16 @@
 import {
   INVALIDATE_TOOLS_HEADER,
   INVALIDATE_TOOLS_REASON_HEADER,
-} from '@flowpunk/gateway/mcp';
+} from "@flowpunk/gateway/mcp";
 
 export interface ExecuteEnvelope {
-  content: Array<{ type: 'text'; text: string }>;
+  content: Array<{ type: "text"; text: string }>;
   isError: boolean;
 }
 
 export function envelopeOk(data: unknown): ExecuteEnvelope {
   return {
-    content: [{ type: 'text', text: JSON.stringify(data) }],
+    content: [{ type: "text", text: JSON.stringify(data) }],
     isError: false,
   };
 }
@@ -23,7 +23,7 @@ export function envelopeErr(
   return {
     content: [
       {
-        type: 'text',
+        type: "text",
         text: JSON.stringify({
           error: {
             code,
@@ -48,10 +48,10 @@ export function envelopeResponse(
   options: MutationOptions = {},
 ): Response {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
   if (options.invalidateTools) {
-    headers[INVALIDATE_TOOLS_HEADER] = 'true';
+    headers[INVALIDATE_TOOLS_HEADER] = "true";
     headers[INVALIDATE_TOOLS_REASON_HEADER] = options.invalidateTools.reason;
   }
   return new Response(JSON.stringify(envelope), { status, headers });

@@ -1,5 +1,5 @@
-import type { Env } from '../types.js';
-import { extractIdentityHeaders } from '../auth/identity-headers.js';
+import type { Env } from "../types.js";
+import { extractIdentityHeaders } from "../auth/identity-headers.js";
 import {
   SESSION_HEADER,
   SESSION_MODE_HEADER,
@@ -9,16 +9,16 @@ import {
   executeJsonRpc,
   getSessionId,
   validateMcpSessionIdentity,
-} from './handler.js';
+} from "./handler.js";
 
 const encoder = new TextEncoder();
-const SESSION_STORAGE_KEY = 'session';
+const SESSION_STORAGE_KEY = "session";
 
 interface SessionIdentity {
   tenantId: string;
   userId: string;
   credentialId: string;
-  credentialType: 'apikey' | 'oauth';
+  credentialType: "apikey" | "oauth";
 }
 
 export interface SessionState extends SessionIdentity {
@@ -36,32 +36,31 @@ export class McpSessionDurableObject {
   ) {}
 
   async fetch(request: Request): Promise<Response> {
-    const requestId = request.headers.get('X-Request-ID') ?? '';
-    const identity = validateMcpSessionIdentity(extractIdentityHeaders(request.headers));
+    const requestId = request.headers.get("X-Request-ID") ?? "";
+    const identity = validateMcpSessionIdentity(
+      extractIdentityHeaders(request.headers),
+    );
     if (!identity) {
-      return new Response(
-        JSON.stringify({ error: 'unauthorized' }),
-        {
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     switch (request.method) {
-      case 'GET':
+      case "GET":
         return this.openSession(request, identity, requestId);
-      case 'POST':
+      case "POST":
         return this.handleJsonRpc(request, identity, requestId);
-      case 'DELETE':
+      case "DELETE":
         return this.closeSession(request, identity, requestId);
       default:
-        return new Response('Method Not Allowed', {
+        return new Response("Method Not Allowed", {
           status: 405,
-          headers: { 'X-Request-ID': requestId },
+          headers: { "X-Request-ID": requestId },
         });
     }
   }
@@ -80,33 +79,27 @@ export class McpSessionDurableObject {
   ): Promise<Response> {
     const sessionId = getSessionId(request);
     if (!sessionId) {
-      return new Response(
-        JSON.stringify({ error: 'missing_session_id' }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "missing_session_id" }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     const now = new Date();
     const sessionMode = request.headers.get(SESSION_MODE_HEADER);
     let session = await this.loadSession();
     if (!session) {
-      if (sessionMode === 'reattach') {
-        return new Response(
-          JSON.stringify({ error: 'unknown_session' }),
-          {
-            status: 404,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Request-ID': requestId,
-            },
+      if (sessionMode === "reattach") {
+        return new Response(JSON.stringify({ error: "unknown_session" }), {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
           },
-        );
+        });
       }
       session = {
         sessionId,
@@ -115,11 +108,11 @@ export class McpSessionDurableObject {
         lastSeenAt: now.toISOString(),
       };
     } else if (!this.isOwnedBy(session, identity)) {
-      return new Response(JSON.stringify({ error: 'forbidden' }), {
+      return new Response(JSON.stringify({ error: "forbidden" }), {
         status: 403,
         headers: {
-          'Content-Type': 'application/json',
-          'X-Request-ID': requestId,
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
       });
     } else if (this.isExpired(session, now)) {
@@ -150,12 +143,12 @@ export class McpSessionDurableObject {
       if (this.writer === writer) this.writer = null;
     });
 
-    await this.emitSseEvent('session', {
+    await this.emitSseEvent("session", {
       sessionId,
       connectedAt: session.lastSeenAt,
       server: {
-        name: 'flowpunk-gateway',
-        version: '0.1.0',
+        name: "flowpunk-gateway",
+        version: "0.1.0",
       },
     });
 
@@ -163,7 +156,7 @@ export class McpSessionDurableObject {
       status: 200,
       headers: {
         ...SSE_HEADERS,
-        'X-Request-ID': requestId,
+        "X-Request-ID": requestId,
         [SESSION_HEADER]: sessionId,
       },
     });
@@ -182,9 +175,10 @@ export class McpSessionDurableObject {
     // session 404s as before.
     const sessionMode = request.headers.get(SESSION_MODE_HEADER);
     const sessionIdHeader = getSessionId(request);
-    const session = sessionMode === 'create' && sessionIdHeader
-      ? await this.loadOrCreateSession(sessionIdHeader, identity)
-      : await this.requireSession(request, identity, requestId);
+    const session =
+      sessionMode === "create" && sessionIdHeader
+        ? await this.loadOrCreateSession(sessionIdHeader, identity)
+        : await this.requireSession(request, identity, requestId);
     if (session instanceof Response) return session;
 
     const now = new Date().toISOString();
@@ -194,7 +188,12 @@ export class McpSessionDurableObject {
     };
     await this.persistSession(updatedSession);
 
-    const ctx = createJsonRpcContext(request, this.env, requestId, updatedSession);
+    const ctx = createJsonRpcContext(
+      request,
+      this.env,
+      requestId,
+      updatedSession,
+    );
     const response = await executeJsonRpc(ctx, updatedSession);
 
     // The MCP client uses Mcp-Session-Id from this response on every
@@ -223,7 +222,11 @@ export class McpSessionDurableObject {
   ): Promise<SessionState> {
     const existing = await this.loadSession();
     const now = new Date().toISOString();
-    if (existing && this.isOwnedBy(existing, identity) && !this.isExpired(existing, new Date())) {
+    if (
+      existing &&
+      this.isOwnedBy(existing, identity) &&
+      !this.isExpired(existing, new Date())
+    ) {
       return existing;
     }
     return {
@@ -247,7 +250,7 @@ export class McpSessionDurableObject {
     return new Response(null, {
       status: 204,
       headers: {
-        'X-Request-ID': requestId,
+        "X-Request-ID": requestId,
       },
     });
   }
@@ -259,57 +262,45 @@ export class McpSessionDurableObject {
   ): Promise<SessionState | Response> {
     const sessionId = getSessionId(request);
     if (!sessionId) {
-      return new Response(
-        JSON.stringify({ error: 'missing_session_id' }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "missing_session_id" }), {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     const session = await this.loadSession();
     if (!session || session.sessionId !== sessionId) {
-      return new Response(
-        JSON.stringify({ error: 'unknown_session' }),
-        {
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "unknown_session" }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     if (!this.isOwnedBy(session, identity)) {
-      return new Response(
-        JSON.stringify({ error: 'forbidden' }),
-        {
-          status: 403,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     if (this.isExpired(session, new Date())) {
       await this.clearSession();
-      return new Response(
-        JSON.stringify({ error: 'unknown_session' }),
-        {
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Request-ID': requestId,
-          },
+      return new Response(JSON.stringify({ error: "unknown_session" }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
         },
-      );
+      });
     }
 
     return session;
@@ -317,11 +308,15 @@ export class McpSessionDurableObject {
 
   private async persistSession(session: SessionState): Promise<void> {
     await this.state.storage.put(SESSION_STORAGE_KEY, session);
-    await this.state.storage.setAlarm(Date.parse(session.lastSeenAt) + SESSION_IDLE_TIMEOUT_MS);
+    await this.state.storage.setAlarm(
+      Date.parse(session.lastSeenAt) + SESSION_IDLE_TIMEOUT_MS,
+    );
   }
 
   private async loadSession(): Promise<SessionState | null> {
-    return (await this.state.storage.get<SessionState>(SESSION_STORAGE_KEY)) ?? null;
+    return (
+      (await this.state.storage.get<SessionState>(SESSION_STORAGE_KEY)) ?? null
+    );
   }
 
   private async clearSession(): Promise<void> {
@@ -348,7 +343,9 @@ export class McpSessionDurableObject {
   }
 
   private isExpired(session: SessionState, now: Date): boolean {
-    return now.getTime() - Date.parse(session.lastSeenAt) > SESSION_IDLE_TIMEOUT_MS;
+    return (
+      now.getTime() - Date.parse(session.lastSeenAt) > SESSION_IDLE_TIMEOUT_MS
+    );
   }
 
   private async emitSseEvent(event: string, payload: unknown): Promise<void> {

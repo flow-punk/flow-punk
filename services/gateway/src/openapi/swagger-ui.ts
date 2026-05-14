@@ -7,7 +7,7 @@
  * an API key for "Try it out" calls against `/api/v1/*`.
  */
 
-const SWAGGER_VERSION = '5.17.14';
+const SWAGGER_VERSION = "5.17.14";
 
 export function swaggerUiHtml(specUrl: string): string {
   return `<!doctype html>

@@ -1,11 +1,11 @@
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import type { DrizzleD1Database } from "drizzle-orm/d1";
+import { eq, sql } from "drizzle-orm";
 
 import {
   authLoginTokens,
   type AuthLoginToken,
   type NewAuthLoginToken,
-} from '../schema/auth-login-tokens.js';
+} from "../schema/auth-login-tokens.js";
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -59,10 +59,11 @@ interface RunResult {
 }
 
 function getChanges(result: unknown): number {
-  if (!result || typeof result !== 'object') return 0;
+  if (!result || typeof result !== "object") return 0;
   const r = result as RunResult;
-  if (typeof r.changes === 'number') return r.changes;
-  if (r.meta && typeof r.meta.changes === 'number') return r.meta.changes;
-  if (r.meta && typeof r.meta.rows_written === 'number') return r.meta.rows_written;
+  if (typeof r.changes === "number") return r.changes;
+  if (r.meta && typeof r.meta.changes === "number") return r.meta.changes;
+  if (r.meta && typeof r.meta.rows_written === "number")
+    return r.meta.rows_written;
   return 0;
 }

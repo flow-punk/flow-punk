@@ -1,8 +1,8 @@
-import { randomBase64Url } from '@flowpunk-indie/oauth-protocol';
-import { INDIE_SCOPE } from './env.js';
+import { randomBase64Url } from "@flowpunk-indie/oauth-protocol";
+import { INDIE_SCOPE } from "./env.js";
 
-const OAUTH_TOKEN_PREFIX = 'mcp_';
-const OAUTH_CLIENT_PREFIX = 'mcpc_';
+const OAUTH_TOKEN_PREFIX = "mcp_";
+const OAUTH_CLIENT_PREFIX = "mcpc_";
 
 export function mintIndieAccessToken(): string {
   return `${OAUTH_TOKEN_PREFIX}${INDIE_SCOPE}.${randomBase64Url(32)}`;
@@ -24,7 +24,7 @@ export function mintIndieClientId(): string {
 export function isIndieToken(raw: string): boolean {
   if (!raw.startsWith(OAUTH_TOKEN_PREFIX)) return false;
   const body = raw.slice(OAUTH_TOKEN_PREFIX.length);
-  const dot = body.indexOf('.');
+  const dot = body.indexOf(".");
   if (dot < 1) return false;
   const scope = body.slice(0, dot);
   const payload = body.slice(dot + 1);
@@ -34,7 +34,7 @@ export function isIndieToken(raw: string): boolean {
 export function isIndieClientId(raw: string): boolean {
   if (!raw.startsWith(OAUTH_CLIENT_PREFIX)) return false;
   const body = raw.slice(OAUTH_CLIENT_PREFIX.length);
-  const dot = body.indexOf('.');
+  const dot = body.indexOf(".");
   if (dot < 1) return false;
   const scope = body.slice(0, dot);
   const payload = body.slice(dot + 1);

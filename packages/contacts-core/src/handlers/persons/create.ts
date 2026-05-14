@@ -1,13 +1,13 @@
-import { personsRepo, type CreatePersonInput } from '@flowpunk-indie/db';
+import { personsRepo, type CreatePersonInput } from "@flowpunk-indie/db";
 
-import type { Actor, ContactsEnv } from '../../types.js';
+import type { Actor, ContactsEnv } from "../../types.js";
 import {
   emitContactsAudit,
   getDb,
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from '../_shared.js';
+} from "../_shared.js";
 
 export async function handleCreatePerson(
   request: Request,
@@ -15,7 +15,7 @@ export async function handleCreatePerson(
   actor: Actor,
 ): Promise<Response> {
   const body = await requireJsonBody<CreatePersonInput>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
 
   try {
     const db = getDb(env);
@@ -23,8 +23,8 @@ export async function handleCreatePerson(
     const person = await personsRepo.create(db, body.value, actor.userId, now);
 
     emitContactsAudit(actor, {
-      action: 'persons.created',
-      resourceType: 'person',
+      action: "persons.created",
+      resourceType: "person",
       resourceId: person.id,
       detail: { hasAccountId: person.accountId !== null },
     });

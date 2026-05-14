@@ -11,18 +11,18 @@
  * we only fall back to `request.url`'s origin for loopback dev.
  */
 
-import type { OAuthEnv } from './env.js';
+import type { OAuthEnv } from "./env.js";
 
 function stripTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.slice(0, -1) : value;
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
 function isLoopbackHost(hostname: string): boolean {
   return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '[::1]' ||
-    hostname === '::1'
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1"
   );
 }
 
@@ -35,7 +35,7 @@ export function getIssuerOrigin(env: OAuthEnv, request: Request): string {
     return stripTrailingSlash(url.origin);
   }
   throw new Error(
-    'GATEWAY_PUBLIC_ORIGIN is required for non-loopback OAuth metadata requests',
+    "GATEWAY_PUBLIC_ORIGIN is required for non-loopback OAuth metadata requests",
   );
 }
 
@@ -59,7 +59,7 @@ export function getProtectedResource(env: OAuthEnv, request: Request): string {
 }
 
 export function getAllowedResources(env: OAuthEnv, request: Request): string[] {
-  const configured = env.OAUTH_RESOURCE_ALLOWLIST?.split(',')
+  const configured = env.OAUTH_RESOURCE_ALLOWLIST?.split(",")
     .map((value) => value.trim())
     .map(stripTrailingSlash)
     .filter(Boolean);
@@ -80,11 +80,11 @@ export function getSingleResource(
   allowedResources: string[],
 ): { ok: true; resource: string } | { ok: false; error: string } {
   if (values.length !== 1) {
-    return { ok: false, error: 'invalid_target' };
+    return { ok: false, error: "invalid_target" };
   }
   const raw = values[0];
   if (!raw) {
-    return { ok: false, error: 'invalid_target' };
+    return { ok: false, error: "invalid_target" };
   }
   // Tolerate trailing-slash variants on both sides — clients commonly
   // canonicalize bare origins by appending `/`. Match is otherwise
@@ -92,7 +92,7 @@ export function getSingleResource(
   const normalized = stripTrailingSlash(raw);
   const allowed = allowedResources.map(stripTrailingSlash);
   if (!allowed.includes(normalized)) {
-    return { ok: false, error: 'invalid_target' };
+    return { ok: false, error: "invalid_target" };
   }
   return { ok: true, resource: normalized };
 }

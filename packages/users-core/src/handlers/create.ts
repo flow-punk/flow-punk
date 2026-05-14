@@ -1,6 +1,6 @@
-import { isRole, usersRepo, type Role } from '@flowpunk-indie/db';
+import { isRole, usersRepo, type Role } from "@flowpunk-indie/db";
 
-import type { Actor, UsersEnv } from '../types.js';
+import type { Actor, UsersEnv } from "../types.js";
 import {
   badRequest,
   emitUsersAudit,
@@ -8,7 +8,7 @@ import {
   jsonResponse,
   mapRepoError,
   requireJsonBody,
-} from './_shared.js';
+} from "./_shared.js";
 
 interface CreateBody {
   email?: unknown;
@@ -24,21 +24,33 @@ export async function handleCreate(
   actor: Actor,
 ): Promise<Response> {
   const body = await requireJsonBody<CreateBody>(request);
-  if (body.kind === 'err') return body.response;
+  if (body.kind === "err") return body.response;
   const input = body.value;
 
-  if (typeof input.email !== 'string') return badRequest('INVALID_EMAIL');
-  if (typeof input.displayName !== 'string') return badRequest('INVALID_DISPLAY_NAME');
-  if (input.firstName !== undefined && input.firstName !== null && typeof input.firstName !== 'string') {
-    return badRequest('INVALID_FIRST_NAME');
+  if (typeof input.email !== "string") return badRequest("INVALID_EMAIL");
+  if (typeof input.displayName !== "string")
+    return badRequest("INVALID_DISPLAY_NAME");
+  if (
+    input.firstName !== undefined &&
+    input.firstName !== null &&
+    typeof input.firstName !== "string"
+  ) {
+    return badRequest("INVALID_FIRST_NAME");
   }
-  if (input.lastName !== undefined && input.lastName !== null && typeof input.lastName !== 'string') {
-    return badRequest('INVALID_LAST_NAME');
+  if (
+    input.lastName !== undefined &&
+    input.lastName !== null &&
+    typeof input.lastName !== "string"
+  ) {
+    return badRequest("INVALID_LAST_NAME");
   }
   let role: Role | undefined;
   if (input.role !== undefined) {
     if (!isRole(input.role)) {
-      return badRequest('INVALID_ROLE', 'role must be one of owner, admin, member, readonly');
+      return badRequest(
+        "INVALID_ROLE",
+        "role must be one of owner, admin, member, readonly",
+      );
     }
     role = input.role;
   }
@@ -59,8 +71,8 @@ export async function handleCreate(
       { enforceSingleOwner: env.USERS_OPTIONS.enforceSingleOwner },
     );
     emitUsersAudit(actor, {
-      action: 'users.created',
-      resourceType: 'user',
+      action: "users.created",
+      resourceType: "user",
       resourceId: user.id,
       detail: { role: user.role },
     });
