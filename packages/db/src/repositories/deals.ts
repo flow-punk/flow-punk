@@ -36,6 +36,7 @@ import {
   type DealPatchableField,
   type NewDeal,
 } from '../schema/deals.js';
+import { dealHistory } from '../schema/deal-history.js';
 import type {
   DealHistoryChangeEntry,
   DealHistoryCredentialType,
@@ -223,27 +224,47 @@ export async function create(
   }
 
   // Indie path: batch the deal INSERT with a predicate-mirrored history
-  // INSERT. The history INSERT's WHERE EXISTS uses the freshly-written
-  // row's audit witness (`created_at = :now AND created_by = :actorId`).
-  // If statement A fails (e.g., FK violation on `pipeline_id`), the batch
-  // is atomically rolled back and statement B never lands.
+  // INSERT. The history INSERT uses `INSERT ... SELECT FROM deals WHERE
+  // <witness>` — semantically equivalent to `INSERT ... SELECT :literals
+  // WHERE EXISTS (SELECT 1 FROM deals WHERE <witness>)`: if the witness
+  // matches one row in `deals`, SELECT yields one row of literals and
+  // INSERT lands; if it matches zero rows, INSERT no-ops. The witness
+  // (`created_at = :now AND created_by = :actorId`) only holds after the
+  // first statement commits the deal row — so on any rollback (FK
+  // violation, etc.) the history INSERT no-ops automatically.
+  //
+  // Note: Drizzle's `db.batch()` is invoked with query builder objects
+  // (`db.insert(...).values(...)` and `db.insert(...).select(qb => ...)`).
+  // Raw `db.run(sql\`...\`)` is NOT a valid BatchItem in drizzle 0.36 —
+  // it returns an eager Promise rather than a deferred prepared
+  // statement, and the D1 driver errors with "Cannot read properties of
+  // undefined (reading 'bind')" when iterating the batch.
   const historyId = generateId('dhx');
   const changesJson = serializeCreated(deal);
   await db.batch([
     db.insert(deals).values(row),
-    db.run(sql`
-      INSERT INTO deal_history
-        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
-      SELECT
-        ${historyId}, ${deal.id}, 'created', ${changesJson},
-        ${actorId}, ${historyOpts.credentialType}, ${now}
-      WHERE EXISTS (
-        SELECT 1 FROM deals
-        WHERE id = ${deal.id}
-          AND created_at = ${now}
-          AND created_by = ${actorId}
-      )
-    `),
+    db.insert(dealHistory).select((qb) =>
+      qb
+        .select({
+          id: sql<string>`${historyId}`.as('id'),
+          dealId: sql<string>`${deal.id}`.as('deal_id'),
+          kind: sql<string>`'created'`.as('kind'),
+          changes: sql<string>`${changesJson}`.as('changes'),
+          actorId: sql<string>`${actorId}`.as('actor_id'),
+          credentialType: sql<string>`${historyOpts.credentialType}`.as(
+            'credential_type',
+          ),
+          createdAt: sql<string>`${now}`.as('created_at'),
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.id, deal.id),
+            eq(deals.createdAt, now),
+            eq(deals.createdBy, actorId),
+          ),
+        ),
+    ),
   ]);
   return deal;
 }
@@ -532,20 +553,29 @@ export async function update(
   const changesJson = serializeUpdated(diffs);
   const results = await db.batch([
     db.update(deals).set(setColumns).where(whereClause).returning(),
-    db.run(sql`
-      INSERT INTO deal_history
-        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
-      SELECT
-        ${historyId}, ${id}, 'updated', ${changesJson},
-        ${actorId}, ${historyOpts.credentialType}, ${now}
-      WHERE EXISTS (
-        SELECT 1 FROM deals
-        WHERE id = ${id}
-          AND status = 'active'
-          AND updated_at = ${now}
-          AND updated_by = ${actorId}
-      )
-    `),
+    db.insert(dealHistory).select((qb) =>
+      qb
+        .select({
+          id: sql<string>`${historyId}`.as('id'),
+          dealId: sql<string>`${id}`.as('deal_id'),
+          kind: sql<string>`'updated'`.as('kind'),
+          changes: sql<string>`${changesJson}`.as('changes'),
+          actorId: sql<string>`${actorId}`.as('actor_id'),
+          credentialType: sql<string>`${historyOpts.credentialType}`.as(
+            'credential_type',
+          ),
+          createdAt: sql<string>`${now}`.as('created_at'),
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.id, id),
+            eq(deals.status, 'active'),
+            eq(deals.updatedAt, now),
+            eq(deals.updatedBy, actorId),
+          ),
+        ),
+    ),
   ]);
   const updatedRows = results[0] as Deal[];
   const row = updatedRows[0];
@@ -626,22 +656,31 @@ export async function softDelete(
   const historyId = generateId('dhx');
   const results = await db.batch([
     db.update(deals).set(setColumns).where(whereClause).returning(),
-    db.run(sql`
-      INSERT INTO deal_history
-        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
-      SELECT
-        ${historyId}, ${id}, 'soft_deleted', NULL,
-        ${actorId}, ${historyOpts.credentialType}, ${now}
-      WHERE EXISTS (
-        SELECT 1 FROM deals
-        WHERE id = ${id}
-          AND status = 'deleted'
-          AND deleted_at = ${now}
-          AND deleted_by = ${actorId}
-          AND updated_at = ${now}
-          AND updated_by = ${actorId}
-      )
-    `),
+    db.insert(dealHistory).select((qb) =>
+      qb
+        .select({
+          id: sql<string>`${historyId}`.as('id'),
+          dealId: sql<string>`${id}`.as('deal_id'),
+          kind: sql<string>`'soft_deleted'`.as('kind'),
+          changes: sql<string | null>`NULL`.as('changes'),
+          actorId: sql<string>`${actorId}`.as('actor_id'),
+          credentialType: sql<string>`${historyOpts.credentialType}`.as(
+            'credential_type',
+          ),
+          createdAt: sql<string>`${now}`.as('created_at'),
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.id, id),
+            eq(deals.status, 'deleted'),
+            eq(deals.deletedAt, now),
+            eq(deals.deletedBy, actorId),
+            eq(deals.updatedAt, now),
+            eq(deals.updatedBy, actorId),
+          ),
+        ),
+    ),
   ]);
   const updatedRows = results[0] as Deal[];
   const row = updatedRows[0];
@@ -752,22 +791,31 @@ async function applyStageTransition(
 
   const results = await db.batch([
     db.update(deals).set(setColumns).where(whereClause).returning(),
-    db.run(sql`
-      INSERT INTO deal_history
-        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
-      SELECT
-        ${historyId}, ${id}, 'stage_moved', ${changesJson},
-        ${actorId}, ${historyOpts.credentialType}, ${now}
-      WHERE EXISTS (
-        SELECT 1 FROM deals
-        WHERE id = ${id}
-          AND status = 'active'
-          AND stage_id = ${targetStageId}
-          AND stage_entered_at = ${now}
-          AND updated_at = ${now}
-          AND updated_by = ${actorId}
-      )
-    `),
+    db.insert(dealHistory).select((qb) =>
+      qb
+        .select({
+          id: sql<string>`${historyId}`.as('id'),
+          dealId: sql<string>`${id}`.as('deal_id'),
+          kind: sql<string>`'stage_moved'`.as('kind'),
+          changes: sql<string>`${changesJson}`.as('changes'),
+          actorId: sql<string>`${actorId}`.as('actor_id'),
+          credentialType: sql<string>`${historyOpts.credentialType}`.as(
+            'credential_type',
+          ),
+          createdAt: sql<string>`${now}`.as('created_at'),
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.id, id),
+            eq(deals.status, 'active'),
+            eq(deals.stageId, targetStageId),
+            eq(deals.stageEnteredAt, now),
+            eq(deals.updatedAt, now),
+            eq(deals.updatedBy, actorId),
+          ),
+        ),
+    ),
   ]);
   const updatedRows = results[0] as Deal[];
   const row = updatedRows[0];
