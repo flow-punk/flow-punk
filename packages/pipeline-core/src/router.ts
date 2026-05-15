@@ -1,6 +1,8 @@
 import type { Logger } from '@flowpunk/service-utils';
 import { withIdempotency } from '@flowpunk/service-utils';
 
+import { handleGetDealHistory } from './handlers/deal-history/get.js';
+import { handleListDealHistory } from './handlers/deal-history/listByDeal.js';
 import { handleCreateDeal } from './handlers/deals/create.js';
 import { handleGetDeal } from './handlers/deals/get.js';
 import { handleListDeals } from './handlers/deals/list.js';
@@ -19,7 +21,12 @@ import { handleUpdateStage } from './handlers/stages/update.js';
 import { handleMcpExecute } from './mcp/execute.js';
 import { handleMcpTools } from './mcp/tools.js';
 import { parseIdentity } from './middleware/identity.js';
-import type { Actor, PipelineEnv } from './types.js';
+import {
+  DEFAULT_PIPELINE_CORE_OPTIONS,
+  type Actor,
+  type PipelineCoreOptions,
+  type PipelineEnv,
+} from './types.js';
 
 const PIPELINES_COLLECTION_PATH = '/api/v1/pipelines';
 const PIPELINES_ITEM_PREFIX = '/api/v1/pipelines/';
@@ -27,6 +34,7 @@ const STAGES_COLLECTION_PATH = '/api/v1/stages';
 const STAGES_ITEM_PREFIX = '/api/v1/stages/';
 const DEALS_COLLECTION_PATH = '/api/v1/deals';
 const DEALS_ITEM_PREFIX = '/api/v1/deals/';
+const DEAL_HISTORY_ITEM_PREFIX = '/api/v1/deal-history/';
 const MCP_TOOLS_PATH = '/mcp/tools';
 const MCP_EXECUTE_PATH = '/mcp/execute';
 
@@ -34,6 +42,7 @@ export async function route(
   request: Request,
   env: PipelineEnv,
   _logger?: Logger,
+  options: PipelineCoreOptions = DEFAULT_PIPELINE_CORE_OPTIONS,
 ): Promise<Response> {
   const url = new URL(request.url);
   const { pathname } = url;
@@ -63,7 +72,7 @@ export async function route(
   if (pathname === MCP_EXECUTE_PATH) {
     if (method === 'POST') {
       return idempotent(request, env, actor, () =>
-        handleMcpExecute(request, env, actor),
+        handleMcpExecute(request, env, actor, options),
       );
     }
     return methodNotAllowed(['POST']);
@@ -138,28 +147,52 @@ export async function route(
     }
     if (method === 'POST') {
       return idempotent(request, env, actor, () =>
-        handleCreateDeal(request, env, actor),
+        handleCreateDeal(request, env, actor, options),
       );
     }
     return methodNotAllowed(['GET', 'HEAD', 'POST']);
   }
   if (pathname.startsWith(DEALS_ITEM_PREFIX)) {
-    const id = pathname.slice(DEALS_ITEM_PREFIX.length);
-    if (id.length === 0 || id.includes('/')) return notFound();
+    const remainder = pathname.slice(DEALS_ITEM_PREFIX.length);
+    if (remainder.length === 0) return notFound();
+    const parts = remainder.split('/');
+    const id = parts[0]!;
+    if (id.length === 0) return notFound();
+
+    // /api/v1/deals/:id/history — append-only timeline read (ADR-022 §15)
+    if (parts.length === 2 && parts[1] === 'history') {
+      if (method === 'GET' || method === 'HEAD') {
+        return handleListDealHistory(request, env, actor, id);
+      }
+      return methodNotAllowed(['GET', 'HEAD']);
+    }
+
+    // /api/v1/deals/:id — standard item dispatch. Reject any deeper path.
+    if (parts.length !== 1) return notFound();
     if (method === 'GET' || method === 'HEAD') {
       return handleGetDeal(request, env, actor, id);
     }
     if (method === 'PATCH') {
       return idempotent(request, env, actor, () =>
-        handleUpdateDeal(request, env, actor, id),
+        handleUpdateDeal(request, env, actor, id, options),
       );
     }
     if (method === 'DELETE') {
       return idempotent(request, env, actor, () =>
-        handleSoftDeleteDeal(request, env, actor, id),
+        handleSoftDeleteDeal(request, env, actor, id, options),
       );
     }
     return methodNotAllowed(['GET', 'HEAD', 'PATCH', 'DELETE']);
+  }
+
+  // /api/v1/deal-history/:id — single history-row read (ADR-022 §15)
+  if (pathname.startsWith(DEAL_HISTORY_ITEM_PREFIX)) {
+    const id = pathname.slice(DEAL_HISTORY_ITEM_PREFIX.length);
+    if (id.length === 0 || id.includes('/')) return notFound();
+    if (method === 'GET' || method === 'HEAD') {
+      return handleGetDealHistory(request, env, actor, id);
+    }
+    return methodNotAllowed(['GET', 'HEAD']);
   }
 
   return notFound();

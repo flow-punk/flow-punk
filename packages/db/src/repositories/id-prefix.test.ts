@@ -18,6 +18,10 @@ test('generateId produces deal_ prefix for deals', () => {
   assert.match(generateId('deal'), /^deal_[a-z0-9]{21}$/);
 });
 
+test('generateId produces dhx_ prefix for deal_history rows', () => {
+  assert.match(generateId('dhx'), /^dhx_[a-z0-9]{21}$/);
+});
+
 test('generateId produces akey_ prefix for api-key row ids', () => {
   assert.match(generateId('akey'), /^akey_[a-z0-9]{21}$/);
 });

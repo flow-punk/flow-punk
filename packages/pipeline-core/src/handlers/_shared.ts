@@ -1,12 +1,14 @@
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { createLogger } from '@flowpunk/service-utils';
 import {
+  DealHistoryRepoError,
   DealsRepoError,
   PipelinesRepoError,
   StagesRepoError,
+  type HistoryEmitOptions,
 } from '@flowpunk-indie/db';
 
-import type { PipelineEnv } from '../types.js';
+import type { Actor, PipelineCoreOptions, PipelineEnv } from '../types.js';
 
 export type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -78,12 +80,37 @@ export async function requireJsonBody<T>(
 }
 
 /**
- * Map a pipeline-domain repo error (pipelines / stages / deals) to HTTP.
- * Non-repo errors are rethrown so the top-level fetch handler logs them
- * as INTERNAL_ERROR. 500s never include the underlying message in the
- * response body.
+ * Build the per-call `HistoryEmitOptions` from the wrapper-provided
+ * core options + the resolved actor. `credentialType` is carried from
+ * the gateway-stamped identity header; the indie `_system` actor would
+ * map to `'system'` here, but pipeline does not produce system writes
+ * today.
+ */
+export function buildHistoryOpts(
+  actor: Actor,
+  options: PipelineCoreOptions,
+): HistoryEmitOptions {
+  return {
+    recordHistory: options.recordHistory,
+    credentialType: actor.credentialType,
+  };
+}
+
+/**
+ * Map a pipeline-domain repo error (pipelines / stages / deals /
+ * deal_history) to HTTP. Non-repo errors are rethrown so the top-level
+ * fetch handler logs them as INTERNAL_ERROR. 500s never include the
+ * underlying message in the response body.
  */
 export function mapRepoError(err: unknown): Response {
+  if (err instanceof DealHistoryRepoError) {
+    switch (err.code) {
+      case 'not_found':
+        return errorResponse(404, 'NOT_FOUND', err.message);
+      case 'invalid_input':
+        return errorResponse(400, 'INVALID_INPUT', err.message);
+    }
+  }
   if (
     !(err instanceof PipelinesRepoError) &&
     !(err instanceof StagesRepoError) &&
@@ -104,6 +131,8 @@ export function mapRepoError(err: unknown): Response {
       return errorResponse(400, 'INVALID_INPUT', err.message);
     case 'wrong_state':
       return errorResponse(409, 'WRONG_STATE', err.message);
+    case 'conflict':
+      return errorResponse(409, 'CONFLICT', err.message);
     case 'invariant_violation': {
       const logger = createLogger({ service: 'pipeline' });
       logger.error(`${repoLabel} repo invariant violation`, {

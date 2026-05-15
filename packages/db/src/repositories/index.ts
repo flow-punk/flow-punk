@@ -7,6 +7,7 @@ export * as usersRepo from './users.js';
 export * as pipelinesRepo from './pipelines.js';
 export * as stagesRepo from './stages.js';
 export * as dealsRepo from './deals.js';
+export * as dealHistoryRepo from './deal-history.js';
 export * as oauthClientsRepo from './oauth-clients.js';
 export * as oauthTokensRepo from './oauth-tokens.js';
 export * as oauthCodesRepo from './oauth-codes.js';
@@ -17,7 +18,8 @@ export { PersonsRepoError } from './persons.js';
 export { UsersRepoError } from './users.js';
 export { PipelinesRepoError } from './pipelines.js';
 export { StagesRepoError } from './stages.js';
-export { DealsRepoError } from './deals.js';
+export { DealsRepoError, type HistoryEmitOptions } from './deals.js';
+export { DealHistoryRepoError } from './deal-history.js';
 export { OauthClientsRepoError } from './oauth-clients.js';
 export { OauthTokensRepoError } from './oauth-tokens.js';
 export { OauthCodesRepoError } from './oauth-codes.js';
@@ -73,3 +75,8 @@ export type {
   UpdateDealPatch,
   UpdateResult as DealsUpdateResult,
 } from './deals.js';
+export type {
+  ListByDealOptions as DealHistoryListOptions,
+  ListResult as DealHistoryListResult,
+  CursorPayload as DealHistoryCursor,
+} from './deal-history.js';

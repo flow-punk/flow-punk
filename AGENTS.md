@@ -24,4 +24,4 @@ AI-powered CRM platform built on Cloudflare Workers. In this checkout, the indie
 | Package | Path | Purpose |
 |---------|------|---------|
 | service-utils | `packages/service-utils/` | Logger, auth, errors, tracing, idempotency, audit emission |
-| db | `packages/db/` | Indie platform DB schema (`users`, `mcp_sessions`, `api_keys`) and repositories |
+| db | `packages/db/` | Indie platform DB schema (`users`, `mcp_sessions`, `api_keys`, `accounts`, `persons`, `pipelines`, `stages`, `deals`, `deal_history`, OAuth tables) and repositories |

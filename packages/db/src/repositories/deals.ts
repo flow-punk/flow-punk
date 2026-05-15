@@ -36,9 +36,18 @@ import {
   type DealPatchableField,
   type NewDeal,
 } from '../schema/deals.js';
+import type {
+  DealHistoryChangeEntry,
+  DealHistoryCredentialType,
+} from '../schema/deal-history.js';
 import { persons } from '../schema/persons.js';
 import { pipelines } from '../schema/pipelines.js';
 import { stages } from '../schema/stages.js';
+import {
+  serializeCreated,
+  serializeStageMoved,
+  serializeUpdated,
+} from './deal-history-serialize.js';
 
 type Db = DrizzleD1Database<Record<string, never>>;
 
@@ -48,12 +57,36 @@ export class DealsRepoError extends Error {
       | 'not_found'
       | 'invalid_input'
       | 'wrong_state'
+      | 'conflict'
       | 'invariant_violation',
     message: string,
   ) {
     super(message);
     this.name = 'DealsRepoError';
   }
+}
+
+/**
+ * Per-call configuration for history co-emission (ADR-022).
+ *
+ * When `recordHistory` is `true`, every successful mutation co-writes a
+ * `deal_history` row in the same `db.batch()` as the underlying deal write,
+ * using a predicate-mirrored `INSERT INTO ... SELECT ... WHERE EXISTS (...)`
+ * so failed mutations do not leak orphan history rows (ADR-022 §7).
+ *
+ * Managed sets `recordHistory: false` for v1 because
+ * `TenantRouterD1Proxy.batch()` throws (ADR-001 §"managed batch
+ * unsupported" / ADR-022 §14). In that mode the repo issues single-
+ * statement INSERT/UPDATE and skips history entirely — managed deal
+ * mutations behave exactly as they did before this ADR.
+ *
+ * `credentialType` is the actor's canonical `audit-events` credential type
+ * (`apikey | oauth | session | system`). Pipeline-core wraps the actor's
+ * `IdentityHeaderValues['credentialType']` directly into this field.
+ */
+export interface HistoryEmitOptions {
+  recordHistory: boolean;
+  credentialType: DealHistoryCredentialType;
 }
 
 const DEAL_ID_REGEX = /^deal_[a-z0-9]{21}$/;
@@ -116,6 +149,7 @@ export async function create(
   input: CreateDealInput,
   actorId: string,
   now: string,
+  historyOpts: HistoryEmitOptions,
 ): Promise<Deal> {
   const normalized = validateCreate(input);
 
@@ -156,11 +190,61 @@ export async function create(
     updatedBy: actorId,
   };
 
-  const inserted = await db.insert(deals).values(row).returning();
-  const deal = inserted[0];
-  if (!deal) {
-    throw new DealsRepoError('invariant_violation', 'insert returned no row');
+  // Reify the inserted Deal locally — we trust the inserted values rather
+  // than round-tripping a SELECT RETURNING, so the `create` path remains a
+  // single batched write on indie and a single INSERT on managed.
+  const deal: Deal = {
+    id: row.id!,
+    name: row.name,
+    pipelineId: row.pipelineId,
+    stageId: row.stageId,
+    stageEnteredAt: row.stageEnteredAt!,
+    accountId: row.accountId ?? null,
+    primaryPersonId: row.primaryPersonId ?? null,
+    amount: row.amount ?? null,
+    currency: row.currency ?? null,
+    expectedCloseDate: row.expectedCloseDate ?? null,
+    probability: row.probability ?? null,
+    ownerUserId: row.ownerUserId ?? null,
+    lostReason: row.lostReason ?? null,
+    status: 'active',
+    deletedAt: null,
+    deletedBy: null,
+    createdAt: now,
+    createdBy: actorId,
+    updatedAt: now,
+    updatedBy: actorId,
+  };
+
+  if (!historyOpts.recordHistory) {
+    // Managed path: no batch() call (TenantRouterD1Proxy.batch() throws).
+    await db.insert(deals).values(row);
+    return deal;
   }
+
+  // Indie path: batch the deal INSERT with a predicate-mirrored history
+  // INSERT. The history INSERT's WHERE EXISTS uses the freshly-written
+  // row's audit witness (`created_at = :now AND created_by = :actorId`).
+  // If statement A fails (e.g., FK violation on `pipeline_id`), the batch
+  // is atomically rolled back and statement B never lands.
+  const historyId = generateId('dhx');
+  const changesJson = serializeCreated(deal);
+  await db.batch([
+    db.insert(deals).values(row),
+    db.run(sql`
+      INSERT INTO deal_history
+        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
+      SELECT
+        ${historyId}, ${deal.id}, 'created', ${changesJson},
+        ${actorId}, ${historyOpts.credentialType}, ${now}
+      WHERE EXISTS (
+        SELECT 1 FROM deals
+        WHERE id = ${deal.id}
+          AND created_at = ${now}
+          AND created_by = ${actorId}
+      )
+    `),
+  ]);
   return deal;
 }
 
@@ -267,6 +351,21 @@ export async function list(db: Db, options: ListOptions = {}): Promise<ListResul
  *
  * Other fields use the standard partial update; `pipelineId` is rejected
  * as immutable, `stageEnteredAt` cannot be patched directly.
+ *
+ * Optimistic concurrency (ADR-022 §8): the UPDATE adds
+ * `AND updated_at = :seenUpdatedAt` where `seenUpdatedAt` is captured by
+ * an active-row pre-read. Concurrent writers can only produce ONE
+ * winner; the loser surfaces as `DealsRepoError('conflict', ...)` which
+ * handlers map to `409 CONFLICT`. The pre-read also classifies
+ * `not_found` / `wrong_state` before the write so the post-write 0-rows
+ * outcome is unambiguously a conflict — no post-batch re-read needed.
+ *
+ * History co-emission (ADR-022 §7): when `historyOpts.recordHistory` is
+ * true, the UPDATE is batched with a predicate-mirrored
+ * `INSERT INTO deal_history ... SELECT ... WHERE EXISTS (post-state witness)`.
+ * Both statements commit together; both no-op together. `kind` is
+ * `'stage_moved'` if the patch successfully changes `stage_id`, otherwise
+ * `'updated'`.
  */
 export async function update(
   db: Db,
@@ -274,6 +373,7 @@ export async function update(
   patch: UpdateDealPatch,
   actorId: string,
   now: string,
+  historyOpts: HistoryEmitOptions,
 ): Promise<UpdateResult> {
   if (!DEAL_ID_REGEX.test(id)) {
     throw new DealsRepoError(
@@ -298,7 +398,7 @@ export async function update(
   }
 
   const changes: Partial<Record<DealPatchableField, unknown>> = {};
-  const fieldsChanged: DealPatchableField[] = [];
+  const submittedFields: DealPatchableField[] = [];
 
   for (const field of ALLOWED_PATCH_FIELDS) {
     if (!(field in patch)) continue;
@@ -311,20 +411,47 @@ export async function update(
         );
       }
       changes[field] = null;
-      fieldsChanged.push(field);
+      submittedFields.push(field);
       continue;
     }
     if (value === undefined) continue;
     validateField(field, value);
     changes[field] = normalizeField(field, value);
-    fieldsChanged.push(field);
+    submittedFields.push(field);
   }
 
-  if (fieldsChanged.length === 0) {
+  if (submittedFields.length === 0) {
     const current = await findById(db, id);
     if (!current) {
       throw new DealsRepoError('not_found', `deal "${id}" not found`);
     }
+    return { deal: current, fieldsChanged: [] };
+  }
+
+  // Pre-read with `includeDeleted: true` so we can distinguish:
+  //   - row missing → 404 `not_found`
+  //   - row soft-deleted → 409 `wrong_state` (matches pipeline.md §Error Codes)
+  //   - row active → proceed to OC-guarded write
+  // The post-write 0-affected case is then unambiguously a conflict
+  // (ADR-022 §8 — no race-prone post-batch re-read).
+  const current = await findById(db, id, { includeDeleted: true });
+  if (!current) {
+    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+  }
+  if (current.status !== 'active') {
+    throw new DealsRepoError('wrong_state', `deal "${id}" is not active`);
+  }
+
+  // Filter no-op writes (post-normalization equality). A PATCH that sets
+  // every field to its existing value produces zero diffs and no history
+  // row (matches user mental-model: "one edit" only emits when there IS
+  // an edit).
+  const fieldsChanged: DealPatchableField[] = [];
+  for (const field of submittedFields) {
+    if (current[field] === (changes[field] as Deal[typeof field])) continue;
+    fieldsChanged.push(field);
+  }
+  if (fieldsChanged.length === 0) {
     return { deal: current, fieldsChanged: [] };
   }
 
@@ -339,73 +466,190 @@ export async function update(
     await assertPersonActive(db, changes.primaryPersonId);
   }
 
-  // Stage transition path: handled atomically by a conditional UPDATE.
-  if ('stageId' in changes && typeof changes.stageId === 'string') {
+  const seenUpdatedAt = current.updatedAt;
+
+  // Stage transition path. Trigger only if the patch BOTH supplies stageId
+  // AND it differs from the current stage; a same-stage stageId in the
+  // PATCH was already filtered out of `fieldsChanged`.
+  const wantsStageTransition =
+    fieldsChanged.includes('stageId') && typeof changes.stageId === 'string';
+  if (wantsStageTransition) {
     return await applyStageTransition(
       db,
       id,
+      current,
       changes,
       fieldsChanged,
       actorId,
       now,
+      seenUpdatedAt,
+      historyOpts,
     );
   }
 
-  // Non-transition path: standard active-row UPDATE.
-  const updated = await db
-    .update(deals)
-    .set({ ...changes, updatedAt: now, updatedBy: actorId } as any)
-    .where(and(eq(deals.id, id), eq(deals.status, 'active')))
-    .returning();
+  // Non-transition path: standard active-row UPDATE with OC guard.
+  const setColumns = { ...changes, updatedAt: now, updatedBy: actorId } as any;
+  const whereClause = and(
+    eq(deals.id, id),
+    eq(deals.status, 'active'),
+    eq(deals.updatedAt, seenUpdatedAt),
+  );
 
-  const row = updated[0];
-  if (!row) {
-    const existing = await db
-      .select({ status: deals.status })
-      .from(deals)
-      .where(eq(deals.id, id))
-      .limit(1);
-    if (existing[0]) {
-      throw new DealsRepoError('wrong_state', `deal "${id}" is not active`);
+  if (!historyOpts.recordHistory) {
+    const updated = await db
+      .update(deals)
+      .set(setColumns)
+      .where(whereClause)
+      .returning();
+    const row = updated[0];
+    if (!row) {
+      // Pre-read confirmed the row was active with seenUpdatedAt — any
+      // 0-affected outcome here is a concurrent-write conflict.
+      throw new DealsRepoError(
+        'conflict',
+        `deal "${id}" was modified by a concurrent write — re-read and retry`,
+      );
     }
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+    return { deal: row, fieldsChanged };
   }
 
+  // Indie path: batch UPDATE with predicate-mirrored history INSERT.
+  //
+  // The post-state witness below proves "an UPDATE by this actor at this
+  // millisecond landed on this row" but does NOT assert the new value of
+  // every co-modified field. ADR-022 §7 documents this as the accepted
+  // v1 limitation — same-actor-same-millisecond races with disjoint
+  // changesets could still emit a phantom history row alongside a 409
+  // (data correctness preserved; only timeline phantom). Tightening to
+  // per-field value witnesses, a version column, or strictly-greater
+  // updated_at is deferred until the race is observed in production.
+  const diffs: DealHistoryChangeEntry[] = fieldsChanged.map((field) => ({
+    field,
+    from: current[field],
+    to: changes[field],
+  }));
+  const historyId = generateId('dhx');
+  const changesJson = serializeUpdated(diffs);
+  const results = await db.batch([
+    db.update(deals).set(setColumns).where(whereClause).returning(),
+    db.run(sql`
+      INSERT INTO deal_history
+        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
+      SELECT
+        ${historyId}, ${id}, 'updated', ${changesJson},
+        ${actorId}, ${historyOpts.credentialType}, ${now}
+      WHERE EXISTS (
+        SELECT 1 FROM deals
+        WHERE id = ${id}
+          AND status = 'active'
+          AND updated_at = ${now}
+          AND updated_by = ${actorId}
+      )
+    `),
+  ]);
+  const updatedRows = results[0] as Deal[];
+  const row = updatedRows[0];
+  if (!row) {
+    throw new DealsRepoError(
+      'conflict',
+      `deal "${id}" was modified by a concurrent write — re-read and retry`,
+    );
+  }
   return { deal: row, fieldsChanged };
 }
 
+/**
+ * Soft-delete a deal. Mirrors `update()`'s pre-read pattern so the
+ * post-write 0-affected case is unambiguously a conflict.
+ *
+ * History co-emission: `kind='soft_deleted'`, `changes=null` (ADR-022 §4).
+ * The post-state witness includes `status='deleted'`, `deleted_at=:now`,
+ * `deleted_by=:actorId` AND `updated_at=:now AND updated_by=:actorId` so a
+ * concurrent same-millisecond update by another actor cannot accidentally
+ * satisfy the witness (ADR-022 §7).
+ */
 export async function softDelete(
   db: Db,
   id: string,
   actorId: string,
   now: string,
+  historyOpts: HistoryEmitOptions,
 ): Promise<Deal> {
-  const updated = await db
-    .update(deals)
-    .set({
-      status: 'deleted',
-      deletedAt: now,
-      deletedBy: actorId,
-      updatedAt: now,
-      updatedBy: actorId,
-    })
-    .where(and(eq(deals.id, id), eq(deals.status, 'active')))
-    .returning();
+  if (!DEAL_ID_REGEX.test(id)) {
+    throw new DealsRepoError(
+      'invalid_input',
+      'deal id must match "deal_<21 lowercase alphanumeric>"',
+    );
+  }
 
-  const row = updated[0];
-  if (!row) {
-    const existing = await db
-      .select({ status: deals.status })
-      .from(deals)
-      .where(eq(deals.id, id))
-      .limit(1);
-    if (existing[0]) {
+  const current = await findById(db, id, { includeDeleted: true });
+  if (!current) {
+    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+  }
+  if (current.status !== 'active') {
+    throw new DealsRepoError(
+      'wrong_state',
+      `deal "${id}" is already deleted`,
+    );
+  }
+  const seenUpdatedAt = current.updatedAt;
+
+  const setColumns = {
+    status: 'deleted' as const,
+    deletedAt: now,
+    deletedBy: actorId,
+    updatedAt: now,
+    updatedBy: actorId,
+  };
+  const whereClause = and(
+    eq(deals.id, id),
+    eq(deals.status, 'active'),
+    eq(deals.updatedAt, seenUpdatedAt),
+  );
+
+  if (!historyOpts.recordHistory) {
+    const updated = await db
+      .update(deals)
+      .set(setColumns)
+      .where(whereClause)
+      .returning();
+    const row = updated[0];
+    if (!row) {
       throw new DealsRepoError(
-        'wrong_state',
-        `deal "${id}" is already deleted`,
+        'conflict',
+        `deal "${id}" was modified by a concurrent write — re-read and retry`,
       );
     }
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
+    return row;
+  }
+
+  const historyId = generateId('dhx');
+  const results = await db.batch([
+    db.update(deals).set(setColumns).where(whereClause).returning(),
+    db.run(sql`
+      INSERT INTO deal_history
+        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
+      SELECT
+        ${historyId}, ${id}, 'soft_deleted', NULL,
+        ${actorId}, ${historyOpts.credentialType}, ${now}
+      WHERE EXISTS (
+        SELECT 1 FROM deals
+        WHERE id = ${id}
+          AND status = 'deleted'
+          AND deleted_at = ${now}
+          AND deleted_by = ${actorId}
+          AND updated_at = ${now}
+          AND updated_by = ${actorId}
+      )
+    `),
+  ]);
+  const updatedRows = results[0] as Deal[];
+  const row = updatedRows[0];
+  if (!row) {
+    throw new DealsRepoError(
+      'conflict',
+      `deal "${id}" was modified by a concurrent write — re-read and retry`,
+    );
   }
   return row;
 }
@@ -413,115 +657,127 @@ export async function softDelete(
 // ---------- stage transition ----------
 
 /**
- * Apply a deal update that includes a stage transition. The conditional
- * UPDATE asserts the target stage is active AND belongs to the deal's
- * current pipeline (matched via the deal's own `pipeline_id` column).
- * `stage_entered_at` is reset to `now` only when `stage_id` actually
- * differs from the current value (guarded by `stage_id != ?` in the
- * WHERE clause; if the patch sets the same stage, the UPDATE still runs
- * to apply other patch fields but `stage_entered_at` is preserved).
+ * Apply a deal update that includes a stage transition. Called only when
+ * `changes.stageId` is present and differs from `current.stageId` (the
+ * same-stage case is filtered out at the no-op-diff check upstream).
  *
- * Two passes: first try the "stage actually changes" path with the
- * transition guard + new stage_entered_at; if zero affected and the deal
- * exists active, the transition guard failed (target stage not in same
- * pipeline / not active). If the deal exists but the target equals the
- * current, fall through to the no-op path which keeps stage_entered_at.
+ * The transition is atomic: a single conditional UPDATE asserts the deal
+ * is active, the seenUpdatedAt OC guard holds, the current stage matches
+ * the pre-read `from_stage_id`, and the target stage is active AND in the
+ * deal's pipeline. `stage_entered_at` is reset to `now`.
+ *
+ * Target-stage validity (active + same-pipeline) is pre-validated as a
+ * synchronous read so that user-facing failures surface as
+ * `invalid_input` (→ 400). The `EXISTS` clause stays in the UPDATE as a
+ * concurrent-soft-delete safety net; if the pre-validation passed and
+ * the UPDATE still affects 0 rows, that's an OC conflict, not invalid
+ * input.
+ *
+ * History `kind='stage_moved'` carries `{from_stage_id, to_stage_id,
+ * changes: [other diffs]}`. The history witness includes
+ * `stage_id=:to AND stage_entered_at=:now AND updated_at=:now AND
+ * updated_by=:actorId` so a coincident-millisecond write by another actor
+ * cannot satisfy it (ADR-022 §7).
  */
 async function applyStageTransition(
   db: Db,
   id: string,
+  current: Deal,
   changes: Partial<Record<DealPatchableField, unknown>>,
   fieldsChanged: DealPatchableField[],
   actorId: string,
   now: string,
+  seenUpdatedAt: string,
+  historyOpts: HistoryEmitOptions,
 ): Promise<UpdateResult> {
   const targetStageId = changes.stageId as string;
+  const fromStageId = current.stageId;
 
-  // Atomic transition: requires deal active, target stage active and in
-  // deal's pipeline, AND target differs from current. Includes all other
-  // patch fields in the same SET to keep the update single-statement.
+  // Pre-validate the target stage's active state + pipeline membership.
+  // Any failure here → 400 INVALID_INPUT; if it passes, a later 0-affected
+  // UPDATE is unambiguously an OC conflict (status / updated_at / stage_id
+  // moved between read and write) and not a pre-validation issue.
+  await assertStageInActivePipeline(db, targetStageId, current.pipelineId);
+
   const otherChanges = { ...changes };
   delete otherChanges.stageId;
 
-  const transitioned = await db
-    .update(deals)
-    .set({
-      ...otherChanges,
-      stageId: targetStageId,
-      stageEnteredAt: now,
-      updatedAt: now,
-      updatedBy: actorId,
-    } as any)
-    .where(
-      and(
-        eq(deals.id, id),
-        eq(deals.status, 'active'),
-        sql`${deals.stageId} != ${targetStageId}`,
-        sql`EXISTS (SELECT 1 FROM stages WHERE id = ${targetStageId} AND status = 'active' AND pipeline_id = ${deals.pipelineId})`,
-      ),
-    )
-    .returning();
+  const setColumns = {
+    ...otherChanges,
+    stageId: targetStageId,
+    stageEnteredAt: now,
+    updatedAt: now,
+    updatedBy: actorId,
+  } as any;
+  const whereClause = and(
+    eq(deals.id, id),
+    eq(deals.status, 'active'),
+    eq(deals.updatedAt, seenUpdatedAt),
+    eq(deals.stageId, fromStageId),
+    sql`EXISTS (SELECT 1 FROM stages WHERE id = ${targetStageId} AND status = 'active' AND pipeline_id = ${deals.pipelineId})`,
+  );
 
-  if (transitioned[0]) {
-    return { deal: transitioned[0], fieldsChanged };
-  }
-
-  // The transition UPDATE matched zero rows. Disambiguate.
-  const current = await db
-    .select({ status: deals.status, stageId: deals.stageId })
-    .from(deals)
-    .where(eq(deals.id, id))
-    .limit(1);
-
-  const currentRow = current[0];
-  if (!currentRow) {
-    throw new DealsRepoError('not_found', `deal "${id}" not found`);
-  }
-  if (currentRow.status !== 'active') {
-    throw new DealsRepoError('wrong_state', `deal "${id}" is not active`);
-  }
-
-  if (currentRow.stageId === targetStageId) {
-    // Same-stage update — preserve stage_entered_at, apply remaining patch.
-    // Guard `stage_id = targetStageId` so a concurrent transition between
-    // the disambiguation read and this write cannot land otherChanges on a
-    // moved deal while we report `fieldsChanged: []` for stageId.
+  if (!historyOpts.recordHistory) {
     const updated = await db
       .update(deals)
-      .set({
-        ...otherChanges,
-        updatedAt: now,
-        updatedBy: actorId,
-      } as any)
-      .where(
-        and(
-          eq(deals.id, id),
-          eq(deals.status, 'active'),
-          eq(deals.stageId, targetStageId),
-        ),
-      )
+      .set(setColumns)
+      .where(whereClause)
       .returning();
     const row = updated[0];
     if (!row) {
-      // The deal's stage changed between our read and write (or it was
-      // soft-deleted). Surface as wrong_state so the caller retries — a
-      // retry runs the transition guard cleanly.
       throw new DealsRepoError(
-        'wrong_state',
-        `deal "${id}" stage changed concurrently — retry`,
+        'conflict',
+        `deal "${id}" was modified by a concurrent write — re-read and retry`,
       );
     }
-    // Drop stageId from fieldsChanged since it didn't actually change.
-    const filtered = fieldsChanged.filter((f) => f !== 'stageId');
-    return { deal: row, fieldsChanged: filtered };
+    return { deal: row, fieldsChanged };
   }
 
-  // Different stage but the EXISTS guard failed: stage missing/deleted/
-  // wrong pipeline. Surface as invalid_input.
-  throw new DealsRepoError(
-    'invalid_input',
-    `stage "${targetStageId}" is not active or does not belong to deal's pipeline`,
+  // Build the `stage_moved` payload: typed transition wrapper around any
+  // co-modified fields. fieldsChanged excludes `stageId` for the inner
+  // diff list.
+  const otherDiffs: DealHistoryChangeEntry[] = fieldsChanged
+    .filter((f) => f !== 'stageId')
+    .map((field) => ({
+      field,
+      from: current[field],
+      to: changes[field],
+    }));
+  const historyId = generateId('dhx');
+  const changesJson = serializeStageMoved(
+    fromStageId,
+    targetStageId,
+    otherDiffs,
   );
+
+  const results = await db.batch([
+    db.update(deals).set(setColumns).where(whereClause).returning(),
+    db.run(sql`
+      INSERT INTO deal_history
+        (id, deal_id, kind, changes, actor_id, credential_type, created_at)
+      SELECT
+        ${historyId}, ${id}, 'stage_moved', ${changesJson},
+        ${actorId}, ${historyOpts.credentialType}, ${now}
+      WHERE EXISTS (
+        SELECT 1 FROM deals
+        WHERE id = ${id}
+          AND status = 'active'
+          AND stage_id = ${targetStageId}
+          AND stage_entered_at = ${now}
+          AND updated_at = ${now}
+          AND updated_by = ${actorId}
+      )
+    `),
+  ]);
+  const updatedRows = results[0] as Deal[];
+  const row = updatedRows[0];
+  if (!row) {
+    throw new DealsRepoError(
+      'conflict',
+      `deal "${id}" was modified by a concurrent write — re-read and retry`,
+    );
+  }
+  return { deal: row, fieldsChanged };
 }
 
 // ---------- pre-checks ----------

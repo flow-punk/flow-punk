@@ -48,6 +48,16 @@ export {
   type NewDeal,
 } from './deals.js';
 export {
+  dealHistory,
+  type DealHistoryRow,
+  type NewDealHistoryRow,
+  type DealHistoryKind,
+  type DealHistoryCredentialType,
+  type DealHistoryChangeEntry,
+  DEAL_HISTORY_CREATED_FIELD_ORDER,
+  type DealHistoryCreatedField,
+} from './deal-history.js';
+export {
   mcpOauthClients,
   type McpOauthClient,
   type NewMcpOauthClient,

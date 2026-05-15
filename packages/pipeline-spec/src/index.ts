@@ -49,7 +49,55 @@ const stdErrors = {
   '400': { description: 'Invalid input', content: { 'application/json': { schema: ERROR_REF } } },
   '401': { description: 'Unauthenticated', content: { 'application/json': { schema: ERROR_REF } } },
   '404': { description: 'Not found', content: { 'application/json': { schema: ERROR_REF } } },
-  '409': { description: 'Conflict (e.g., child rows still active)', content: { 'application/json': { schema: ERROR_REF } } },
+  '409': { description: 'Conflict (e.g., child rows still active, or optimistic-concurrency miss on deal writes per ADR-022)', content: { 'application/json': { schema: ERROR_REF } } },
+} as const;
+
+// `deal_history` is a hand-built schema rather than Drizzle-derived: the
+// `changes` JSON shape varies by `kind` (per ADR-022 §4), which doesn't
+// round-trip through `tableToSchemas`. PII: `changes` is `pii()`-marked
+// in the schema and treated as opaque text in OpenAPI — clients are PII-
+// aware.
+const dealHistorySchemas = {
+  DealHistory: {
+    type: 'object',
+    required: [
+      'id',
+      'dealId',
+      'kind',
+      'changes',
+      'actorId',
+      'credentialType',
+      'createdAt',
+    ],
+    properties: {
+      id: { type: 'string', pattern: '^dhx_[a-z0-9]{21}$' },
+      dealId: { type: 'string', pattern: '^deal_[a-z0-9]{21}$' },
+      kind: {
+        type: 'string',
+        enum: [
+          'created',
+          'updated',
+          'stage_moved',
+          'soft_deleted',
+          'contact_added',
+          'contact_removed',
+        ],
+        description:
+          "Append-only kind discriminator. v1 emits `created | updated | stage_moved | soft_deleted`; `contact_added | contact_removed` are reserved in the schema CHECK constraint but not emitted until deal_contacts ships.",
+      },
+      changes: {
+        type: ['string', 'null'],
+        description:
+          'JSON-stringified change payload (shape varies by kind — see ADR-022 §4). `null` for kind="soft_deleted".',
+      },
+      actorId: { type: 'string' },
+      credentialType: {
+        type: 'string',
+        enum: ['apikey', 'oauth', 'session', 'system'],
+      },
+      createdAt: { type: 'string', format: 'date-time' },
+    },
+  },
 } as const;
 
 function listResponse(itemRef: string) {
@@ -167,14 +215,58 @@ function crudPaths(opts: {
   };
 }
 
+const DEAL_HISTORY_LIST_RESPONSE = {
+  description: 'Cursor-paginated list of deal-history rows.',
+  content: {
+    'application/json': {
+      schema: {
+        type: 'object',
+        required: ['items', 'nextCursor'],
+        properties: {
+          items: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/DealHistory' },
+          },
+          nextCursor: { type: ['string', 'null'] },
+        },
+      },
+    },
+  },
+} as const;
+
+const DEAL_HISTORY_ITEM_RESPONSE = {
+  description: 'A single deal-history row.',
+  content: {
+    'application/json': {
+      schema: {
+        type: 'object',
+        required: ['deal_history'],
+        properties: {
+          deal_history: { $ref: '#/components/schemas/DealHistory' },
+        },
+      },
+    },
+  },
+} as const;
+
 export const pipelineSpec = {
   tags: [
     { name: 'Pipelines', description: 'Sales pipelines.' },
     { name: 'Stages', description: 'Stages within a pipeline.' },
     { name: 'Deals', description: 'Deals (opportunities) flowing through stages.' },
+    {
+      name: 'DealHistory',
+      description:
+        'Append-only per-tenant timeline of deal mutations (ADR-022). Read-only surface.',
+    },
   ],
   components: {
-    schemas: { ...pipelineSchemas, ...stageSchemas, ...dealSchemas },
+    schemas: {
+      ...pipelineSchemas,
+      ...stageSchemas,
+      ...dealSchemas,
+      ...dealHistorySchemas,
+    },
   },
   paths: {
     ...crudPaths({
@@ -216,5 +308,35 @@ export const pipelineSpec = {
       },
       noun: 'deal',
     }),
+    '/api/v1/deals/{id}/history': {
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^deal_[a-z0-9]{21}$' } }],
+      get: {
+        operationId: 'listDealHistoryByDeal',
+        summary: 'List the append-only history timeline for a deal',
+        tags: ['DealHistory'],
+        parameters: [
+          { name: 'limit', in: 'query', required: false, schema: { type: 'integer', minimum: 1, maximum: 200 } },
+          { name: 'cursor', in: 'query', required: false, schema: { type: 'string' } },
+        ],
+        responses: {
+          '200': DEAL_HISTORY_LIST_RESPONSE,
+          '400': stdErrors['400'],
+          '401': stdErrors['401'],
+        },
+      },
+    },
+    '/api/v1/deal-history/{id}': {
+      parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^dhx_[a-z0-9]{21}$' } }],
+      get: {
+        operationId: 'getDealHistory',
+        summary: 'Get a single deal-history row by id',
+        tags: ['DealHistory'],
+        responses: {
+          '200': DEAL_HISTORY_ITEM_RESPONSE,
+          '401': stdErrors['401'],
+          '404': stdErrors['404'],
+        },
+      },
+    },
   },
 } as const;

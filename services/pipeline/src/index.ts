@@ -1,5 +1,17 @@
 import { createLogger } from '@flowpunk/service-utils';
-import { route, type PipelineEnv } from '@flowpunk-indie/pipeline-core';
+import {
+  route,
+  type PipelineCoreOptions,
+  type PipelineEnv,
+} from '@flowpunk-indie/pipeline-core';
+
+// Indie ships `deal_history` fully (ADR-022). The indie tenant is the
+// single-D1 deploy, so `db.batch()` works end-to-end and history rows are
+// co-emitted with every deal mutation. Per ADR-022 §14 / ADR-011 §201,
+// edition-specific options thread through `route()`'s 4th argument.
+const INDIE_OPTIONS: PipelineCoreOptions = {
+  recordHistory: true,
+};
 
 export default {
   async fetch(request: Request, env: PipelineEnv): Promise<Response> {
@@ -11,7 +23,7 @@ export default {
       .withTenantId(tenantId);
 
     try {
-      return await route(request, env, logger);
+      return await route(request, env, logger, INDIE_OPTIONS);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       logger.error('unhandled error in pipeline worker', {

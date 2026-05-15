@@ -1,13 +1,20 @@
 import { dealsRepo, type UpdateDealPatch } from '@flowpunk-indie/db';
 
-import type { Actor, PipelineEnv } from '../../types.js';
-import { getDb, jsonResponse, mapRepoError, requireJsonBody } from '../_shared.js';
+import type { Actor, PipelineCoreOptions, PipelineEnv } from '../../types.js';
+import {
+  buildHistoryOpts,
+  getDb,
+  jsonResponse,
+  mapRepoError,
+  requireJsonBody,
+} from '../_shared.js';
 
 export async function handleUpdateDeal(
   request: Request,
   env: PipelineEnv,
   actor: Actor,
   id: string,
+  options: PipelineCoreOptions,
 ): Promise<Response> {
   const body = await requireJsonBody<UpdateDealPatch>(request);
   if (body.kind === 'err') return body.response;
@@ -15,7 +22,14 @@ export async function handleUpdateDeal(
   try {
     const db = getDb(env);
     const now = new Date().toISOString();
-    const result = await dealsRepo.update(db, id, body.value, actor.userId, now);
+    const result = await dealsRepo.update(
+      db,
+      id,
+      body.value,
+      actor.userId,
+      now,
+      buildHistoryOpts(actor, options),
+    );
     // audit emission deferred — see plan §Out of scope
     return jsonResponse(200, { deal: result.deal });
   } catch (err) {
